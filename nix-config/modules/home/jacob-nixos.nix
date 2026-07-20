@@ -60,7 +60,6 @@ in
             kitty
             prismlauncher
             discord
-            makemkv
             proton-vpn
             bolt-launcher
             mullvad-browser
