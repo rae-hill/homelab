@@ -71,6 +71,7 @@ in
             dmidecode
             popsicle
             google-fonts
+            font-awesome
             affinity-photo
             affinity-designer
             affinity-publisher
