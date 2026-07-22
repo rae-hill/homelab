@@ -40,7 +40,7 @@ in
 
         # UniFi controller configuration
         unifi.defaults = {
-          url = "https://192.168.1.1"; # TODO: replace with actual controller IP/hostname
+          url = "https://10.76.100.1"; 
           user = "unpoller";
           pass = config.sops.secrets.unpoller_password.path;
           sites = "all";
