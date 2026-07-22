@@ -136,6 +136,13 @@ in
             ];
             metrics_path = "/metrics";
           }
+          {
+            job_name = "unpoller";
+            static_configs = [
+              { targets = [ "127.0.0.1:${toString c.services.unpoller.port}" ]; }
+            ];
+            metrics_path = "/metrics";
+          }
         ];
 
         exporters.node = {

@@ -205,6 +205,10 @@ in
         port = 11434;
       };
 
+      unpoller = {
+        port = 9130;
+      };
+
       tailscale-metrics = {
         port = 5252;
       };

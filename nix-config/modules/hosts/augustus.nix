@@ -41,6 +41,7 @@ in
       nixos.alloy
       nixos.tempo
       nixos.grafana
+      nixos.unpoller
       nixos.homelab-api
       nixos.homelab-kanidm
       nixos.homelab-ui

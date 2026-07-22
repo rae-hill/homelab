@@ -207,4 +207,10 @@
   sops.secrets.grafana_pushover_token = {
     owner = "grafana";
   };
+
+  sops.secrets.unpoller_password = {
+    owner = "unifi-poller";
+    group = "unifi-poller";
+    mode = "0400";
+  };
 }

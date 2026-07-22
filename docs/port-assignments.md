@@ -31,6 +31,7 @@ Last updated: 2026-07-14
 | 9095  | Tempo (gRPC server)    | TCP      | 127.0.0.1                | Internal Tempo gRPC                     |
 | 9096  | Loki (gRPC)            | TCP      | 127.0.0.1                | Internal Loki gRPC                      |
 | 9100  | Node Exporter          | TCP      | 127.0.0.1                | System metrics for Prometheus           |
+| 9130  | Unpoller (Prometheus)  | TCP      | 127.0.0.1                | UniFi metrics exporter                  |
 | 9187  | Postgres Exporter      | TCP      | 127.0.0.1                | PostgreSQL metrics for Prometheus       |
 | 12345 | Alloy                  | TCP      | 127.0.0.1                | Log shipper admin UI                    |
 | 19553 | Open WebUI             | TCP      | 127.0.0.1                | AI chat interface (behind Caddy)        |
