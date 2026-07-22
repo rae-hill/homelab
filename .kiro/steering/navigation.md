@@ -54,6 +54,37 @@ nix-config/
 └── secrets/                    # SOPS-encrypted secrets per host
 ```
 
+## NixOS Package & Module Reference
+
+Vendored nixpkgs subtrees provide browsable NixOS module source for determining available options:
+
+| User says                                       | Resolves to                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| NixOS module for `services.X` (stable 26.05)    | `./repos/nixpkgs-26.05/nixos/modules/services/...`                     |
+| NixOS module for `services.X` (unstable/master) | `./repos/nixpkgs-unstable/nixos/modules/services/...`                  |
+| Nix package derivation for X (stable)           | `./repos/nixpkgs-26.05/pkgs/by-name/<two-letter-prefix>/<name>/...`    |
+| Nix package derivation for X (unstable)         | `./repos/nixpkgs-unstable/pkgs/by-name/<two-letter-prefix>/<name>/...` |
+
+### Browsing NixOS Options
+
+To find available NixOS service options, read the module source directly from the vendored repos:
+
+- **Service modules:** `repos/nixpkgs-26.05/nixos/modules/services/<category>/<service>.nix`
+- **Prometheus exporters:** `repos/nixpkgs-26.05/nixos/modules/services/monitoring/prometheus/exporters/<name>.nix`
+- **Package derivations:** `repos/nixpkgs-26.05/pkgs/by-name/<prefix>/<name>/package.nix`
+
+When options differ between branches, prefer the branch matching the host's nixpkgs input:
+
+- Augustus, cicero, praeconinus, nixos → `nixpkgs` (nixos-26.05)
+- Packages from `pkgs-unstable` overlay → `nixpkgs-unstable`
+
+### Updating Vendored Nixpkgs
+
+```sh
+git subtree pull --prefix=repos/nixpkgs-26.05 https://github.com/NixOS/nixpkgs.git nixos-26.05 --squash
+git subtree pull --prefix=repos/nixpkgs-unstable https://github.com/NixOS/nixpkgs.git nixos-unstable --squash
+```
+
 ## Hosts
 
 | Name        | Role                                                                              |

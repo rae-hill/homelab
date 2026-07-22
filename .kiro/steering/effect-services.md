@@ -4,17 +4,20 @@
 
 Upstream monorepos are vendored at `./repos/` as read-only reference material via git subtrees.
 
-| Directory           | Source                                       | Purpose                      |
-| ------------------- | -------------------------------------------- | ---------------------------- |
-| `repos/effect/`     | https://github.com/Effect-TS/effect.git      | Effect runtime & platform    |
-| `repos/kobalte/`    | https://github.com/kobaltedev/kobalte.git    | SolidJS UI component library |
-| `repos/astro/`      | https://github.com/withastro/astro.git       | Astro framework              |
-| `repos/nanostores/` | https://github.com/nanostores/nanostores.git | Nanostores state management  |
+| Directory                 | Source                                       | Purpose                                 |
+| ------------------------- | -------------------------------------------- | --------------------------------------- |
+| `repos/effect/`           | https://github.com/Effect-TS/effect.git      | Effect runtime & platform               |
+| `repos/kobalte/`          | https://github.com/kobaltedev/kobalte.git    | SolidJS UI component library            |
+| `repos/astro/`            | https://github.com/withastro/astro.git       | Astro framework                         |
+| `repos/nanostores/`       | https://github.com/nanostores/nanostores.git | Nanostores state management             |
+| `repos/nixpkgs-26.05/`    | https://github.com/NixOS/nixpkgs.git         | NixOS packages & modules (stable 26.05) |
+| `repos/nixpkgs-unstable/` | https://github.com/NixOS/nixpkgs.git         | NixOS packages & modules (unstable)     |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`
 - Do NOT import from `./repos/` — application code imports from normal package dependencies (e.g. `effect`, `@effect/platform`, `@kobalte/core`, `nanostores`)
 - Key reference packages: `repos/effect/packages/effect/`, `repos/effect/packages/platform/`, `repos/effect/packages/platform-node/`, `repos/kobalte/packages/core/`, `repos/nanostores/`
+- Key NixOS reference paths: `repos/nixpkgs-26.05/nixos/modules/services/`, `repos/nixpkgs-unstable/nixos/modules/services/`, `repos/nixpkgs-26.05/pkgs/`
 
 ### Adding a New Vendored Subtree
 
