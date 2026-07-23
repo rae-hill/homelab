@@ -10,6 +10,10 @@
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
+  hardware.bluetooth = {
+    enable = false;
+  };
+
   networking.hosts = {
     "127.0.0.1" = [
       "ca.plato-splunk.media"
