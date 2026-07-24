@@ -10,9 +10,31 @@ in
       config,
       lib,
       pkgs,
+      pkgs-unstable,
       ...
     }:
+    let
+      cfg = config.services.unpoller;
+
+      configFile = pkgs.writeText "patched_unpoller.json" (
+        lib.generators.toJSON { } {
+          inherit (cfg)
+            poller
+            influxdb
+            loki
+            prometheus
+            unifi
+            ;
+        }
+      );
+    in
     {
+      systemd.services.unifi-poller = {
+        serviceConfig = {
+          ExecStart = lib.mkForce "${pkgs-unstable.unpoller}/bin/unpoller --config ${configFile}";
+        };
+      };
+
       services.unpoller = {
         enable = true;
 
@@ -40,7 +62,7 @@ in
 
         # UniFi controller configuration
         unifi.defaults = {
-          url = "https://10.76.100.1"; 
+          url = "https://10.76.100.1";
           user = "unpoller";
           pass = config.sops.secrets.unpoller_password.path;
           sites = "all";
