@@ -37,7 +37,7 @@ in
         unifi.defaults = {
           url = "https://10.76.100.1";
           user = "unpoller";
-          pass = config.sops.secrets.unpoller_password.path;
+          pass = "file://${config.sops.secrets.unpoller_password.path}";
           sites = [ "all" ];
           verify_ssl = false;
           save_sites = true;
