@@ -40,7 +40,6 @@ in
 
         poller = {
           debug = false;
-          quiet = true;
         };
 
         # Disable InfluxDB — we use Prometheus + Loki
