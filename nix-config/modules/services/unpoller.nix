@@ -54,6 +54,7 @@ in
 
         # Loki output for events, alarms, anomalies, IDS
         loki = {
+          tenant_id = "unpoller_unifi_events";
           url = "http://127.0.0.1:${toString lokiSvc.port}/loki/api/v1/push";
           interval = "2m";
           timeout = "10s";
