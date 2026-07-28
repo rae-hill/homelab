@@ -42,7 +42,7 @@ in
         }
       }
 
-      reverse_proxy localhost:2019
+      metrics
     }
 
     https://mini-jellyfin-metrics.plato-splunk.media {
@@ -55,7 +55,7 @@ in
         }
       }
 
-      reverse_proxy localhost:8096/metrics
+      reverse_proxy 127.0.0.1:8096/metrics
     }
 
     https://jellyfin.plato-splunk.media {
