@@ -32,12 +32,11 @@ in
     }
 
     https://mini-caddy-metrics.plato-splunk.media {
-        tls {
-          client_auth {
-            mode require_and_verify
-            trust_pool file {
-              pem_file ${rootCert}
-            }
+      tls {
+        client_auth {
+          mode require_and_verify
+          trust_pool file {
+            pem_file ${rootCert}
           }
         }
       }
