@@ -29,6 +29,7 @@ in
       
       admin off
       metrics
+      debug
     }
 
     https://mini-caddy-metrics.plato-splunk.media {
