@@ -1,4 +1,13 @@
-{ inputs, lib, config, pkgs, ... }:
+{
+  inputs,
+  lib,
+  config,
+  pkgs,
+  ...
+}:
+let
+  rootCert = ../../../../certs/alford-root.crt;
+in
 {
   programs.zsh = {
     enable = true;
@@ -10,8 +19,49 @@
     pkgs.step-cli
   ];
 
+  environment.etc."caddy_nix/Caddyfile".text = ''
+    {
+      email web@jacob-alford.dev
+      acme_ca https://ca.plato-splunk.media/acme/http/directory
+      acme_ca_root /etc/step/certs/root_ca.crt
+
+      storage file_system /etc/caddy
+      
+      admin off
+    }
+
+    https://mini-caddy-metrics.plato-splunk.media {
+        tls {
+          client_auth {
+            mode require_and_verify
+            trust_pool file {
+              pem_file ${rootCert}
+            }
+          }
+        }
+      }
+
+      metrics
+    }
+
+    https://jellyfin.plato-splunk.media {
+      handle_path /metrics {
+        tls {
+          client_auth {
+            mode require_and_verify
+            trust_pool file {
+              pem_file ${rootCert}
+            }
+          }
+        }
+      }
+
+      reverse_proxy localhost:8096
+    }
+  '';
+
   launchd.daemons.caddy = {
-    command = "${pkgs.caddy}/bin/caddy run --config ${./Caddyfile} --adapter caddyfile";
+    command = "${pkgs.caddy}/bin/caddy run --config /etc/caddy_nix/Caddyfile --adapter caddyfile";
     serviceConfig = {
       KeepAlive = true;
       RunAtLoad = true;
@@ -29,7 +79,8 @@
   nixpkgs.hostPlatform = "aarch64-darwin";
 
   nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.allowUnfreePredicate = pkg:
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
     builtins.elem (lib.getName pkg) [
     ];
 }

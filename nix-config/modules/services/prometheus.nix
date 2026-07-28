@@ -46,6 +46,41 @@ in
             ];
           }
           {
+            job_name = "caddy-mini";
+            static_configs = [
+              { targets = [ "https://mini-caddy-metrics.plato-splunk.media" ]; }
+            ];
+            scheme = "https";
+            tls_config = {
+              ca_file = toString c.ca.rootCert;
+              cert_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/fullchain.pem";
+              key_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/key.pem";
+              server_name = c.ca.metricsDomain;
+            };
+          }
+          {
+            job_name = "jellyfin";
+            static_configs = [
+              { targets = [ "https://jellyfin.plato-splunk.media" ]; }
+            ];
+            metrics_path = "/metrics";
+            scheme = "https";
+            tls_config = {
+              ca_file = toString c.ca.rootCert;
+              cert_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/fullchain.pem";
+              key_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/key.pem";
+              server_name = c.ca.metricsDomain;
+            };
+          }
+          {
             job_name = "loki";
             static_configs = [
               { targets = [ "127.0.0.1:${toString c.services.loki.port}" ]; }
