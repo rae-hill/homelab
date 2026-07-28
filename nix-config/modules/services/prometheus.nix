@@ -48,7 +48,7 @@ in
           {
             job_name = "caddy-mini";
             static_configs = [
-              { targets = [ "https://mini-caddy-metrics.plato-splunk.media" ]; }
+              { targets = [ "mini-caddy-metrics.plato-splunk.media" ]; }
             ];
             scheme = "https";
             tls_config = {
@@ -65,7 +65,7 @@ in
           {
             job_name = "jellyfin";
             static_configs = [
-              { targets = [ "https://jellyfin.plato-splunk.media" ]; }
+              { targets = [ "jellyfin.plato-splunk.media" ]; }
             ];
             metrics_path = "/metrics";
             scheme = "https";
