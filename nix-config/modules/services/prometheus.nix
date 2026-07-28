@@ -65,9 +65,8 @@ in
           {
             job_name = "jellyfin";
             static_configs = [
-              { targets = [ "jellyfin.plato-splunk.media" ]; }
+              { targets = [ "mini-jellyfin-metrics.plato-splunk.media" ]; }
             ];
-            metrics_path = "/metrics";
             scheme = "https";
             tls_config = {
               ca_file = toString c.ca.rootCert;
