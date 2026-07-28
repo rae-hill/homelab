@@ -28,6 +28,7 @@ in
       storage file_system /etc/caddy
       
       admin off
+      metrics
     }
 
     https://mini-caddy-metrics.plato-splunk.media {
@@ -41,7 +42,7 @@ in
         }
       }
 
-      metrics
+      reverse_proxy localhost:2019
     }
 
     https://jellyfin.plato-splunk.media {
