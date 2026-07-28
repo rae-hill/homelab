@@ -44,16 +44,22 @@ in
       reverse_proxy localhost:2019
     }
 
-    https://jellyfin.plato-splunk.media {
-      handle_path /metrics {
-        tls {
-          client_auth {
-            mode require_and_verify
-            trust_pool file {
-              pem_file ${rootCert}
-            }
+    https://mini-jellyfin-metrics.plato-splunk.media {
+      tls {
+        client_auth {
+          mode require_and_verify
+          trust_pool file {
+            pem_file ${rootCert}
           }
         }
+      }
+
+      reverse_proxy localhost:8096/metrics
+    }
+
+    https://jellyfin.plato-splunk.media {
+      handle_path /metrics {
+        redir https://mini-jellyfin-metrics.plato-splunk.media
       }
 
       reverse_proxy localhost:8096
