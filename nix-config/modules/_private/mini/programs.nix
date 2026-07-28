@@ -55,7 +55,7 @@ in
         }
       }
 
-      reverse_proxy localhost:8096/metrics
+      reverse_proxy http://localhost:8096/metrics
     }
 
     https://jellyfin.plato-splunk.media {
