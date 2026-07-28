@@ -59,7 +59,7 @@ in
               key_file = "${
                 config.security.acme.certs."${c.services.prometheus-client.domain}".directory
               }/key.pem";
-              server_name = c.ca.metricsDomain;
+              server_name = "mini-caddy-metrics.plato-splunk.media";
             };
           }
           {
@@ -76,7 +76,7 @@ in
               key_file = "${
                 config.security.acme.certs."${c.services.prometheus-client.domain}".directory
               }/key.pem";
-              server_name = c.ca.metricsDomain;
+              server_name = "mini-jellyfin-metrics.plato-splunk.media";
             };
           }
           {
