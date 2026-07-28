@@ -54,8 +54,9 @@ in
           }
         }
       }
-
-      reverse_proxy 127.0.0.1:8096/metrics
+      
+      rewrite / /metrics
+      reverse_proxy 127.0.0.1:8096
     }
 
     https://jellyfin.plato-splunk.media {
