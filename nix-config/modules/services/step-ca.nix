@@ -104,27 +104,6 @@ in
               };
             };
             provisioners = [
-              # ----------- TODO: remove -----------
-              {
-                type = "ACME";
-                name = "acme";
-                forceCN = true;
-                challenges = [
-                  "http-01"
-                  "dns-01"
-                  "tls-alpn-01"
-                  "device-attest-01"
-                ];
-                claims = {
-                  disableRenewal = false;
-                  allowRenewalAfterExpiry = false;
-                  disableSmallstepExtensions = false;
-                };
-                options = {
-                  x509 = { };
-                };
-              }
-              # ------------------------------------
               {
                 type = "ACME";
                 name = "http";
