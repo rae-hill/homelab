@@ -13,6 +13,7 @@ in
 
       darwin.darwin-base
       darwin.nixvim-complete
+      darwin.homebrew
 
       ./../_private/mini/sops.nix
       ./../_private/mini/programs.nix
