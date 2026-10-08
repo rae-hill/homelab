@@ -130,6 +130,13 @@ in
             enable = true;
             enableDefaultConfig = false;
             settings = {
+              "aedilis.plato-splunk.media" = {
+                inherit identityAgent;
+                user = "ubuntu";
+                addKeysToAgent = "yes";
+                forwardAgent = true;
+                identityFile = "~/.ssh/yk_ssh_keys/id_ed25519_sk";
+              };
               "augustus.plato-splunk.media" = {
                 inherit identityAgent;
                 user = "jacob";
