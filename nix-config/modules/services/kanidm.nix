@@ -81,6 +81,9 @@ in
 
             "grafana.access" = { };
             "grafana.admins" = { };
+
+            "technitium.access" = { };
+            "technitium.admins" = { };
           };
 
           persons = {
@@ -134,6 +137,8 @@ in
 
                 "grafana.access"
                 "grafana.admins"
+
+                "technitium.admins"
               ];
             };
             rae = {
@@ -167,6 +172,8 @@ in
 
                 "grafana.access"
                 "grafana.admins"
+
+                "technitium.admins"
               ];
             };
             "g1447dk9fp" = {

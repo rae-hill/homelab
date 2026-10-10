@@ -35,6 +35,9 @@
       mini = {
         system = "aarch64-darwin";
       };
+      aedilis = {
+        system = "x86_64-linux";
+      };
     };
 
     x509PermittedIps = [

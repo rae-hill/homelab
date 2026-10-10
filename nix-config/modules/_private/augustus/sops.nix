@@ -191,6 +191,21 @@
     owner = "kanidm";
   };
 
+  sops.secrets.technitium_client_secret = {
+    owner = "kanidm";
+  };
+
+  # Password for the limited Technitium "prometheus" metrics user, plus its TOTP
+  # seed. Used by the augustus metrics-token oneshot to log in and mint short-lived
+  # bearer tokens for scraping (see docs/aedilis-host-plan.md §6).
+  sops.secrets.technitium_metrics_user_password = {
+    owner = "prometheus";
+  };
+
+  sops.secrets.technitium_metrics_totp_secret = {
+    owner = "prometheus";
+  };
+
   sops.templates."grafana-client-secret" = {
     content = config.sops.placeholder.grafana_client_secret;
     owner = "grafana";

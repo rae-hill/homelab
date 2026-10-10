@@ -4,6 +4,7 @@ keys:
   - &jacob_augustus age1syqnex2sfaa3h2v0gjp553tf8cgc24a3k5y3qz3ww2nvh3cc8cssxwvyg7
   - &jacob_cicero age1zvql35wdg0kf69a9e6rhs5u8yc29jpwq350wp45jhtt9xmhr6qtqvxm9nr
   - &jacob_praeconius age14wpn3v4639t4tvgw0l54paquxd5gyzse8nm8pvkha3m2r3j94q2q2vz4nt
+  - &admin_aedilis age16rnevpzh322shv47krfx3e6da0h88t0yx8ellwpqwe6s6qh6pd8qj2fnwn
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
@@ -13,3 +14,4 @@ creation_rules:
           - *jacob_augustus
           - *jacob_cicero
           - *jacob_praeconius
+          - *admin_aedilis

@@ -134,6 +134,54 @@ in
             metrics_path = "/metrics";
           }
           {
+            job_name = "aedilis-node";
+            scheme = "https";
+            tls_config = {
+              ca_file = toString c.ca.rootCert;
+              cert_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/fullchain.pem";
+              key_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/key.pem";
+              server_name = c.services.dns-metrics.domain;
+            };
+            static_configs = [
+              {
+                targets = [ "${c.services.dns-metrics.domain}:${toString c.services.dns-metrics.port}" ];
+                labels = {
+                  instance = "aedilis";
+                };
+              }
+            ];
+            metrics_path = "/metrics";
+          }
+          {
+            job_name = "aedilis-dns";
+            scheme = "https";
+            # Short-lived bearer token minted by the technitium-metrics-token oneshot.
+            authorization.credentials_file = "/run/technitium-metrics/token";
+            tls_config = {
+              ca_file = toString c.ca.rootCert;
+              cert_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/fullchain.pem";
+              key_file = "${
+                config.security.acme.certs."${c.services.prometheus-client.domain}".directory
+              }/key.pem";
+              server_name = c.services.dns-metrics.domain;
+            };
+            static_configs = [
+              {
+                targets = [ "${c.services.dns-metrics.domain}:${toString c.services.dns-metrics.port}" ];
+                labels = {
+                  instance = "aedilis";
+                };
+              }
+            ];
+            metrics_path = "/api/dashboard/metrics/text";
+          }
+          {
             job_name = "tailscale";
             scheme = "http";
             static_configs = [
@@ -165,6 +213,12 @@ in
                 targets = [ "mini.plato-splunk.media:${toString c.services.tailscale-metrics.port}" ];
                 labels = {
                   instance = "mini";
+                };
+              }
+              {
+                targets = [ "aedilis.plato-splunk.media:${toString c.services.tailscale-metrics.port}" ];
+                labels = {
+                  instance = "aedilis";
                 };
               }
             ];
@@ -257,5 +311,86 @@ in
         "prometheus"
         "prometheus-node-exporter"
       ];
+
+      # ---------------------------------------------------------------------------
+      # Technitium metrics token exchange (aedilis).
+      #
+      # Technitium's /api/dashboard/metrics/text requires a bearer token. We avoid
+      # non-expiring API tokens: a oneshot logs in with a password + TOTP (sops) to
+      # mint a SHORT-LIVED session token, written to /run/technitium-metrics/token,
+      # which the aedilis-dns scrape job reads via authorization.credentials_file.
+      # A timer refreshes it well before the session expires.
+      # See docs/aedilis-host-plan.md §6.
+      # ---------------------------------------------------------------------------
+      systemd.tmpfiles.rules = [
+        "d /run/technitium-metrics 0750 prometheus prometheus -"
+      ];
+
+      systemd.services.technitium-metrics-token =
+        let
+          dnsMetrics = c.services.dns-metrics;
+          promClientCert =
+            config.security.acme.certs."${c.services.prometheus-client.domain}".directory;
+          endpoint = "https://${dnsMetrics.domain}:${toString dnsMetrics.port}";
+          tokenScript = pkgs.writeShellApplication {
+            name = "technitium-metrics-token";
+            runtimeInputs = with pkgs; [
+              curl
+              jq
+              oath-toolkit
+              coreutils
+            ];
+            text = ''
+              set -euo pipefail
+
+              PASS="$(cat "${config.sops.secrets.technitium_metrics_user_password.path}")"
+              TOTP_SECRET="$(cat "${config.sops.secrets.technitium_metrics_totp_secret.path}")"
+              CODE="$(oathtool --totp -b "$TOTP_SECRET")"
+
+              # mTLS login over the Tailscale metrics endpoint.
+              RESP="$(curl -fsS \
+                --cacert "${toString c.ca.rootCert}" \
+                --cert "${promClientCert}/fullchain.pem" \
+                --key "${promClientCert}/key.pem" \
+                "${endpoint}/api/user/login?user=prometheus&pass=$PASS&totp=$CODE&includeInfo=false")"
+
+              TOKEN="$(echo "$RESP" | jq -r '.token // empty')"
+              if [ -z "$TOKEN" ]; then
+                echo "technitium-metrics-token: login failed: $(echo "$RESP" | jq -r '.errorMessage // "unknown"')" >&2
+                exit 1
+              fi
+
+              umask 027
+              printf '%s' "$TOKEN" > /run/technitium-metrics/token
+              chown prometheus:prometheus /run/technitium-metrics/token
+            '';
+          };
+        in
+        {
+          description = "Acquire a short-lived Technitium metrics bearer token";
+          after = [ "network-online.target" ];
+          wants = [ "network-online.target" ];
+          before = [ "prometheus.service" ];
+          wantedBy = [ "prometheus.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            User = "prometheus";
+            Group = "prometheus";
+            ExecStart = lib.getExe tokenScript;
+          };
+        };
+
+      systemd.timers.technitium-metrics-token = {
+        description = "Refresh the Technitium metrics bearer token before expiry";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          # Session timeout on the prometheus user is 3600s (set during aedilis
+          # provisioning); refresh every 20 minutes with jitter.
+          OnBootSec = "2min";
+          OnUnitActiveSec = "20min";
+          RandomizedDelaySec = "60s";
+          Persistent = true;
+        };
+      };
     };
 }

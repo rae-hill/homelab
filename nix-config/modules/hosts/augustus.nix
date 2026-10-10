@@ -45,6 +45,7 @@ in
       nixos.homelab-api
       nixos.homelab-kanidm
       nixos.homelab-ui
+      nixos.technitium-kanidm
 
       ./../_private/augustus/hardware.nix
       ./../_private/augustus/filesystems.nix

@@ -217,6 +217,39 @@ in
         whisperPort = 10300;
         piperPort = 10200;
       };
+
+      technitium = {
+        # Public authoritative/encrypted DNS endpoint (aedilis)
+        subdomain = "dns";
+        domain = mkDomain "dns";
+        url = mkUrl "dns";
+        clientId = "technitium";
+        oidcEndpoint = mkOidcEndpoint "technitium";
+        # DNS protocol ports
+        dnsPort = 53;
+        dotPort = 853; # DNS-over-TLS (tcp) and DNS-over-QUIC (udp)
+        dohPort = 443; # DNS-over-HTTPS (behind Caddy)
+        # Technitium web console (admin UI) — bound to loopback, fronted by Caddy
+        webHttpPort = 5380;
+        webHttpsPort = 53443;
+        # ACME http-01 challenge listener (loopback; Caddy proxies :80 to it)
+        acmePort = 22482;
+        # Admin UI vhost (Tailscale-only, mTLS + OIDC)
+        adminSubdomain = "dns-admin";
+        adminDomain = mkDomain "dns-admin";
+        adminUrl = mkUrl "dns-admin";
+      };
+
+      dns-metrics = {
+        # Technitium metrics endpoint (aedilis), mTLS-guarded, scraped by augustus
+        subdomain = "dns-metrics";
+        domain = mkDomain "dns-metrics";
+        url = mkUrl "dns-metrics";
+        port = 8443;
+        acmePort = 22481;
+        # node_exporter on the aedilis host
+        nodeExporterPort = 9100;
+      };
     };
   };
 }

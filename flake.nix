@@ -152,6 +152,11 @@
                   help = "Rebuild Praeconinus over ssh";
                   command = "nixos-rebuild --target-host jacob@praeconinus.neko-bicolor.ts.net switch --flake .#praeconinus --sudo --ask-sudo-password";
                 }
+                {
+                  name = "remote-build-aedilis";
+                  help = "Rebuild Aedilis over ssh";
+                  command = "nixos-rebuild --target-host jacob@aedilis.neko-bicolor.ts.net switch --flake .#aedilis --sudo --ask-sudo-password";
+                }
               ];
             };
           };

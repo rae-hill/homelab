@@ -2,7 +2,7 @@
 
 This document tracks all port assignments across homelab hosts to prevent conflicts.
 
-Last updated: 2026-07-14
+Last updated: 2026-10-10
 
 ---
 
@@ -98,6 +98,26 @@ Last updated: 2026-07-14
 | 443  | Caddy             | TCP      | 0.0.0.0         | HTTPS reverse proxy         |
 | 5252 | Tailscale metrics | TCP      | tailscale0 only | Prometheus scrape target    |
 | 8096 | Jellyfin          | TCP      | localhost       | Media server (behind Caddy) |
+
+---
+
+## Aedilis (Authoritative DNS - OVHCloud VPS)
+
+Runs Technitium DNS. Authoritative-only on plain 53 (recursion locked to trusted ACLs); encrypted
+transports (DoH/DoT/DoQ) public; admin UI + metrics gated behind Tailscale + mTLS.
+
+| Port  | Service                | Protocol | Bind Address    | Notes                                       |
+| ----- | ---------------------- | -------- | --------------- | ------------------------------------------- |
+| 22    | OpenSSH                | TCP      | tailscale0 only | Firewall: tailscale0 interface              |
+| 53    | Technitium DNS         | TCP/UDP  | 0.0.0.0         | Authoritative DNS (public); recursion ACL   |
+| 80    | Caddy (ACME HTTP-01)   | TCP      | 0.0.0.0         | Let's Encrypt challenge + DoH backend (:80) |
+| 443   | Caddy                  | TCP      | 0.0.0.0 / TS    | Public DoH (dns._); admin UI (dns-admin._)  |
+| 853   | Technitium DoT/DoQ     | TCP/UDP  | 0.0.0.0         | DNS-over-TLS (tcp) + DNS-over-QUIC (udp)    |
+| 5252  | Tailscale metrics      | TCP      | tailscale0 only | Prometheus scrape target                    |
+| 5380  | Technitium web console | TCP      | 127.0.0.1       | Admin UI (behind Caddy, loopback)           |
+| 8443  | Caddy metrics vhost    | TCP      | tailscale0 only | mTLS; node_exporter + Technitium metrics    |
+| 9100  | Node Exporter          | TCP      | 127.0.0.1       | Host metrics (behind mTLS Caddy vhost)      |
+| 22481 | dns-metrics ACME       | TCP      | 127.0.0.1       | step-ca http-01 for the metrics cert        |
 
 ---
 
