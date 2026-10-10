@@ -19,6 +19,7 @@
       nixvim-lint
       nixvim-neo-tree
       nixvim-lsp
+      nixvim-conform
       nixvim-barbar
       nixvim-alpha
       nixvim-rzip
@@ -44,6 +45,7 @@
       nixvim-lint
       nixvim-neo-tree
       nixvim-lsp
+      nixvim-conform
       nixvim-barbar
       nixvim-alpha
       nixvim-rzip

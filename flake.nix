@@ -97,6 +97,7 @@
                 # NixOS tooling
                 sops
                 age
+                nixfmt
                 # TypeScript/Node development
                 dprint
                 yarn-berry

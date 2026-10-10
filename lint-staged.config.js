@@ -11,6 +11,7 @@ export default {
     () => "yarn typecheck",
   ],
   "*.nix": [
+    "nixfmt",
     () => "nix flake check --no-build",
   ],
 }

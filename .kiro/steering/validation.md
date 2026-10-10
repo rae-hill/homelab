@@ -8,6 +8,7 @@ Run these commands from the repo root in order:
 
 ```sh
 dprint fmt fmt .
+nixfmt $(git ls-files '*.nix')
 yarn lint --fix
 yarn lint
 yarn typecheck
@@ -20,9 +21,21 @@ yarn test
 
 ```sh
 dprint fmt fmt .
+nixfmt $(git ls-files '*.nix')
 ```
 
-Formats all files in the repo. Run this before linting.
+`dprint` formats everything except Nix (TypeScript, JSON, Markdown, TOML, YAML, CSS, HTML).
+`nixfmt` (RFC style, `pkgs.nixfmt`) formats `.nix` files. These are separate engines:
+
+- **CLI / pre-commit:** `dprint` runs via the `fmt` devshell command; `nixfmt` is wired into
+  `lint-staged.config.js` so staged `.nix` files are formatted on commit, then `nix flake check`
+  runs.
+- **Editor (nixvim):** `conform.nvim` formats `.nix` with the same `nixfmt`, and falls back to the
+  dprint LSP for other filetypes. The `<C-f>` keymap (`_G.format_with_dprint_priority`) routes
+  through conform first, so editor output matches the CLI.
+
+Keep `nixfmt` and `dprint` versions aligned between the devshell (`flake.nix` packages) and the
+nixvim config (`features/nixvim/plugins/conform.nix`) so formatting is deterministic everywhere.
 
 ### Lint
 

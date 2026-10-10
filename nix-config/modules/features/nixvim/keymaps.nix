@@ -139,6 +139,24 @@ let
       programs.nixvim = {
         extraConfigLua = ''
           function _G.format_with_dprint_priority()
+            -- Prefer conform formatters (e.g. nixfmt for .nix). conform falls back
+            -- to the LSP for filetypes it has no formatter for, where the dprint LSP
+            -- handles formatting (TS/JSON/astro/etc.). We keep disallowing the TS/astro
+            -- language servers from formatting so dprint wins there.
+            local ok, conform = pcall(require, "conform")
+            if ok then
+              conform.format({
+                async = true,
+                lsp_format = "fallback",
+                filter = function(client)
+                  local disallowed = { ts_ls = true, astro = true }
+                  return not disallowed[client.name]
+                end,
+              })
+              return
+            end
+
+            -- Fallback: original LSP-only path if conform is unavailable.
             local clients = vim.lsp.get_clients({ bufnr = 0 })
             local has_dprint = false
             for _, c in ipairs(clients) do
