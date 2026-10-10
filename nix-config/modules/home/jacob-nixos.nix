@@ -135,7 +135,7 @@ in
                 user = "ubuntu";
                 addKeysToAgent = "yes";
                 forwardAgent = true;
-                identityFile = "~/.ssh/yk_ssh_keys/id_ed25519_sk";
+                identityFile = "~/.ssh/id_ed25519_signing.pub";
               };
               "augustus.plato-splunk.media" = {
                 inherit identityAgent;
