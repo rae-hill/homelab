@@ -1,4 +1,9 @@
-{ lib, config, pkgs, ... }:
+{
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 {
   # OVHCloud base-image settings (preserved from the provisioned configuration.nix)
   # Workaround for https://github.com/NixOS/nix/issues/8502

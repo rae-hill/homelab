@@ -8,7 +8,7 @@ Run these commands from the repo root in order:
 
 ```sh
 dprint fmt fmt .
-nixfmt $(git ls-files '*.nix')
+nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 yarn lint --fix
 yarn lint
 yarn typecheck
@@ -21,21 +21,27 @@ yarn test
 
 ```sh
 dprint fmt fmt .
-nixfmt $(git ls-files '*.nix')
+nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 ```
 
 `dprint` formats everything except Nix (TypeScript, JSON, Markdown, TOML, YAML, CSS, HTML).
-`nixfmt` (RFC style, `pkgs.nixfmt`) formats `.nix` files. These are separate engines:
+`nixfmt` (RFC style) formats `.nix` files, **excluding the vendored `repos/` subtrees** (read-only
+upstream sources — never reformat them). Invoke it via `nix run .#nixfmt` so you always use the
+flake-pinned `nixfmt` (exposed as `packages.<system>.nixfmt`) rather than whatever is on `PATH` —
+this keeps the version identical across the hook, the devshell, and the editor. These are separate
+engines:
 
-- **CLI / pre-commit:** `dprint` runs via the `fmt` devshell command; `nixfmt` is wired into
-  `lint-staged.config.js` so staged `.nix` files are formatted on commit, then `nix flake check`
-  runs.
-- **Editor (nixvim):** `conform.nvim` formats `.nix` with the same `nixfmt`, and falls back to the
-  dprint LSP for other filetypes. The `<C-f>` keymap (`_G.format_with_dprint_priority`) routes
-  through conform first, so editor output matches the CLI.
+- **CLI / pre-commit:** `dprint` runs via the `fmt` devshell command (which excludes `repos/*`);
+  `nix run .#nixfmt` is wired into `lint-staged.config.js` with a `repos/` filter so staged `.nix`
+  files are formatted on commit, then `nix flake check` runs. Using `nix run .#nixfmt` (not a bare
+  `nixfmt`) is important: git hooks run in a minimal shell that does not inherit the devshell PATH.
+- **Editor (nixvim):** `conform.nvim` formats `.nix` with the same pinned `nixfmt`, and falls back
+  to the dprint LSP for other filetypes. The `<C-f>` keymap (`_G.format_with_dprint_priority`)
+  routes through conform first, so editor output matches the CLI.
 
-Keep `nixfmt` and `dprint` versions aligned between the devshell (`flake.nix` packages) and the
-nixvim config (`features/nixvim/plugins/conform.nix`) so formatting is deterministic everywhere.
+The pinned `nixfmt` is defined once as `packages.<system>.nixfmt = pkgs.nixfmt` in `flake.nix`; the
+devshell, the hook (`.#nixfmt`), and the nixvim config (`features/nixvim/plugins/conform.nix`) all
+resolve to that same version so formatting is deterministic everywhere.
 
 ### Lint
 

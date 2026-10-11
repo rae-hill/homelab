@@ -77,6 +77,11 @@
           {
             formatter = pkgs.dprint;
 
+            # Expose the pinned nixfmt so git hooks / CI format Nix with the SAME
+            # version as the devshell and the nixvim editor config (deterministic).
+            # Invoke via `nix run .#nixfmt`.
+            packages.nixfmt = pkgs.nixfmt;
+
             checks = {
               formatting =
                 pkgs.runCommand "check-formatting"

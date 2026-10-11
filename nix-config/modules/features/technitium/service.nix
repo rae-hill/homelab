@@ -63,21 +63,18 @@ in
           DNS_SERVER_OPTIONAL_PROTOCOL_DNS_OVER_HTTP = "true";
 
           # Admin bootstrap password (first boot only).
-          DNS_SERVER_ADMIN_PASSWORD_FILE =
-            config.sops.secrets.technitium_admin_password.path;
+          DNS_SERVER_ADMIN_PASSWORD_FILE = config.sops.secrets.technitium_admin_password.path;
 
           # Authoritative-only on plain UDP/53: recursion restricted to trusted ACLs
           # (Tailscale CGNAT + ULA + loopback). Prevents DNS amplification abuse.
           DNS_SERVER_RECURSION = "UseSpecifiedNetworkACL";
-          DNS_SERVER_RECURSION_NETWORK_ACL =
-            "100.64.0.0/10,fd7a:115c:a1e0::/48,127.0.0.1,::1";
+          DNS_SERVER_RECURSION_NETWORK_ACL = "100.64.0.0/10,fd7a:115c:a1e0::/48,127.0.0.1,::1";
 
           # OIDC/SSO against Kanidm (client registered on augustus).
           DNS_SERVER_SSO_ENABLED = "true";
           DNS_SERVER_SSO_AUTHORITY = "https://${c.idm.domain}/oauth2/openid/${tech.clientId}";
           DNS_SERVER_SSO_CLIENT_ID = tech.clientId;
-          DNS_SERVER_SSO_CLIENT_SECRET_FILE =
-            config.sops.secrets.technitium_sso_client_secret.path;
+          DNS_SERVER_SSO_CLIENT_SECRET_FILE = config.sops.secrets.technitium_sso_client_secret.path;
           DNS_SERVER_SSO_SCOPES = "openid,profile,email";
           DNS_SERVER_SSO_ALLOW_SIGNUP = "true";
           DNS_SERVER_SSO_ALLOW_SIGNUP_ONLY_FOR_MAPPED_USERS = "true";
