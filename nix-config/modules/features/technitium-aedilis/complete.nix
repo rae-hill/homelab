@@ -34,6 +34,43 @@ let
           ];
         };
 
+        # DNSSEC validation on the recursive side (protects trusted clients from
+        # forged upstream answers). Zone signing is per-zone, done when zones exist.
+        dnssecValidation = true;
+
+        # Per-client QPM rate limiting to blunt UDP reflection/amplification on the
+        # public authoritative service. Over-limit UDP gets TC=1 (TCP retry) for 50%,
+        # the rest dropped. Defaults from the module are sane; set explicitly here.
+        rateLimit = {
+          enable = true;
+          sampleMinutes = 5;
+          udpTruncationPercentage = 50;
+          ipv4 = [
+            {
+              prefix = 32;
+              udpLimit = 600;
+              tcpLimit = 600;
+            }
+            {
+              prefix = 24;
+              udpLimit = 6000;
+              tcpLimit = 6000;
+            }
+          ];
+          ipv6 = [
+            {
+              prefix = 64;
+              udpLimit = 1200;
+              tcpLimit = 1200;
+            }
+            {
+              prefix = 56;
+              udpLimit = 6000;
+              tcpLimit = 6000;
+            }
+          ];
+        };
+
         oidc = {
           enable = true;
           authority = "https://${c.idm.domain}/oauth2/openid/${tech.clientId}";
@@ -62,6 +99,9 @@ let
         provision = {
           enable = true;
           provisionDoTDoQCert = true;
+          # Order the provisioner after the public DNS cert exists (needed for the
+          # PKCS#12 conversion), without the generic module touching security.acme.
+          certReadyUnits = [ "acme-${tech.domain}.service" ];
           metricsUser = {
             enable = true;
             username = "prometheus";

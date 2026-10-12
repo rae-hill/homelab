@@ -324,13 +324,15 @@ in
       # ---------------------------------------------------------------------------
       systemd.tmpfiles.rules = [
         "d /run/technitium-metrics 0750 prometheus prometheus -"
+        # Pre-create an empty token file so Prometheus' credentials_file always
+        # exists even before the first successful token exchange (empty = clean 401).
+        "f /run/technitium-metrics/token 0640 prometheus prometheus -"
       ];
 
       systemd.services.technitium-metrics-token =
         let
           dnsMetrics = c.services.dns-metrics;
-          promClientCert =
-            config.security.acme.certs."${c.services.prometheus-client.domain}".directory;
+          promClientCert = config.security.acme.certs."${c.services.prometheus-client.domain}".directory;
           endpoint = "https://${dnsMetrics.domain}:${toString dnsMetrics.port}";
           tokenScript = pkgs.writeShellApplication {
             name = "technitium-metrics-token";
@@ -343,6 +345,27 @@ in
             text = ''
               set -euo pipefail
 
+              TOKEN_FILE=/run/technitium-metrics/token
+
+              # Ensure the file always exists so Prometheus config load never fails
+              # on a missing credentials_file. An empty token yields a clean 401
+              # (target DOWN) rather than a silent stale-token success.
+              if [ ! -e "$TOKEN_FILE" ]; then
+                umask 027
+                : > "$TOKEN_FILE"
+                chown prometheus:prometheus "$TOKEN_FILE"
+              fi
+
+              # On any failure, blank the token so a stale/expired one is not left in
+              # place (would otherwise 401 silently until the next successful run).
+              fail() {
+                echo "technitium-metrics-token: $1" >&2
+                umask 027
+                : > "$TOKEN_FILE"
+                chown prometheus:prometheus "$TOKEN_FILE"
+                exit 1
+              }
+
               PASS="$(cat "${config.sops.secrets.technitium_metrics_user_password.path}")"
               TOTP_SECRET="$(cat "${config.sops.secrets.technitium_metrics_totp_secret.path}")"
               CODE="$(oathtool --totp -b "$TOTP_SECRET")"
@@ -352,17 +375,17 @@ in
                 --cacert "${toString c.ca.rootCert}" \
                 --cert "${promClientCert}/fullchain.pem" \
                 --key "${promClientCert}/key.pem" \
-                "${endpoint}/api/user/login?user=prometheus&pass=$PASS&totp=$CODE&includeInfo=false")"
+                "${endpoint}/api/user/login?user=prometheus&pass=$PASS&totp=$CODE&includeInfo=false")" \
+                || fail "login request failed (aedilis reachable over Tailscale?)"
 
               TOKEN="$(echo "$RESP" | jq -r '.token // empty')"
               if [ -z "$TOKEN" ]; then
-                echo "technitium-metrics-token: login failed: $(echo "$RESP" | jq -r '.errorMessage // "unknown"')" >&2
-                exit 1
+                fail "login rejected: $(echo "$RESP" | jq -r '.errorMessage // "unknown"')"
               fi
 
               umask 027
-              printf '%s' "$TOKEN" > /run/technitium-metrics/token
-              chown prometheus:prometheus /run/technitium-metrics/token
+              printf '%s' "$TOKEN" > "$TOKEN_FILE"
+              chown prometheus:prometheus "$TOKEN_FILE"
             '';
           };
         in

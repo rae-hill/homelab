@@ -61,8 +61,9 @@
             '';
           };
 
-        # Caddy needs read access to the technitium-group-owned certs.
-        users.groups.${cfg.group}.members = [ "caddy" ];
+        # Caddy needs read access to the admin + metrics ACME certs (owned by the
+        # dedicated cert group) — NOT the service group or any secrets.
+        users.groups.${cfg.certGroup}.members = [ "caddy" ];
       };
     };
 }

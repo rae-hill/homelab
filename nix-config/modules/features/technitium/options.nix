@@ -35,7 +35,19 @@
         group = mkOption {
           type = types.str;
           default = "technitium";
-          description = "System group for the service (cert/secret read access).";
+          description = "System group the service runs under (service process group).";
+        };
+
+        certGroup = mkOption {
+          type = types.str;
+          default = "technitium-certs";
+          description = ''
+            Group that owns the Caddy/Alloy-consumed ACME certs (admin + metrics).
+            Caddy and Alloy join this group so they can read the certs WITHOUT being
+            members of the service `group` (which would otherwise grant them nothing
+            useful but widens the blast radius). The service `user` reads the public
+            DNS cert directly as the cert owner.
+          '';
         };
 
         webHttpPort = mkOption {
@@ -53,6 +65,18 @@
           type = types.bool;
           default = true;
           description = "Prefer IPv6 for outbound resolution (DNS_SERVER_PREFER_IPV6).";
+        };
+
+        dnssecValidation = mkOption {
+          type = types.bool;
+          default = true;
+          description = ''
+            Validate DNSSEC signatures on recursive answers (resolver side). Protects
+            trusted clients from forged/poisoned upstream responses. Applied via the
+            settings API during provisioning. Note: this is the VALIDATION side only;
+            signing authoritative zones is a per-zone operation done when zones are
+            created.
+          '';
         };
 
         recursion = {
@@ -84,6 +108,94 @@
               Network ACL entries for recursion (DNS_SERVER_RECURSION_NETWORK_ACL),
               joined to a comma-separated list. Prefix an entry with `!` to deny.
             '';
+          };
+        };
+
+        rateLimit = {
+          enable = mkEnableOption "per-client query-per-minute (QPM) rate limiting";
+
+          sampleMinutes = mkOption {
+            type = types.int;
+            default = 5;
+            description = "Sampling window in minutes for the QPM average (qpmLimitSampleMinutes).";
+          };
+
+          udpTruncationPercentage = mkOption {
+            type = types.int;
+            default = 50;
+            description = ''
+              Percentage of over-limit UDP requests answered with TC=1 (forcing a TCP
+              retry) rather than dropped (qpmLimitUdpTruncationPercentage). Mitigates
+              UDP reflection/amplification while keeping legitimate clients working.
+            '';
+          };
+
+          ipv4 = mkOption {
+            type = types.listOf (
+              types.submodule {
+                options = {
+                  prefix = mkOption {
+                    type = types.int;
+                    description = "IPv4 prefix length the limit applies to (e.g. 32).";
+                  };
+                  udpLimit = mkOption {
+                    type = types.int;
+                    description = "Max UDP queries/min for a subnet of this prefix (0 = unlimited).";
+                  };
+                  tcpLimit = mkOption {
+                    type = types.int;
+                    description = "Max TCP queries/min for a subnet of this prefix (0 = unlimited).";
+                  };
+                };
+              }
+            );
+            default = [
+              {
+                prefix = 32;
+                udpLimit = 600;
+                tcpLimit = 600;
+              }
+              {
+                prefix = 24;
+                udpLimit = 6000;
+                tcpLimit = 6000;
+              }
+            ];
+            description = "IPv4 QPM prefix limits (qpmPrefixLimitsIPv4), rendered as pipe-separated rows.";
+          };
+
+          ipv6 = mkOption {
+            type = types.listOf (
+              types.submodule {
+                options = {
+                  prefix = mkOption {
+                    type = types.int;
+                    description = "IPv6 prefix length the limit applies to (e.g. 64).";
+                  };
+                  udpLimit = mkOption {
+                    type = types.int;
+                    description = "Max UDP queries/min for a subnet of this prefix (0 = unlimited).";
+                  };
+                  tcpLimit = mkOption {
+                    type = types.int;
+                    description = "Max TCP queries/min for a subnet of this prefix (0 = unlimited).";
+                  };
+                };
+              }
+            );
+            default = [
+              {
+                prefix = 64;
+                udpLimit = 1200;
+                tcpLimit = 1200;
+              }
+              {
+                prefix = 56;
+                udpLimit = 6000;
+                tcpLimit = 6000;
+              }
+            ];
+            description = "IPv6 QPM prefix limits (qpmPrefixLimitsIPv6), rendered as pipe-separated rows.";
           };
         };
 
@@ -190,6 +302,19 @@
             description = ''
               Convert the encryptedDns cert to PKCS#12 and enable DoT/DoQ/DoH via the
               Technitium settings API. Only meaningful when encryptedDns.enable is set.
+            '';
+          };
+
+          certReadyUnits = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            example = [ "acme-dns.example.com.service" ];
+            description = ''
+              Extra systemd units the provisioning oneshot should order `after` and
+              `wants` — typically the ACME cert unit(s) that must produce the
+              encrypted-DNS cert before the PKCS#12 conversion. Keeps the generic
+              module decoupled from `security.acme` (the consuming layer supplies the
+              exact unit names).
             '';
           };
 

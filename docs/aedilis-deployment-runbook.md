@@ -1,7 +1,9 @@
 # Aedilis Deployment Runbook
 
 Status: **runbook** — step-by-step first deployment of the `aedilis` Technitium DNS host.
-Date: 2026-10-11
+Date: 2026-10-12 (updated for the configurable-module refactor:
+`services.technitium-server-complete`, native DoH/DoT/DoQ, admin UI on `:8443` OIDC-only,
+metrics on `:9443` mTLS).
 
 This runbook covers the full bring-up sequence for `aedilis`, an OVHCloud VPS running Technitium
 DNS. It accounts for the bootstrapping ordering problem: **aedilis cannot reach Kanidm or step-ca
@@ -22,8 +24,10 @@ retries) in the right order.
   — SSH is only firewalled to `tailscale0` in the final config, but on the stock OVH image (before
   the first switch) SSH is still open on the public interface.
 - `secrets/aedilis.yaml` committed and encrypted to **both** your personal age key and the aedilis
-  host age key (see `.sops.yaml`). The five technitium secrets + `step_jwk_provisioner_password`
-  must be present.
+  host age key (see `.sops.yaml`). Required: `technitium_admin_password`,
+  `technitium_sso_client_secret`, `technitium_pkcs12_password`, `technitium_metrics_user_password`,
+  and `step_jwk_provisioner_password`. (The metrics **TOTP seed** is server-generated on aedilis
+  during provisioning — not pre-seeded here.)
 - On **augustus**, `secrets/augustus.yaml` must contain `technitium_client_secret`,
   `technitium_metrics_user_password`, and `technitium_metrics_totp_secret`. The TOTP secret value is
   **not known yet** — it is generated on aedilis during provisioning (step 6). Seed it with a
@@ -130,12 +134,15 @@ ls -l /run/secrets/                  # should list the technitium_* secrets
 
 - `acme-dns.plato-splunk.media` — Let's Encrypt HTTP-01 needs public port 80 reachable; should
   actually SUCCEED here if the OVH firewall allows 80 inbound. If it fails, check port 80.
-- `acme-dns-metrics.plato-splunk.media` — needs step-ca over Tailscale → **will fail** until step 5+6.
-- `technitium-provision` — needs the ACME cert for the public domain; retries (Restart=on-failure).
+- `acme-dns-admin.plato-splunk.media` and `acme-dns-metrics.plato-splunk.media` — step-ca certs,
+  need step-ca over Tailscale → **will fail** until steps 5+6.
+- `technitium-provision` — needs the public ACME cert for the DoH/DoT/DoQ PKCS#12; retries
+  (`Restart=on-failure`).
 - `alloy` — needs the dns-metrics cert → will fail until step 6.
 - `ssh-cert-renewer` — needs step-ca over Tailscale → will fail until step 6 (daily timer retries).
 
-The core `technitium-dns-server` should be **running** (it does not depend on the certs to start):
+The core `technitium-dns-server` should be **running** (it does not depend on the certs to start;
+plain DNS on 53 works immediately, encrypted transports come online after provisioning):
 
 ```sh
 systemctl status technitium-dns-server
@@ -166,10 +173,10 @@ SSH/admin/metrics only on `tailscale0`, so from here on prefer the tailnet name
 
 In the Tailscale admin console (ACL editor), grant `aedilis` access to:
 
-- **step-ca** on cicero (ACME for the dns-metrics cert + ssh host cert renewal).
+- **step-ca** on cicero (ACME for the dns-admin + dns-metrics certs + ssh host cert renewal).
 - **Kanidm** (`idm.plato-splunk.media`) for OIDC discovery/token (admin-UI SSO).
 - **augustus Loki push** endpoint (Alloy log shipping) and the metrics scrape path (augustus →
-  aedilis `dns-metrics:8443`).
+  aedilis `dns-metrics:9443`).
 
 Example ACL grant (adapt to your policy syntax):
 
@@ -182,17 +189,23 @@ Example ACL grant (adapt to your policy syntax):
     "augustus:*"                     // loki-push + general
   ]
 }
-// And allow augustus -> aedilis for the metrics scrape:
+// And allow augustus -> aedilis for the metrics scrape + admin UI + TS metrics:
 {
   "src": ["augustus"],
-  "dst": ["aedilis:8443", "aedilis:5252"]
+  "dst": ["aedilis:9443", "aedilis:5252"]
+}
+// Allow your workstation/devices to reach the admin UI over Tailscale:
+{
+  "src": ["autogroup:member"],
+  "dst": ["aedilis:8443"]
 }
 ```
 
 After saving the ACLs, trigger the dependent units on aedilis:
 
 ```sh
-# On aedilis — force the internal cert + provisioning now that step-ca is reachable:
+# On aedilis — force the internal certs + provisioning now that step-ca is reachable:
+sudo systemctl start acme-dns-admin.plato-splunk.media.service
 sudo systemctl start acme-dns-metrics.plato-splunk.media.service
 sudo systemctl status acme-dns-metrics.plato-splunk.media.service
 
@@ -254,22 +267,23 @@ sudo systemctl reload prometheus || sudo systemctl restart prometheus
 ### DNS (public, from off-network)
 
 ```sh
-# Plain DNS (authoritative only — recursion is ACL-restricted):
+# Plain DNS (authoritative only — recursion is ACL-restricted to Tailscale):
 dig @aedilis-public-ip <a-zone-you-host>        # should answer authoritatively
 dig @aedilis-public-ip google.com               # should REFUSE/not recurse for untrusted clients
 
-# DoT:
-kdig -d @aedilis-public-ip +tls <zone>          # port 853 TCP
-# DoH (via Caddy on 443):
+# DoT (Technitium-native TLS on 853/tcp):
+kdig -d @aedilis-public-ip +tls <zone>
+# DoH (Technitium-native TLS on 443):
 curl -s "https://dns.plato-splunk.media/dns-query?name=<zone>&type=A" \
   -H 'accept: application/dns-json'
-# DoQ (if your client supports it): port 853 UDP
+# DoQ (if your client supports it): 853/udp
+# From a trusted Tailscale client, recursion should work over the encrypted transports.
 ```
 
-### Admin UI (Tailscale + mTLS + OIDC)
+### Admin UI (Tailscale + OIDC, no mTLS)
 
-- Browse to `https://dns-admin.plato-splunk.media` over Tailscale, presenting your **client
-  certificate** (the mTLS gate). You should then be able to log in via Kanidm SSO.
+- Browse to `https://dns-admin.plato-splunk.media:8443` **over Tailscale**. No client cert is
+  required (Tailscale network + OIDC are the gates). You should be redirected to Kanidm SSO.
 - Verify SSO: the `technitium.admins` Kanidm group maps to Technitium `Administrators`.
 
 ### Metrics (from augustus)
@@ -279,9 +293,9 @@ curl -s "https://dns.plato-splunk.media/dns-query?name=<zone>&type=A" \
 curl -s --cacert <root-ca> \
   --cert <prometheus-client-cert> --key <prometheus-client-key> \
   -H "Authorization: Bearer $(cat /run/technitium-metrics/token)" \
-  https://dns-metrics.plato-splunk.media:8443/api/dashboard/metrics/text | head
+  https://dns-metrics.plato-splunk.media:9443/api/dashboard/metrics/text | head
 # Node exporter via the same mTLS vhost:
-curl -s --cacert ... --cert ... --key ... https://dns-metrics.plato-splunk.media:8443/metrics | head
+curl -s --cacert ... --cert ... --key ... https://dns-metrics.plato-splunk.media:9443/metrics | head
 ```
 
 In Grafana/Prometheus, confirm the `aedilis-node`, `aedilis-dns`, and `tailscale{instance=aedilis}`
@@ -295,25 +309,25 @@ targets are **UP**.
 
 ## 9. Debugging cheatsheet
 
-| Symptom                                    | Check                                                                                                                                                                      |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `technitium-provision` keeps restarting    | `journalctl -u technitium-provision` — it fails fast with the Technitium `errorMessage`. Common causes: admin password mismatch (sops), ACME cert not yet present.         |
-| Public cert won't issue                    | `journalctl -u acme-dns.plato-splunk.media` — ensure OVH security group allows inbound 80; Caddy's `:80` vhost proxies `/.well-known/acme-challenge` to the acme listener. |
-| Metrics cert won't issue                   | step-ca unreachable → verify Tailscale ACLs (step 6); `journalctl -u acme-dns-metrics.plato-splunk.media`.                                                                 |
-| DoH returns 502                            | Technitium DoH-over-HTTP listener not relocated. Re-run `technitium-provision`; confirm `dnsOverHttpPort=8053` via the admin UI Settings.                                  |
-| DoT/DoQ not listening on 853               | provisioning `settings/set` for DoT/DoQ failed — check provision logs; confirm PKCS#12 exists at `/var/lib/technitium-dns-server/dns.pfx`.                                 |
-| Admin SSO redirect error                   | OIDC `originUrl` in the Kanidm client must match Technitium's real callback. Check `journalctl -u kanidm` on augustus and Technitium web logs.                             |
-| Metrics scrape 401/invalid-token           | augustus token oneshot failed → `journalctl -u technitium-metrics-token`; verify TOTP seed + password match between hosts; re-run the service.                             |
-| Prometheus won't load config               | `/run/technitium-metrics/token` missing → start `technitium-metrics-token.service` before prometheus.                                                                      |
-| SSH host cert missing                      | `journalctl -u ssh-cert-renewer` — needs step-ca over Tailscale + the JWK provisioner key on the box.                                                                      |
-| sops secrets absent (`/run/secrets` empty) | aedilis host age key not a recipient, or `/home/admin/.config/sops/age/keys.txt` missing → `journalctl -u sops-nix`.                                                       |
+| Symptom                                    | Check                                                                                                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `technitium-provision` keeps restarting    | `journalctl -u technitium-provision` — it fails fast with the Technitium `errorMessage`. Common causes: admin password mismatch (sops), public ACME cert not yet present.   |
+| Public cert won't issue                    | `journalctl -u acme-dns.plato-splunk.media` — ensure OVH security group allows inbound 80; Caddy's `:80` vhost proxies `/.well-known/acme-challenge` to the acme listener.  |
+| Admin/metrics cert won't issue             | step-ca unreachable → verify Tailscale ACLs (step 6); `journalctl -u acme-dns-admin.plato-splunk.media` / `acme-dns-metrics...`.                                            |
+| DoH/DoT/DoQ not listening (443/853)        | `technitium-provision` `settings/set` failed → check provision logs; confirm the PKCS#12 exists at `/var/lib/technitium-dns-server/dns.pfx` and the public cert is present. |
+| Admin UI unreachable                       | It's bound to `tailscale0:8443` — must be reached over Tailscale. Confirm the Tailscale ACL allows your device → `aedilis:8443`.                                            |
+| Admin SSO redirect error                   | OIDC `originUrl` in the Kanidm client must match Technitium's real callback. Check `journalctl -u kanidm` on augustus and Technitium web logs.                              |
+| Metrics scrape 401/invalid-token           | augustus token oneshot failed → `journalctl -u technitium-metrics-token`; verify TOTP seed + password match between hosts; re-run the service.                              |
+| Prometheus won't load config               | `/run/technitium-metrics/token` missing → start `technitium-metrics-token.service` before prometheus.                                                                       |
+| SSH host cert missing                      | `journalctl -u ssh-cert-renewer` — needs step-ca over Tailscale + the JWK provisioner key on the box.                                                                       |
+| sops secrets absent (`/run/secrets` empty) | aedilis host age key not a recipient, or `/home/admin/.config/sops/age/keys.txt` missing → `journalctl -u sops-nix`.                                                        |
 
 ### Useful one-liners (on aedilis)
 
 ```sh
 systemctl --failed
 sudo journalctl -u technitium-dns-server -u technitium-provision -u caddy -u alloy --since "10 min ago"
-sudo ss -tlnp | grep -E ':(53|80|443|853|5380|8053|8443)'   # who is listening where
+sudo ss -tlnp | grep -E ':(53|80|443|853|5380|8443|9443|9100)'   # who is listening where
 sudo tailscale status
 ```
 

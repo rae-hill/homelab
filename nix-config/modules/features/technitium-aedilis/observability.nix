@@ -86,14 +86,14 @@
           }
         '';
 
-        # Static user with group-based cert access (certs are owned by cfg.group).
+        # Static user with group-based cert access (metrics cert owned by certGroup).
         systemd.services.alloy.serviceConfig = {
           DynamicUser = lib.mkForce false;
           User = "alloy";
           Group = "alloy";
           SupplementaryGroups = [
             "systemd-journal"
-            cfg.group
+            cfg.certGroup
           ];
         };
 

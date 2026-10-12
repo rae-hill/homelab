@@ -16,6 +16,9 @@ in
       lib,
       ...
     }:
+    let
+      cfg = config.services.technitium-server-complete;
+    in
     {
       imports = [ inputs.self.modules.nixos.acme ];
 
@@ -23,13 +26,14 @@ in
       services.homelab-acme.defaultCA = "internal";
 
       # Public cert for the DNS endpoint (Let's Encrypt, HTTP-01 on port 80 — which
-      # is now fully free since Technitium no longer uses it). Consumed by Technitium.
+      # is now fully free since Technitium no longer uses it). Consumed by the
+      # Technitium service (converted to PKCS#12), so owned by the service group.
       security.acme.certs."${tech.domain}" = {
         domain = tech.domain;
         email = "rae@plato-splunk.media";
         server = "https://acme-v02.api.letsencrypt.org/directory";
         listenHTTP = "127.0.0.1:${toString tech.acmePort}";
-        group = tech.clientId; # "technitium" group owns the cert for the service
+        group = cfg.group; # "technitium" — service reads it for the PKCS#12 conversion
         reloadServices = [
           "caddy.service"
           "technitium-dns-server.service"
@@ -37,21 +41,23 @@ in
         ];
       };
 
-      # step-ca cert for the admin UI vhost (Caddy).
+      # step-ca cert for the admin UI vhost (Caddy). Owned by the dedicated cert
+      # group so Caddy can read it without joining the service group.
       security.acme.certs."${tech.adminDomain}" = {
         domain = tech.adminDomain;
         listenHTTP = "127.0.0.1:${toString tech.adminAcmePort}";
         server = c.ca.acmeDirectoryHttp;
-        group = "technitium";
+        group = cfg.certGroup;
         reloadServices = [ "caddy.service" ];
       };
 
       # step-ca cert for the metrics vhost (Caddy) + Alloy client cert (Loki push).
+      # Both Caddy and Alloy are members of the cert group.
       security.acme.certs."${dnsMetrics.domain}" = {
         domain = dnsMetrics.domain;
         listenHTTP = "127.0.0.1:${toString dnsMetrics.acmePort}";
         server = c.ca.acmeDirectoryHttp;
-        group = "technitium";
+        group = cfg.certGroup;
         reloadServices = [
           "caddy.service"
           "alloy.service"

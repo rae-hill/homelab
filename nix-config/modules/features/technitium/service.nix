@@ -46,14 +46,18 @@
           openFirewall = false;
         };
 
-        # Static user/group so the service can read sops secrets and ACME certs via
-        # group ownership (upstream defaults to DynamicUser = true, which cannot).
+        # Static user/group so the service can read sops secrets and the public DNS
+        # cert via ownership (upstream defaults to DynamicUser = true, which cannot).
         users.users.${cfg.user} = {
           isSystemUser = true;
           group = cfg.group;
           home = cfg.stateDir;
         };
         users.groups.${cfg.group} = { };
+
+        # Dedicated group for Caddy/Alloy-consumed ACME certs (admin + metrics), so
+        # those services get cert read access without joining the service group.
+        users.groups.${cfg.certGroup} = { };
 
         systemd.services.technitium-dns-server = {
           serviceConfig = {
@@ -64,6 +68,14 @@
             # Allow binding privileged DNS/TLS ports (53, 443, 853).
             AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
             CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
+            # Additional syscall hardening on top of the upstream sandbox (which is
+            # retained via module merge). @system-service minus privileged/raw-io.
+            SystemCallFilter = [
+              "@system-service"
+              "~@privileged"
+              "~@resources"
+            ];
+            SystemCallArchitectures = "native";
           };
 
           # First-boot bootstrap environment. NOTE: Technitium reads these ONLY when

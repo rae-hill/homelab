@@ -22,7 +22,22 @@
       doCert = cfg.encryptedDns.enable && cfg.provision.provisionDoTDoQCert;
       doMetricsUser = cfg.provision.metricsUser.enable;
       doTotp = doMetricsUser && cfg.provision.metricsUser.totp.enable;
+      doRateLimit = cfg.rateLimit.enable;
       mu = cfg.provision.metricsUser;
+
+      inherit (lib) concatStringsSep concatMapStringsSep;
+
+      # Technitium renders QPM prefix limits as pipe-separated rows:
+      #   prefix|udpLimit|tcpLimit|prefix|udpLimit|tcpLimit...
+      renderQpm =
+        rows:
+        concatMapStringsSep "|" (
+          r: "${toString r.prefix}|${toString r.udpLimit}|${toString r.tcpLimit}"
+        ) rows;
+      qpmV4 = renderQpm cfg.rateLimit.ipv4;
+      qpmV6 = renderQpm cfg.rateLimit.ipv6;
+
+      boolStr = b: if b then "true" else "false";
 
       provisionScript = pkgs.writeShellApplication {
         name = "technitium-provision";
@@ -41,6 +56,23 @@
           ${optionalString doCert ''PKCS12_PASS="$(cat "${cfg.encryptedDns.pkcs12PasswordFile}")"''}
 
           API="${apiBase}"
+
+          # --- 0. Wait for Technitium to be ready ---------------------------------
+          # Poll the unauthenticated status endpoint instead of a fixed sleep, so the
+          # first-boot ordering is deterministic. Bounded to ~60s; the unit's
+          # Restart=on-failure covers longer startups.
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -fsS "$API/api/status" >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "technitium-provision: Technitium API not ready at $API after ~60s" >&2
+            exit 1
+          fi
 
           # --- helpers -------------------------------------------------------------
           # api_call <description> <path> [curl --data-urlencode args...] — fails fast
@@ -87,8 +119,27 @@
             exit 1
           fi
 
+          # --- 2. Global DNS settings: DNSSEC validation + QPM rate limiting ------
+          api_call "set DNSSEC validation" \
+            "api/settings/set" \
+            --data-urlencode "dnssecValidation=${boolStr cfg.dnssecValidation}" \
+            >/dev/null
+
+          ${optionalString doRateLimit ''
+            # Per-client QPM limits blunt UDP reflection/amplification on the public
+            # authoritative service while letting legitimate clients through (over-limit
+            # UDP gets TC=1 to force a TCP retry rather than being dropped).
+            api_call "set QPM rate limits" \
+              "api/settings/set" \
+              --data-urlencode "qpmLimitSampleMinutes=${toString cfg.rateLimit.sampleMinutes}" \
+              --data-urlencode "qpmLimitUdpTruncationPercentage=${toString cfg.rateLimit.udpTruncationPercentage}" \
+              --data-urlencode "qpmPrefixLimitsIPv4=${qpmV4}" \
+              --data-urlencode "qpmPrefixLimitsIPv6=${qpmV6}" \
+              >/dev/null
+          ''}
+
           ${optionalString doCert ''
-            # --- 2. Convert managed PEM -> PKCS#12 + enable DoT/DoQ/DoH -----------
+            # --- 3. Convert managed PEM -> PKCS#12 + enable DoT/DoQ/DoH -----------
             if [ ! -f "${cfg.encryptedDns.certPemFile}" ] || [ ! -f "${cfg.encryptedDns.certKeyFile}" ]; then
               echo "technitium-provision: encrypted-DNS cert not found (${cfg.encryptedDns.certPemFile})" >&2
               exit 1
@@ -114,7 +165,7 @@
           ''}
 
           ${optionalString doMetricsUser ''
-            # --- 3. Dedicated "Dashboard view only" group -------------------------
+            # --- 4. Dedicated "Dashboard view only" group -------------------------
             groups_json="$(api_call "list groups" "api/admin/groups/list")"
             if ! printf '%s' "$groups_json" | jq -e \
               '.response.groups[]? | select(.name == "metrics-readonly")' >/dev/null; then
@@ -130,7 +181,7 @@
               --data-urlencode "groupPermissions=metrics-readonly|true|false|false" \
               >/dev/null
 
-            # --- 4. Ensure the limited metrics user -------------------------------
+            # --- 5. Ensure the limited metrics user -------------------------------
             users_json="$(api_call "list users" "api/admin/users/list")"
             if ! printf '%s' "$users_json" | jq -e \
               '.response.users[]? | select(.username == "${mu.username}")' >/dev/null; then
@@ -150,7 +201,7 @@
           ''}
 
           ${optionalString doTotp ''
-            # --- 5. Enable TOTP for the metrics user (init -> enable) -------------
+            # --- 6. Enable TOTP for the metrics user (init -> enable) -------------
             # Server-generated seed from 2fa/init is persisted for out-of-band
             # transfer to the scraping host. Only runs once (seed file is the guard).
             if [ ! -s "${totpSeedPath}" ]; then
@@ -212,8 +263,9 @@
       config = mkIf (cfg.enable && cfg.provision.enable) {
         systemd.services.technitium-provision = {
           description = "Bootstrap Technitium: DoH/DoT/DoQ cert, metrics user, TOTP";
-          after = [ "technitium-dns-server.service" ];
+          after = [ "technitium-dns-server.service" ] ++ cfg.provision.certReadyUnits;
           requires = [ "technitium-dns-server.service" ];
+          wants = cfg.provision.certReadyUnits;
           wantedBy = [ "multi-user.target" ];
 
           serviceConfig = {
@@ -229,9 +281,8 @@
             StartLimitIntervalSec = "300";
             StartLimitBurst = 10;
           };
-
-          # Give Technitium time to write its initial config before the first attempt.
-          preStart = "${pkgs.coreutils}/bin/sleep 10";
+          # Readiness is handled inside the script (polls /api/status), so no fixed
+          # preStart sleep is needed.
         };
       };
     };
