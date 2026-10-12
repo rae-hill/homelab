@@ -11,6 +11,10 @@
   "json": {
   },
   "markdown": {
+    "lineWidth": 100,
+    "textWrap": "maintain",
+    "emphasisKind": "underscores",
+    "strongKind": "asterisks"
   },
   "toml": {
   },

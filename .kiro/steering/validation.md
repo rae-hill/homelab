@@ -24,7 +24,10 @@ dprint fmt fmt .
 nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 ```
 
-`dprint` formats everything except Nix (TypeScript, JSON, Markdown, TOML, YAML, CSS, HTML).
+`dprint` formats everything except Nix (TypeScript, JSON, Markdown, TOML, YAML, CSS, HTML). Its
+plugins and per-language settings (including Markdown: `lineWidth` 100, `textWrap` maintain) live in
+`dprint.json`, so `dprint fmt <path>` auto-discovers the config — no need to pass `--plugins`
+manually when formatting a single file.
 `nixfmt` (RFC style) formats `.nix` files, **excluding the vendored `repos/` subtrees** (read-only
 upstream sources — never reformat them). Invoke it via `nix run .#nixfmt` so you always use the
 flake-pinned `nixfmt` (exposed as `packages.<system>.nixfmt`) rather than whatever is on `PATH` —
