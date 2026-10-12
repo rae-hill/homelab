@@ -118,8 +118,7 @@ export const handleMyEndpoint = Effect.fn("handleMyEndpoint")(
   response headers (e.g., `DPoP-Nonce`):
   ```typescript
   yield * HttpApp.appendPreResponseHandler(
-    (_, res) =>
-      Effect.succeed(HttpServerResponse.setHeader(res, "My-Header", value)),
+    (_, res) => Effect.succeed(HttpServerResponse.setHeader(res, "My-Header", value)),
   )
   ```
 

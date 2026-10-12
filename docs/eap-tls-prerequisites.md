@@ -309,8 +309,7 @@ export * as IpAddress from "./IpAddress.js"
 ```typescript
 import { Context, Effect, Option } from "effect"
 
-export const SerialNumberConfigId =
-  "homelab-api/config/serial-number-config/SerialNumberConfig"
+export const SerialNumberConfigId = "homelab-api/config/serial-number-config/SerialNumberConfig"
 
 export interface SerialNumberConfigDef {
   /** Resolves an IP address to a device serial number, or None if not found. */
@@ -383,9 +382,7 @@ export const SerialNumberConfigLive = Layer.effect(
   }),
 )
 
-class SerialNumberConfigImpl
-  implements Config.SerialNumberConfig.SerialNumberConfigDef
-{
+class SerialNumberConfigImpl implements Config.SerialNumberConfig.SerialNumberConfigDef {
   constructor(
     private readonly serialNumbers: HashMap.HashMap<string, string>,
   ) {}

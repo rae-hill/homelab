@@ -199,8 +199,7 @@ export const handleMyEndpoint = Effect.fn("handleMyEndpoint")(
         Match.value,
         Match.tag(
           "SomeInternalError",
-          (e) =>
-            new ApiErrors.InternalServerError({ message: "...", error: e }),
+          (e) => new ApiErrors.InternalServerError({ message: "...", error: e }),
         ),
         Match.orElse((_) => _),
       ),

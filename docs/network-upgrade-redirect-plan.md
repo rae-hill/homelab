@@ -48,11 +48,7 @@ Only the praeconinus `.env` will set these. When unset, the effect short-circuit
 New file: `src/lib/upgrade/index.ts`
 
 ```ts
-import {
-  HttpClient,
-  HttpClientRequest,
-  HttpClientResponse,
-} from "@effect/platform"
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "@effect/platform"
 import { Effect } from "effect"
 import { UPGRADE_STATUS_URL, UPGRADE_TARGET_ORIGIN } from "../config.js"
 

@@ -83,17 +83,13 @@ import { Context, Data, Effect } from "effect"
 
 export const FooServiceId = "homelab-api/services/foo/FooService"
 
-export class FooError
-  extends Data.TaggedError("FooError")<{ readonly error: unknown }>
-{}
+export class FooError extends Data.TaggedError("FooError")<{ readonly error: unknown }> {}
 
 export interface FooServiceDef {
   readonly doSomething: (input: string) => Effect.Effect<string, FooError>
 }
 
-export class FooService
-  extends Context.Tag(FooServiceId)<FooService, FooServiceDef>()
-{}
+export class FooService extends Context.Tag(FooServiceId)<FooService, FooServiceDef>() {}
 
 /** {@inheritDoc FooServiceDef.doSomething} */
 export function doSomething(
@@ -237,9 +233,7 @@ export interface EnvDef {
   readonly hmacSecretFilePath: Option.Option<string>
 }
 
-export class Env
-  extends Context.Tag("homelab-api/config/env/Env")<Env, EnvDef>()
-{}
+export class Env extends Context.Tag("homelab-api/config/env/Env")<Env, EnvDef>() {}
 
 export const originUrl = Env.pipe(Effect.map((_) => _.originUrl))
 ```

@@ -45,26 +45,45 @@ Technitium does NOT run its own ACME.
 
 - Technitium web console listens over **plain HTTP on an internal loopback port**
   (`DNS_SERVER_WEB_SERVICE_HTTP_PORT`, bound to `127.0.0.1`).
-- **Caddy listens on `8443` (Tailscale-only)** and reverse-proxies to that internal HTTP port, with
-  **mTLS client-cert gating**. OIDC/SSO (Kanidm) runs behind this for interactive login.
+- **Caddy listens on `8443` (Tailscale-only)** and reverse-proxies to that internal HTTP port.
+  **No mTLS** — the admin UI is already Tailscale-only (firewall) AND OIDC-gated (Kanidm SSO behind
+  it), so client-cert gating is redundant. Caddy just terminates TLS (step-ca cert) and proxies.
 - `DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES = "127.0.0.1"` so the console trusts Caddy.
 - Technitium's own HTTPS web console (`DNS_SERVER_WEB_SERVICE_ENABLE_HTTPS`) stays **disabled** — TLS
   for the admin UI is Caddy's job.
 
+### Recursion / anti-amplification — CONFIRMED
+
+- Recursion is restricted by **network ACL to the Tailscale interface** (IPv4 CGNAT + IPv6 ULA +
+  loopback), via `DNS_SERVER_RECURSION=UseSpecifiedNetworkACL` +
+  `DNS_SERVER_RECURSION_NETWORK_ACL`. Technitium's recursion gate is network-based (not
+  transport-based), which is the correct model: public clients over **any** transport get
+  authoritative-only answers; trusted Tailscale clients get recursion over any transport (plain or
+  encrypted). This prevents UDP/53 amplification/reflection abuse from the public internet.
+- **Prefer IPv6** for outbound resolution (`DNS_SERVER_PREFER_IPV6=true`). Configurable.
+- Recursion ACL and preferIPv6 are **options** (see §4).
+
 ### Resulting port map
 
-| Port                                   | Bind       | Served by  | Purpose                                      |
-| -------------------------------------- | ---------- | ---------- | -------------------------------------------- |
-| 53 udp/tcp                             | public     | Technitium | Plain authoritative DNS                      |
-| 443                                    | public     | Technitium | DoH (native TLS, managed cert)               |
-| 853 tcp                                | public     | Technitium | DoT (native TLS, managed cert)               |
-| 853 udp                                | public     | Technitium | DoQ (native TLS, managed cert)               |
-| `webHttpPort` (e.g. 5380)              | 127.0.0.1  | Technitium | Web console (plain HTTP, behind Caddy)       |
-| 8443                                   | tailscale0 | Caddy      | Admin UI (mTLS) → proxies to `webHttpPort`   |
-| `metricsPort` (pick ≠ 8443, e.g. 9443) | tailscale0 | Caddy      | Metrics (mTLS) → node-exporter + DNS metrics |
+| Port                      | Bind       | Served by  | Purpose                                         |
+| ------------------------- | ---------- | ---------- | ----------------------------------------------- |
+| 53 udp/tcp                | public     | Technitium | Plain DNS (authoritative; recursion ACL)        |
+| 443                       | public     | Technitium | DoH (native TLS, managed cert)                  |
+| 853 tcp                   | public     | Technitium | DoT (native TLS, managed cert)                  |
+| 853 udp                   | public     | Technitium | DoQ (native TLS, managed cert)                  |
+| 80                        | public     | Caddy      | HTTP-01 ACME challenge (now free — see note)    |
+| `webHttpPort` (e.g. 5380) | 127.0.0.1  | Technitium | Web console (plain HTTP, behind Caddy)          |
+| 8443                      | tailscale0 | Caddy      | Admin UI (TLS, OIDC) → proxies to `webHttpPort` |
+| `metricsPort` (e.g. 9443) | tailscale0 | Caddy      | Metrics (mTLS) → node-exporter + DNS metrics    |
 
-> **Port collision:** the metrics vhost currently uses `8443`. Since the admin UI now takes `8443`,
-> move the metrics endpoint to a distinct port (e.g. `9443`) in `service-registry.nix` — see §6.
+> **Port 80 is now fully Caddy's.** Technitium no longer uses port 80 for anything (plain 53 is
+> sufficient for plaintext DNS), so the public Let's Encrypt HTTP-01 challenge can be served
+> directly by Caddy on `:80` without any relocation workaround.
+>
+> **Metrics port** is arbitrary and Tailscale-restricted on both ends (NixOS firewall + your
+> Tailscale ACLs). Using `9443` to avoid the `8443` admin-UI port.
+>
+> **mTLS remains only on the metrics endpoint** (Prometheus has no OIDC), not the admin UI.
 
 ---
 
@@ -73,7 +92,7 @@ Technitium does NOT run its own ACME.
 ```
 nix-config/modules/features/
 ├── technitium/                      # GENERIC, reusable, option-driven
-│   ├── options.nix                  # NEW: options schema (services.technitium-homelab.*)
+│   ├── options.nix                  # NEW: options schema (services.technitium-server-complete.*)
 │   ├── service.nix                  # Technitium service + env bootstrap, driven by options
 │   ├── provision.nix                # Provisioner, driven by options (cert paths passed in)
 │   ├── caddy.nix                    # Admin UI + metrics vhosts, gated by options
@@ -89,17 +108,17 @@ Notes:
 - `kanidm.nix` (`technitium-kanidm`) targets **augustus** (the Kanidm host), NOT aedilis. It stays
   as its own module imported by augustus — it does **not** move under `technitium-aedilis`.
 - `alloy.nix` + `node-exporter.nix` fold into `technitium-aedilis/observability.nix`, gated by
-  `services.technitium-homelab.observability.enable`.
+  `services.technitium-server-complete.observability.enable`.
 
 ---
 
 ## 4. Option Schema (draft — `options.nix`)
 
-Namespace: `services.technitium-homelab` (avoids clashing with upstream
+Namespace: `services.technitium-server-complete` (avoids clashing with upstream
 `services.technitium-dns-server`).
 
 ```nix
-options.services.technitium-homelab = {
+options.services.technitium-server-complete = {
   enable = mkEnableOption "Homelab Technitium DNS wrapper";
 
   domain = mkOption { type = str; };
@@ -111,8 +130,12 @@ options.services.technitium-homelab = {
 
   # --- bootstrap (first-boot env vars) ---
   adminPasswordFile = mkOption { type = path; };
+  preferIPv6 = mkOption { type = bool; default = true; };    # DNS_SERVER_PREFER_IPV6
   recursion = {
     mode = mkOption { type = enum [ "Deny" "Allow" "AllowOnlyForPrivateNetworks" "UseSpecifiedNetworkACL" ]; default = "UseSpecifiedNetworkACL"; };
+    # Restrict recursion to trusted networks (Tailscale IPv4 CGNAT + IPv6 ULA +
+    # loopback). Public clients get authoritative-only answers over ALL transports
+    # — this is the anti-amplification control (network-based, not transport-based).
     networkACL = mkOption { type = listOf str; default = [ ]; };   # joined to CSV
   };
 
@@ -160,15 +183,17 @@ options.services.technitium-homelab = {
   # --- optional Caddy fronting (admin UI + metrics) ---
   caddy = {
     enable = mkEnableOption "Caddy vhosts for admin UI + metrics";
+    # Admin UI: TLS + reverse-proxy only. NO mTLS (Tailscale-only + OIDC-gated).
     adminDomain = mkOption { type = str; };
     adminPort = mkOption { type = port; default = 8443; };
     adminCertPemFile = mkOption { type = path; };     # step-ca (internal) PEM
     adminCertKeyFile = mkOption { type = path; };
+    # Metrics: TLS + mTLS (Prometheus has no OIDC).
     metricsDomain = mkOption { type = str; };
     metricsPort = mkOption { type = port; default = 9443; };
     metricsCertPemFile = mkOption { type = path; };
     metricsCertKeyFile = mkOption { type = path; };
-    mtlsTrustPoolFile = mkOption { type = path; };    # root CA for client_auth
+    metricsMtlsTrustPoolFile = mkOption { type = path; };   # root CA for metrics client_auth
     nodeExporterPort = mkOption { type = port; default = 9100; };
   };
 
@@ -208,8 +233,9 @@ Pure option declarations. No config.
 - `config = mkIf cfg.enable { ... }`.
 - Upstream `services.technitium-dns-server` + static user/group + `CAP_NET_BIND_SERVICE` (unchanged).
 - Env bootstrap built **from options**: domain, admin password file, web console on
-  `127.0.0.1:${webHttpPort}` (HTTP only), reverse-proxy ACL `127.0.0.1`, recursion mode+ACL, and the
-  OIDC block (conditional on `cfg.oidc.enable`).
+  `127.0.0.1:${webHttpPort}` (HTTP only), reverse-proxy ACL `127.0.0.1`, recursion mode+ACL,
+  `DNS_SERVER_PREFER_IPV6` from `cfg.preferIPv6`, and the OIDC block (conditional on
+  `cfg.oidc.enable`).
 - **Removed:** all DoH-over-HTTP env vars.
 
 ### `technitium/provision.nix`
@@ -229,11 +255,13 @@ Pure option declarations. No config.
 ### `technitium/caddy.nix`
 
 - `config = mkIf cfg.caddy.enable { ... }`.
-- **Admin UI vhost:** `https://${adminDomain}:${adminPort}` (8443), `tls` with step-ca cert +
-  `client_auth` mTLS, `reverse_proxy 127.0.0.1:${webHttpPort}`.
-- **Metrics vhost:** `https://${metricsDomain}:${metricsPort}` (9443), mTLS, path-routed to
-  node-exporter (`/metrics`) and Technitium DNS metrics (`/api/dashboard/metrics/text`).
-- **No public DoH vhost.** The `http://` ACME challenge vhosts move to the aedilis ACME layer.
+- **Admin UI vhost:** `https://${adminDomain}:${adminPort}` (8443), `tls` with step-ca cert,
+  `reverse_proxy 127.0.0.1:${webHttpPort}`. **No `client_auth`/mTLS** — Tailscale-only + OIDC-gated.
+- **Metrics vhost:** `https://${metricsDomain}:${metricsPort}` (9443), `tls` with step-ca cert +
+  `client_auth` **mTLS** (`metricsMtlsTrustPoolFile`), path-routed to node-exporter (`/metrics`) and
+  Technitium DNS metrics (`/api/dashboard/metrics/text`).
+- **No public DoH vhost.** The `http://` ACME challenge vhost (port 80) lives in the aedilis ACME
+  layer (port 80 is now entirely free — Technitium doesn't use it).
 - Adds `caddy` to the technitium group for cert read access.
 
 ### `technitium/complete.nix`
@@ -243,10 +271,10 @@ Pure option declarations. No config.
 ### `technitium-aedilis/acme.nix` (NEW)
 
 - Let's Encrypt public cert (`dns.plato-splunk.media`, HTTP-01) + step-ca certs for admin + metrics
-  domains, plus the `http://` ACME challenge Caddy vhosts.
-- Note: with the public DNS cert used by Technitium (not Caddy), the HTTP-01 challenge still needs
-  port 80. **Decision:** keep a minimal Caddy `http://dns...` challenge vhost here, OR use the acme
-  module's own `listenHTTP` on a loopback port fronted by a tiny Caddy :80 vhost (current pattern).
+  domains, plus the `http://` ACME challenge Caddy vhost on **port 80** (now fully free since
+  Technitium no longer uses 80).
+- The public DNS cert is consumed by **Technitium** (encrypted DNS), passed in via
+  `encryptedDns.certPemFile`/`certKeyFile`. The admin/metrics step-ca certs are consumed by Caddy.
 
 ### `technitium-aedilis/observability.nix` (NEW)
 
@@ -255,7 +283,7 @@ Pure option declarations. No config.
 ### `technitium-aedilis/complete.nix` (NEW)
 
 - `imports = [ inputs.self.modules.nixos.technitium ] ++ [ acme observability ]`.
-- Sets all `services.technitium-homelab.*` values for aedilis (from `config.constants`, sops
+- Sets all `services.technitium-server-complete.*` values for aedilis (from `config.constants`, sops
   secrets, recursion ACL, OIDC, cert dirs). This concentrates host specifics in one place.
 
 ### `technitium-kanidm` (augustus) — unchanged.
@@ -268,13 +296,15 @@ Pure option declarations. No config.
 
 ## 6. `service-registry.nix` changes
 
-- **Remove** `dohBackendPort` (no longer needed).
-- **Admin UI** on `8443`; **metrics** moves to a distinct port (e.g. `9443`) to avoid colliding with
-  the admin UI. Update `dns-metrics.port`.
-- Keep `dnsPort` 53, `dotPort` 853, `dohPort` 443, `webHttpPort` 5380, `acmePort` (public), and the
-  metrics `acmePort`.
-- Update `_private/aedilis/security.nix` firewall (tailscale0: 22, 8443 admin, 9443 metrics, 5252)
-  and `docs/port-assignments.md`.
+- **Remove** `dohBackendPort` (no longer needed — Technitium frees port 80 entirely).
+- **Admin UI** on `8443`; **metrics** on a distinct Tailscale-restricted port (`9443`). Update
+  `dns-metrics.port`.
+- Keep `dnsPort` 53, `dotPort` 853, `dohPort` 443, `webHttpPort` 5380, and the public ACME port + the
+  metrics ACME port.
+- Update `_private/aedilis/security.nix` firewall:
+  - **public:** 53 (tcp+udp), 443, 853 (tcp+udp), **80** (ACME HTTP-01 — now Caddy-owned).
+  - **tailscale0:** 22, 8443 (admin), 9443 (metrics), 5252 (TS metrics).
+- Update `docs/port-assignments.md`.
 
 ---
 
@@ -285,14 +315,15 @@ Pure option declarations. No config.
   recursion/OIDC into the provisioner (`settings/set`, `api/admin/sso/set`) for full
   reconfigurability is possible but **out of scope** for this refactor unless you want it.
 - **Augustus unaffected.** `technitium-kanidm` keeps its name/location.
-- **Firewall + port doc** must be updated for the 8443/9443 split.
+- **Firewall + port doc** must be updated for the 8443/9443 split and the freed port 80.
 
 ---
 
 ## 8. Implementation Order
 
-1. `technitium/options.nix` — schema.
-2. Refactor `service.nix`, `provision.nix`, `caddy.nix` → `mkIf cfg.*`, option-driven; drop DoH-over-HTTP.
+1. `technitium/options.nix` — schema (`services.technitium-server-complete`).
+2. Refactor `service.nix`, `provision.nix`, `caddy.nix` → `mkIf cfg.*`, option-driven; drop
+   DoH-over-HTTP; drop admin mTLS; add `preferIPv6`.
 3. `technitium/complete.nix` — generic aggregate.
 4. `technitium-aedilis/{acme,observability,complete}.nix` — aedilis wiring + option values.
 5. `hosts/aedilis.nix` → `technitium-aedilis`.
@@ -302,10 +333,14 @@ Pure option declarations. No config.
 
 ---
 
-## 9. Remaining Minor Decisions
+## 9. Decisions — all CONFIRMED
 
-1. **Metrics port** when admin UI takes 8443 — recommend `9443`. (OK?)
-2. **ACME HTTP-01 challenge serving** for the public DNS cert — keep a minimal Caddy `:80` challenge
-   vhost in the aedilis ACME layer (recommended), vs the acme module's own listener. (OK?)
-3. **Option namespace** `services.technitium-homelab` — acceptable?
-4. Defer moving recursion/OIDC into the provisioner (recommended defer). (OK?)
+1. **Metrics port** = `9443` (arbitrary, Tailscale-restricted on both the NixOS firewall and your
+   Tailscale ACLs). ✓
+2. **ACME HTTP-01** for the public DNS cert served by Caddy on port **80** (now fully free). ✓
+3. **Option namespace** = `services.technitium-server-complete`. ✓
+4. **No mTLS on admin UI** (Tailscale-only + OIDC). mTLS stays only on the metrics endpoint. ✓
+5. **Recursion** restricted by network ACL to the Tailscale interface (IPv4 CGNAT + IPv6 ULA +
+   loopback); plain 53 and encrypted transports alike are authoritative-only for public clients. ✓
+6. **`preferIPv6` = true**, configurable via options. ✓
+7. Recursion/OIDC stay as first-boot env vars (NOT moved into the provisioner) for this pass. ✓
