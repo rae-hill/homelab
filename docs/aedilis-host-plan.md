@@ -65,7 +65,8 @@ Technitium exposes a native Prometheus endpoint (confirmed in [APIDOCS.md](https
 
 - `GET /api/dashboard/metrics/text` → `Content-Type: text/plain; version=0.0.4`
 - Requires `Dashboard: View` permission via `Authorization: Bearer <token>`
-- Token is a non-expiring API token created via `POST /api/user/createToken`
+- The token is obtained via the **expiring** `POST /api/user/login` flow (NOT the non-expiring
+  `createToken`), refreshed by a systemd timer — see §6 for the full model.
 
 Marked experimental by upstream ("This API call is experimental and may change in later releases") — acceptable risk.
 

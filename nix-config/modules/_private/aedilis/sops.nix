@@ -32,4 +32,10 @@
     owner = "technitium";
     group = "technitium";
   };
+
+  # Password for the step-ca JWK provisioner, used by ssh-cert-renewer to obtain
+  # the host's SSH certificate (see _private/aedilis/security.nix).
+  sops.secrets.step_jwk_provisioner_password = {
+    owner = "root";
+  };
 }

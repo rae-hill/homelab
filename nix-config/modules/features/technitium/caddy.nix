@@ -48,11 +48,13 @@ in
       };
 
       # Public DoH endpoint (443). Caddy terminates TLS with the Let's Encrypt cert
-      # and proxies to Technitium's plaintext DoH listener on :80.
+      # and proxies to Technitium's plaintext DoH-over-HTTP listener, which the
+      # provisioning oneshot relocates to `dohBackendPort` (off port 80, which Caddy
+      # owns for ACME). See docs/aedilis-implementation-audit.md #1.
       services.caddy.virtualHosts."https://${tech.domain}" = {
         extraConfig = ''
           tls ${publicCert}/fullchain.pem ${publicCert}/key.pem
-          reverse_proxy 127.0.0.1:80
+          reverse_proxy 127.0.0.1:${toString tech.dohBackendPort}
         '';
       };
 

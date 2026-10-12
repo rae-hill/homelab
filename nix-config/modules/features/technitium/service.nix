@@ -56,11 +56,15 @@ in
           DNS_SERVER_WEB_SERVICE_HTTP_PORT = toString tech.webHttpPort;
           DNS_SERVER_WEB_SERVICE_ENABLE_HTTPS = "false";
           DNS_SERVER_WEB_SERVICE_HTTP_TO_TLS_REDIRECT = "false";
-          # Caddy on loopback is the only reverse proxy.
-          DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES = "127.0.0.1";
-
-          # DoH behind the TLS-terminating reverse proxy (Caddy) on TCP 80.
+          # DoH behind the TLS-terminating reverse proxy (Caddy). Enabling it here
+          # (first-boot) turns on the plaintext DoH-over-HTTP listener; the
+          # provisioning oneshot then moves it off port 80 to `dohBackendPort` and
+          # restricts it to the loopback reverse proxy (Caddy). Port 80 is owned by
+          # Caddy (ACME + redirect), so the listener MUST be relocated — see
+          # technitium-provision and docs/aedilis-implementation-audit.md #1.
           DNS_SERVER_OPTIONAL_PROTOCOL_DNS_OVER_HTTP = "true";
+          # Only trust Caddy on loopback as the DoH reverse proxy.
+          DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES = "127.0.0.1";
 
           # Admin bootstrap password (first boot only).
           DNS_SERVER_ADMIN_PASSWORD_FILE = config.sops.secrets.technitium_admin_password.path;

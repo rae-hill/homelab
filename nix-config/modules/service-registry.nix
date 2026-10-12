@@ -228,7 +228,11 @@ in
         # DNS protocol ports
         dnsPort = 53;
         dotPort = 853; # DNS-over-TLS (tcp) and DNS-over-QUIC (udp)
-        dohPort = 443; # DNS-over-HTTPS (behind Caddy)
+        dohPort = 443; # DNS-over-HTTPS (public, Caddy-terminated)
+        # Technitium's plaintext DoH-over-HTTP listener, bound to loopback. Caddy
+        # terminates public TLS on 443 and reverse-proxies /dns-query here. This is
+        # moved OFF the Technitium default of 80 so Caddy can own port 80 for ACME.
+        dohBackendPort = 8053;
         # Technitium web console (admin UI) — bound to loopback, fronted by Caddy
         webHttpPort = 5380;
         webHttpsPort = 53443;

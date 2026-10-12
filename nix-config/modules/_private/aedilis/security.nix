@@ -42,4 +42,15 @@
   };
 
   services.openssh.openFirewall = false;
+
+  # SSH host certificate renewal via step-ca (like cicero). Requires step-ca
+  # reachability over Tailscale + the JWK provisioner private key on the box, so it
+  # only succeeds AFTER aedilis joins the tailnet and the ACLs are updated. The
+  # daily timer will retry until then; see docs/aedilis-deployment-runbook.md.
+  services.ssh-cert-renewer = {
+    enable = true;
+    sshKeyName = "ssh_host_ed25519_key";
+    serviceName = "aedilis.plato-splunk.media";
+    passwordFile = config.sops.secrets.step_jwk_provisioner_password.path;
+  };
 }
