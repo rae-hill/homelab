@@ -219,37 +219,36 @@ in
       };
 
       technitium = {
-        # Public authoritative/encrypted DNS endpoint (aedilis)
+        # Public authoritative/encrypted DNS endpoint (aedilis). Technitium natively
+        # terminates DoH/DoT/DoQ with a managed Let's Encrypt cert.
         subdomain = "dns";
         domain = mkDomain "dns";
         url = mkUrl "dns";
         clientId = "technitium";
         oidcEndpoint = mkOidcEndpoint "technitium";
-        # DNS protocol ports
+        # DNS protocol ports (all public, Technitium-terminated)
         dnsPort = 53;
         dotPort = 853; # DNS-over-TLS (tcp) and DNS-over-QUIC (udp)
-        dohPort = 443; # DNS-over-HTTPS (public, Caddy-terminated)
-        # Technitium's plaintext DoH-over-HTTP listener, bound to loopback. Caddy
-        # terminates public TLS on 443 and reverse-proxies /dns-query here. This is
-        # moved OFF the Technitium default of 80 so Caddy can own port 80 for ACME.
-        dohBackendPort = 8053;
-        # Technitium web console (admin UI) — bound to loopback, fronted by Caddy
+        dohPort = 443; # DNS-over-HTTPS (native TLS)
+        # Technitium web console — loopback plain HTTP, fronted by Caddy on adminPort.
         webHttpPort = 5380;
-        webHttpsPort = 53443;
-        # ACME http-01 challenge listener (loopback; Caddy proxies :80 to it)
+        # ACME http-01 challenge listener (loopback; Caddy proxies :80 to it).
         acmePort = 22482;
-        # Admin UI vhost (Tailscale-only, mTLS + OIDC)
+        # Admin UI vhost (Tailscale-only, OIDC-gated, no mTLS) on Caddy.
         adminSubdomain = "dns-admin";
         adminDomain = mkDomain "dns-admin";
         adminUrl = mkUrl "dns-admin";
+        adminPort = 8443;
+        adminAcmePort = 22483;
       };
 
       dns-metrics = {
-        # Technitium metrics endpoint (aedilis), mTLS-guarded, scraped by augustus
+        # Technitium metrics endpoint (aedilis), mTLS-guarded, scraped by augustus.
+        # Tailscale-restricted; port is arbitrary (distinct from the 8443 admin UI).
         subdomain = "dns-metrics";
         domain = mkDomain "dns-metrics";
         url = mkUrl "dns-metrics";
-        port = 8443;
+        port = 9443;
         acmePort = 22481;
         # node_exporter on the aedilis host
         nodeExporterPort = 9100;

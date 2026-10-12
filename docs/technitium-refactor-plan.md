@@ -1,7 +1,22 @@
 # Technitium Module Refactor Plan — Configurable Module + Provisioning
 
-Status: **planning** (nothing implemented yet)
+Status: **IMPLEMENTED** (2026-10-12) — the plan below was carried out. See the implementation note.
 Date: 2026-10-12
+
+> **Implementation note (2026-10-12):** The refactor is complete and `aedilis` evaluates cleanly.
+> Delivered:
+>
+> - `features/technitium/` is now generic + option-driven via
+>   `services.technitium-server-complete` (`options.nix`, `service.nix`, `provision.nix`,
+>   `caddy.nix`, `complete.nix`). `kanidm.nix` stays (augustus-targeted).
+> - Removed `acme.nix`, `alloy.nix`, `node-exporter.nix` from the generic feature.
+> - New `features/technitium-aedilis/` (`acme.nix`, `observability.nix`, `complete.nix`) wires the
+>   aedilis option values + ACME certs, mirroring `cicero-observability`.
+> - DoH/DoT/DoQ are Technitium-native (managed LE cert → PKCS#12 by path); the DoH-over-HTTP
+>   mechanism is fully removed. Admin UI on Caddy `:8443` (OIDC, no mTLS); metrics on Caddy `:9443`
+>   (mTLS). Recursion ACL + `preferIPv6` are options. `dohBackendPort` dropped.
+> - `hosts/aedilis.nix` → `nixos.technitium-aedilis`; firewall + `docs/port-assignments.md` updated.
+> - Provision script passes shellcheck; augustus scrape auto-updated to `:9443`.
 
 ## Goal
 

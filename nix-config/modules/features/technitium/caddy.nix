@@ -1,9 +1,4 @@
-{ config, inputs, ... }:
-let
-  c = config.constants;
-  tech = c.services.technitium;
-  dnsMetrics = c.services.dns-metrics;
-in
+{ inputs, ... }:
 {
   flake.modules.nixos.technitium-caddy =
     {
@@ -12,99 +7,62 @@ in
       ...
     }:
     let
-      publicCert = config.security.acme.certs."${tech.domain}".directory;
-      metricsCert = config.security.acme.certs."${dnsMetrics.domain}".directory;
+      cfg = config.services.technitium-server-complete;
+      inherit (lib) mkIf;
     in
     {
-      imports = [
-        inputs.self.modules.nixos.caddy
-      ];
+      imports = [ inputs.self.modules.nixos.caddy ];
 
-      services.caddy = {
-        enable = true;
-        # Caddy's internal-CA default is irrelevant here: every vhost names its cert
-        # explicitly. Public vhosts use the Let's Encrypt PEM; internal vhosts use
-        # the step-ca PEM. We do not rely on Caddy's own ACME.
-        useInternalCA = true;
-      };
+      config = mkIf (cfg.enable && cfg.caddy.enable) {
+        services.caddy = {
+          enable = true;
+          # Every vhost names its cert explicitly; the global default issuer is unused.
+          useInternalCA = true;
+        };
 
-      # Port 80: serve the public Let's Encrypt HTTP-01 challenge for dns.* and the
-      # step-ca HTTP-01 challenge for dns-metrics.* by proxying to the acme listeners.
-      services.caddy.virtualHosts."http://${tech.domain}" = {
-        extraConfig = ''
-          handle /.well-known/acme-challenge/* {
-            reverse_proxy 127.0.0.1:${toString tech.acmePort}
-          }
-          handle {
-            redir https://${tech.domain}{uri}
-          }
-        '';
-      };
+        # Admin UI (Tailscale-only via firewall, OIDC-gated by Technitium). No mTLS —
+        # Tailscale + OIDC already gate access. Caddy terminates TLS with the step-ca
+        # cert and reverse-proxies to the loopback web console.
+        services.caddy.virtualHosts."https://${cfg.caddy.adminDomain}:${toString cfg.caddy.adminPort}" = {
+          extraConfig = ''
+            tls ${cfg.caddy.adminCertPemFile} ${cfg.caddy.adminCertKeyFile}
+            reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
+          '';
+        };
 
-      services.caddy.virtualHosts."http://${dnsMetrics.domain}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${toString dnsMetrics.acmePort}
-        '';
-      };
-
-      # Public DoH endpoint (443). Caddy terminates TLS with the Let's Encrypt cert
-      # and proxies to Technitium's plaintext DoH-over-HTTP listener, which the
-      # provisioning oneshot relocates to `dohBackendPort` (off port 80, which Caddy
-      # owns for ACME). See docs/aedilis-implementation-audit.md #1.
-      services.caddy.virtualHosts."https://${tech.domain}" = {
-        extraConfig = ''
-          tls ${publicCert}/fullchain.pem ${publicCert}/key.pem
-          reverse_proxy 127.0.0.1:${toString tech.dohBackendPort}
-        '';
-      };
-
-      # Admin UI (Tailscale-only via firewall, mTLS client-cert gated).
-      # Technitium's own OIDC/SSO runs behind this for interactive logins.
-      services.caddy.virtualHosts."https://${tech.adminDomain}" = {
-        extraConfig = ''
-          tls {
-            client_auth {
-              mode require_and_verify
-              trust_pool file {
-                pem_file ${c.ca.rootCert}
+        # Metrics endpoint (Tailscale-only, mTLS). Prometheus has no OIDC, so client
+        # certs gate it. Serves node_exporter at /metrics and Technitium DNS metrics
+        # at /api/dashboard/metrics/text; everything else is denied.
+        services.caddy.virtualHosts."https://${cfg.caddy.metricsDomain}:${toString cfg.caddy.metricsPort}" =
+          {
+            extraConfig = ''
+              tls ${cfg.caddy.metricsCertPemFile} ${cfg.caddy.metricsCertKeyFile} {
+                client_auth {
+                  mode require_and_verify
+                  trust_pool file {
+                    pem_file ${cfg.caddy.metricsMtlsTrustPoolFile}
+                  }
+                }
               }
-            }
-          }
-          reverse_proxy 127.0.0.1:${toString tech.webHttpPort}
-        '';
-      };
 
-      # Metrics endpoint (Tailscale-only, mTLS). Serves two scrape targets:
-      #   - /metrics                     -> node_exporter (host metrics)
-      #   - /api/dashboard/metrics/text  -> Technitium DNS metrics (bearer-gated by Technitium)
-      # Everything else is denied.
-      services.caddy.virtualHosts."https://${dnsMetrics.domain}:${toString dnsMetrics.port}" = {
-        extraConfig = ''
-          tls ${metricsCert}/fullchain.pem ${metricsCert}/key.pem {
-            client_auth {
-              mode require_and_verify
-              trust_pool file {
-                pem_file ${c.ca.rootCert}
+              @node path /metrics
+              handle @node {
+                reverse_proxy 127.0.0.1:${toString cfg.caddy.nodeExporterPort}
               }
-            }
-          }
 
-          @node path /metrics
-          handle @node {
-            reverse_proxy 127.0.0.1:${toString dnsMetrics.nodeExporterPort}
-          }
+              @dns path /api/dashboard/metrics/text
+              handle @dns {
+                reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
+              }
 
-          @dns path /api/dashboard/metrics/text
-          handle @dns {
-            reverse_proxy 127.0.0.1:${toString tech.webHttpPort}
-          }
+              handle {
+                respond 404
+              }
+            '';
+          };
 
-          handle {
-            respond 404
-          }
-        '';
+        # Caddy needs read access to the technitium-group-owned certs.
+        users.groups.${cfg.group}.members = [ "caddy" ];
       };
-
-      users.groups.technitium.members = [ "caddy" ];
     };
 }

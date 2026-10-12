@@ -1,8 +1,4 @@
-{ config, ... }:
-let
-  c = config.constants;
-  tech = c.services.technitium;
-in
+{ ... }:
 {
   flake.modules.nixos.technitium-service =
     {
@@ -12,86 +8,89 @@ in
       ...
     }:
     let
-      inherit (config.security.acme.certs."${tech.domain}") directory;
-      stateDir = "/var/lib/technitium-dns-server";
-      # PKCS#12 bundle (converted from the ACME PEM) used by the DoT/DoQ listener.
-      pkcs12Path = "${stateDir}/dns.pfx";
+      cfg = config.services.technitium-server-complete;
+      inherit (lib)
+        mkIf
+        optionalAttrs
+        concatStringsSep
+        mapAttrsToList
+        ;
+
+      boolStr = b: if b then "true" else "false";
+
+      ssoEnv = optionalAttrs cfg.oidc.enable {
+        DNS_SERVER_SSO_ENABLED = "true";
+        DNS_SERVER_SSO_AUTHORITY = cfg.oidc.authority;
+        DNS_SERVER_SSO_CLIENT_ID = cfg.oidc.clientId;
+        DNS_SERVER_SSO_CLIENT_SECRET_FILE = cfg.oidc.clientSecretFile;
+        DNS_SERVER_SSO_SCOPES = concatStringsSep "," cfg.oidc.scopes;
+        DNS_SERVER_SSO_ALLOW_SIGNUP = boolStr cfg.oidc.allowSignup;
+        DNS_SERVER_SSO_ALLOW_SIGNUP_ONLY_FOR_MAPPED_USERS = boolStr cfg.oidc.allowSignupOnlyForMappedUsers;
+        DNS_SERVER_SSO_GROUP_MAP = concatStringsSep "," (
+          mapAttrsToList (remote: local: "${remote}:${local}") cfg.oidc.groupMap
+        );
+      };
+
+      recursionEnv = {
+        DNS_SERVER_RECURSION = cfg.recursion.mode;
+      }
+      // optionalAttrs (cfg.recursion.mode == "UseSpecifiedNetworkACL") {
+        DNS_SERVER_RECURSION_NETWORK_ACL = concatStringsSep "," cfg.recursion.networkACL;
+      };
     in
     {
-      # Trust the limited metrics user bootstrap + the admin bootstrap via *_FILE env vars.
-      services.technitium-dns-server = {
-        enable = true;
-        # We control the firewall explicitly in _private/aedilis/security.nix.
-        openFirewall = false;
-      };
-
-      # Static user/group so the service can read sops secrets and ACME certs via
-      # group ownership (upstream defaults to DynamicUser = true, which cannot).
-      users.users.technitium = {
-        isSystemUser = true;
-        group = "technitium";
-        home = stateDir;
-      };
-      users.groups.technitium = { };
-
-      systemd.services.technitium-dns-server = {
-        serviceConfig = {
-          DynamicUser = lib.mkForce false;
-          User = "technitium";
-          Group = "technitium";
-          StateDirectory = lib.mkForce "technitium-dns-server";
-          # Allow binding privileged DNS/HTTP ports.
-          AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
-          CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
+      config = mkIf cfg.enable {
+        services.technitium-dns-server = {
+          enable = true;
+          # Firewall is controlled explicitly by the host (see _private/<host>/security.nix).
+          openFirewall = false;
         };
 
-        # First-boot bootstrap environment. NOTE: Technitium reads these ONLY when
-        # no config file exists yet (first start). Subsequent changes made in the
-        # UI/API persist in the state dir and are not reconciled from here.
-        environment = {
-          DNS_SERVER_DOMAIN = tech.domain;
-
-          # Web console: loopback only, fronted by Caddy.
-          DNS_SERVER_WEB_SERVICE_LOCAL_ADDRESSES = "127.0.0.1";
-          DNS_SERVER_WEB_SERVICE_HTTP_PORT = toString tech.webHttpPort;
-          DNS_SERVER_WEB_SERVICE_ENABLE_HTTPS = "false";
-          DNS_SERVER_WEB_SERVICE_HTTP_TO_TLS_REDIRECT = "false";
-          # DoH behind the TLS-terminating reverse proxy (Caddy). Enabling it here
-          # (first-boot) turns on the plaintext DoH-over-HTTP listener; the
-          # provisioning oneshot then moves it off port 80 to `dohBackendPort` and
-          # restricts it to the loopback reverse proxy (Caddy). Port 80 is owned by
-          # Caddy (ACME + redirect), so the listener MUST be relocated — see
-          # technitium-provision and docs/aedilis-implementation-audit.md #1.
-          DNS_SERVER_OPTIONAL_PROTOCOL_DNS_OVER_HTTP = "true";
-          # Only trust Caddy on loopback as the DoH reverse proxy.
-          DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES = "127.0.0.1";
-
-          # Admin bootstrap password (first boot only).
-          DNS_SERVER_ADMIN_PASSWORD_FILE = config.sops.secrets.technitium_admin_password.path;
-
-          # Authoritative-only on plain UDP/53: recursion restricted to trusted ACLs
-          # (Tailscale CGNAT + ULA + loopback). Prevents DNS amplification abuse.
-          DNS_SERVER_RECURSION = "UseSpecifiedNetworkACL";
-          DNS_SERVER_RECURSION_NETWORK_ACL = "100.64.0.0/10,fd7a:115c:a1e0::/48,127.0.0.1,::1";
-
-          # OIDC/SSO against Kanidm (client registered on augustus).
-          DNS_SERVER_SSO_ENABLED = "true";
-          DNS_SERVER_SSO_AUTHORITY = "https://${c.idm.domain}/oauth2/openid/${tech.clientId}";
-          DNS_SERVER_SSO_CLIENT_ID = tech.clientId;
-          DNS_SERVER_SSO_CLIENT_SECRET_FILE = config.sops.secrets.technitium_sso_client_secret.path;
-          DNS_SERVER_SSO_SCOPES = "openid,profile,email";
-          DNS_SERVER_SSO_ALLOW_SIGNUP = "true";
-          DNS_SERVER_SSO_ALLOW_SIGNUP_ONLY_FOR_MAPPED_USERS = "true";
-          # Map the Kanidm "Administrators" remote group to the local one.
-          DNS_SERVER_SSO_GROUP_MAP = "Administrators:Administrators";
+        # Static user/group so the service can read sops secrets and ACME certs via
+        # group ownership (upstream defaults to DynamicUser = true, which cannot).
+        users.users.${cfg.user} = {
+          isSystemUser = true;
+          group = cfg.group;
+          home = cfg.stateDir;
         };
+        users.groups.${cfg.group} = { };
 
-        # Start after the public ACME cert is available (used for DoT/DoQ PKCS#12).
-        after = [ "acme-${tech.domain}.service" ];
-        wants = [ "acme-${tech.domain}.service" ];
+        systemd.services.technitium-dns-server = {
+          serviceConfig = {
+            DynamicUser = lib.mkForce false;
+            User = cfg.user;
+            Group = cfg.group;
+            StateDirectory = lib.mkForce "technitium-dns-server";
+            # Allow binding privileged DNS/TLS ports (53, 443, 853).
+            AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
+            CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
+          };
+
+          # First-boot bootstrap environment. NOTE: Technitium reads these ONLY when
+          # no config file exists yet (first start). Subsequent changes made in the
+          # UI/API persist in the state dir and are not reconciled from here.
+          environment = {
+            DNS_SERVER_DOMAIN = cfg.domain;
+            DNS_SERVER_PREFER_IPV6 = boolStr cfg.preferIPv6;
+
+            # Web console: loopback plain HTTP only, fronted by Caddy (no native HTTPS).
+            DNS_SERVER_WEB_SERVICE_LOCAL_ADDRESSES = "127.0.0.1";
+            DNS_SERVER_WEB_SERVICE_HTTP_PORT = toString cfg.webHttpPort;
+            DNS_SERVER_WEB_SERVICE_ENABLE_HTTPS = "false";
+            DNS_SERVER_WEB_SERVICE_HTTP_TO_TLS_REDIRECT = "false";
+            # Trust the loopback reverse proxy (Caddy) for real-client-IP headers.
+            DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES = "127.0.0.1";
+
+            # Admin bootstrap password (first boot only).
+            DNS_SERVER_ADMIN_PASSWORD_FILE = cfg.adminPasswordFile;
+          }
+          // recursionEnv
+          // ssoEnv;
+
+          # If encrypted DNS is enabled, the public ACME cert must exist before the
+          # provisioner converts it; ordering is handled in the aedilis layer via the
+          # acme unit. The core service itself does not block on the cert.
+        };
       };
-
-      # Expose paths for the provisioning oneshot (§6) and PKCS#12 conversion.
-      environment.etc."technitium/pkcs12-path".text = pkcs12Path;
     };
 }

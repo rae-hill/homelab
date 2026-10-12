@@ -19,23 +19,24 @@
     # aedilis is an AUTHORITATIVE nameserver (recursion is locked down to trusted
     # ACLs inside Technitium — see docs/aedilis-host-plan.md §7a/§7b), so plain 53
     # is served publicly for authoritative answers and future HA (secondaries).
+    # DoH/DoT/DoQ are terminated natively by Technitium with a managed LE cert.
     allowedTCPPorts = [
       53 # DNS (authoritative, TCP fallback + future zone transfers)
-      80 # Let's Encrypt HTTP-01 challenge (public ACME)
-      443 # DoH (Caddy TLS termination)
-      853 # DNS-over-TLS
+      80 # Let's Encrypt HTTP-01 challenge (Caddy; Technitium does not use 80)
+      443 # DoH (Technitium-native TLS)
+      853 # DoT (Technitium-native TLS)
     ];
     allowedUDPPorts = [
       53 # DNS (authoritative)
-      853 # DNS-over-QUIC
+      853 # DoQ (Technitium-native TLS)
     ];
 
     # Tailscale-only ports (admin UI, metrics, SSH, TS metrics exporter).
     interfaces.tailscale0 = {
       allowedTCPPorts = [
         22 # SSH
-        443 # admin UI vhost (mTLS) — shares Caddy with public DoH via SNI
-        8443 # dns-metrics endpoint (mTLS); see service-registry dns-metrics.port
+        8443 # admin UI vhost (Caddy, OIDC-gated, no mTLS)
+        9443 # dns-metrics endpoint (Caddy, mTLS); see service-registry dns-metrics.port
         5252 # Tailscale metrics exporter
       ];
     };

@@ -18,7 +18,7 @@ in
       inputs.sops-nix.nixosModules.sops
 
       nixos.system-base
-      nixos.technitium
+      nixos.technitium-aedilis
 
       ./../_private/aedilis/hardware.nix
       ./../_private/aedilis/security.nix
