@@ -42,7 +42,7 @@ in
         in
         {
           nixpkgs = {
-            overlays = [ inputs.affinity-nix.overlays.default ];
+            overlays = [ ];
             config = {
               allowUnfree = true;
               allowUnfreePredicate = _: true;
@@ -71,9 +71,6 @@ in
             popsicle
             google-fonts
             font-awesome
-            affinity-photo
-            affinity-designer
-            affinity-publisher
             typst
             pkgs-unstable.kiro-cli
             pkgs-unstable.kiro

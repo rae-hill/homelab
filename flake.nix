@@ -18,8 +18,6 @@
 
     nixvim.url = "github:nix-community/nixvim/nixos-26.05";
 
-    affinity-nix.url = "github:mrshmllow/affinity-nix";
-
     quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
 
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
@@ -43,7 +41,6 @@
       home-manager,
       sops-nix,
       nix-darwin,
-      affinity-nix,
       quadlet-nix,
       nix-minecraft,
       flake-parts,
