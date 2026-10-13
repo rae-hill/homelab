@@ -226,13 +226,53 @@ in
           programs.starship = {
             enable = true;
             enableZshIntegration = true;
+            # Catppuccin Frappé palette inlined instead of using
+            # `catppuccin.starship.enable`. The catppuccin starship module injects
+            # the palette via `lib.importTOML "${sources.starship}/frappe.toml"`,
+            # which is Import-From-Derivation: it must BUILD the catppuccin-starship
+            # source at eval time. That breaks `nix flake check --no-build` (used by
+            # the lint-staged pre-commit hook) with "path ... is not valid". Inlining
+            # the palette removes the IFD entirely while keeping the identical theme.
+            settings = {
+              palette = "catppuccin_frappe";
+              palettes.catppuccin_frappe = {
+                rosewater = "#f2d5cf";
+                flamingo = "#eebebe";
+                pink = "#f4b8e4";
+                mauve = "#ca9ee6";
+                red = "#e78284";
+                maroon = "#ea999c";
+                peach = "#ef9f76";
+                yellow = "#e5c890";
+                green = "#a6d189";
+                teal = "#81c8be";
+                sky = "#99d1db";
+                sapphire = "#85c1dc";
+                blue = "#8caaee";
+                lavender = "#babbf1";
+                text = "#c6d0f5";
+                subtext1 = "#b5bfe2";
+                subtext0 = "#a5adce";
+                overlay2 = "#949cbb";
+                overlay1 = "#838ba7";
+                overlay0 = "#737994";
+                surface2 = "#626880";
+                surface1 = "#51576d";
+                surface0 = "#414559";
+                base = "#303446";
+                mantle = "#292c3c";
+                crust = "#232634";
+              };
+            };
           };
 
           catppuccin = {
             enable = true;
             flavor = "frappe";
             accent = "sapphire";
-            starship.enable = true;
+            # starship palette is inlined above (see note) to avoid IFD in
+            # `nix flake check --no-build`.
+            starship.enable = false;
             kitty.enable = true;
             ghostty.enable = true;
             vivaldi.enable = true;
