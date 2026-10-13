@@ -2,7 +2,7 @@
 
 This document tracks all port assignments across homelab hosts to prevent conflicts.
 
-Last updated: 2026-10-10
+Last updated: 2026-10-13
 
 ---
 
@@ -101,16 +101,19 @@ Last updated: 2026-10-10
 
 ---
 
-## Aedilis (Authoritative DNS - OVHCloud VPS)
+## Aedilis (Recursive DNS resolver - OVHCloud VPS)
 
-Runs Technitium DNS. Authoritative-only on plain 53 (recursion locked to trusted Tailscale ACLs);
-DoH/DoT/DoQ terminated **natively by Technitium** with a managed Let's Encrypt cert. Admin UI
-(Tailscale-only, OIDC-gated, no mTLS) and metrics (Tailscale-only, mTLS) are fronted by Caddy.
+Runs Technitium DNS as a personal **recursive resolver**. Recursion is open to any client
+(`DNS_SERVER_RECURSION=Allow`), rate-limited per client. Public plaintext 53 is **firewalled off**
+(reachable only over Tailscale for personal devices); public recursion is served only over the
+encrypted transports DoH/DoT/DoQ, terminated **natively by Technitium** with a managed Let's Encrypt
+cert. Admin UI (Tailscale-only, OIDC-gated, no mTLS) and metrics (Tailscale-only, mTLS) are fronted
+by Caddy.
 
 | Port  | Service                | Protocol | Bind Address    | Notes                                         |
 | ----- | ---------------------- | -------- | --------------- | --------------------------------------------- |
 | 22    | OpenSSH                | TCP      | tailscale0 only | Firewall: tailscale0 interface                |
-| 53    | Technitium DNS         | TCP/UDP  | 0.0.0.0         | Authoritative DNS (public); recursion ACL     |
+| 53    | Technitium DNS         | TCP/UDP  | tailscale0 only | Plain DNS for personal devices (NOT public)   |
 | 80    | Caddy (ACME HTTP-01)   | TCP      | 0.0.0.0         | Let's Encrypt + step-ca challenge (Caddy)     |
 | 443   | Technitium DoH         | TCP      | 0.0.0.0         | DNS-over-HTTPS (Technitium-native TLS)        |
 | 853   | Technitium DoT/DoQ     | TCP/UDP  | 0.0.0.0         | DoT (tcp) + DoQ (udp), Technitium-native TLS  |
@@ -122,6 +125,11 @@ DoH/DoT/DoQ terminated **natively by Technitium** with a managed Let's Encrypt c
 | 22481 | dns-metrics ACME       | TCP      | 127.0.0.1       | step-ca http-01 for the metrics cert          |
 | 22482 | dns ACME               | TCP      | 127.0.0.1       | Let's Encrypt http-01 for the public DNS cert |
 | 22483 | dns-admin ACME         | TCP      | 127.0.0.1       | step-ca http-01 for the admin UI cert         |
+
+> Note: Technitium always binds a plain-DNS listener on port 53 on all its listen addresses (the
+> listener cannot be disabled selectively without also disabling DoH/DoT/DoQ, which share the same
+> interface addresses). Port 53 is therefore left bound but **closed to the public internet at the
+> firewall** and allowed only on the `tailscale0` interface.
 
 ---
 

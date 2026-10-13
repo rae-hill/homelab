@@ -219,17 +219,20 @@ in
       };
 
       technitium = {
-        # Public authoritative/encrypted DNS endpoint (aedilis). Technitium natively
-        # terminates DoH/DoT/DoQ with a managed Let's Encrypt cert.
+        # Personal recursive DNS resolver (aedilis). Recursion is open to any
+        # client (rate-limited); public plaintext 53 is firewalled off (Tailscale
+        # only). Technitium natively terminates DoH/DoT/DoQ with a managed Let's
+        # Encrypt cert for public recursion.
         subdomain = "dns";
         domain = mkDomain "dns";
         url = mkUrl "dns";
         clientId = "technitium";
         oidcEndpoint = mkOidcEndpoint "technitium";
-        # DNS protocol ports (all public, Technitium-terminated)
-        dnsPort = 53;
-        dotPort = 853; # DNS-over-TLS (tcp) and DNS-over-QUIC (udp)
-        dohPort = 443; # DNS-over-HTTPS (native TLS)
+        # DNS protocol ports. DoH/DoT/DoQ are public (Technitium-terminated); plain
+        # 53 is Tailscale-only (firewalled off the public internet).
+        dnsPort = 53; # plain DNS — Tailscale-only (see _private/aedilis/security.nix)
+        dotPort = 853; # DNS-over-TLS (tcp) and DNS-over-QUIC (udp) — public
+        dohPort = 443; # DNS-over-HTTPS (native TLS) — public
         # Technitium web console — loopback plain HTTP, fronted by Caddy on adminPort.
         webHttpPort = 5380;
         # ACME http-01 challenge listener (loopback; Caddy proxies :80 to it).

@@ -264,20 +264,22 @@ sudo systemctl reload prometheus || sudo systemctl restart prometheus
 
 ## 8. End-to-end verification
 
-### DNS (public, from off-network)
+### DNS (recursive resolver)
 
 ```sh
-# Plain DNS (authoritative only — recursion is ACL-restricted to Tailscale):
-dig @aedilis-public-ip <a-zone-you-host>        # should answer authoritatively
-dig @aedilis-public-ip google.com               # should REFUSE/not recurse for untrusted clients
+# Public plaintext 53 is FIREWALLED OFF — this should TIME OUT from off-network:
+dig @aedilis-public-ip google.com               # expect timeout (port 53 closed publicly)
 
+# Public recursion works over the encrypted transports (open to any client):
 # DoT (Technitium-native TLS on 853/tcp):
-kdig -d @aedilis-public-ip +tls <zone>
+kdig -d @aedilis-public-ip +tls google.com      # should resolve recursively
 # DoH (Technitium-native TLS on 443):
-curl -s "https://dns.plato-splunk.media/dns-query?name=<zone>&type=A" \
-  -H 'accept: application/dns-json'
+curl -s "https://dns.plato-splunk.media/dns-query?name=google.com&type=A" \
+  -H 'accept: application/dns-json'              # should resolve recursively
 # DoQ (if your client supports it): 853/udp
-# From a trusted Tailscale client, recursion should work over the encrypted transports.
+
+# Plain DNS over Tailscale (personal devices) should resolve recursively:
+dig @aedilis.plato-splunk.media google.com      # over the tailnet; should resolve
 ```
 
 ### Admin UI (Tailscale + OIDC, no mTLS)
@@ -337,7 +339,8 @@ sudo tailscale status
 
 - Re-run full validation and commit the TOTP seed change.
 - Confirm the `technitium-metrics-token.timer` is active (`systemctl list-timers | grep technitium`).
-- Create your first authoritative zone(s) in the Technitium admin UI; plan NS records / secondaries
-  for the HA path (see `docs/aedilis-host-plan.md` §7b).
+- Confirm recursion works for your own devices over the encrypted transports and over Tailscale
+  plain DNS; set your clients' DNS to aedilis (DoH/DoT) as desired. Authoritative zones and HA are
+  handled on separate dedicated hosts, not aedilis (see `docs/aedilis-host-plan.md` §7b).
 - Consider enabling Tailscale client metrics so the `tailscale{instance=aedilis}` scrape target is
   UP (fleet-wide gap noted in the audit §8).

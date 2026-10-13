@@ -14,7 +14,7 @@ augustus-side wiring. Severity: **[HIGH]** act before/at deploy, **[MED]** worth
 | #  | Sev  | Area              | One-line                                                                     |
 | -- | ---- | ----------------- | ---------------------------------------------------------------------------- |
 | 1  | DONE | systemd hardening | ✅ added `SystemCallFilter`/`SystemCallArchitectures` on the DNS service     |
-| 2  | DONE | DNS abuse         | ✅ QPM rate limiting on public UDP/53 implemented                            |
+| 2  | DONE | DNS abuse         | ✅ QPM rate limiting — primary control for the open recursive resolver       |
 | 3  | DONE | secrets           | ✅ dedicated `certGroup` for Caddy/Alloy; secrets are owner-only (no group)  |
 | 4  | DONE | DNSSEC            | ✅ validation implemented; zone signing is a per-zone follow-up              |
 | 5  | MED  | provisioning      | Admin password only set first-boot; break-glass local admin (manual disable) |
@@ -51,14 +51,21 @@ since the rest of the sandbox is intact.
 
 ---
 
-## 2. [HIGH → IMPLEMENTED] Per-client rate limiting on public UDP/53
+## 2. [HIGH → IMPLEMENTED] Per-client rate limiting — now the primary open-resolver control
+
+> **Role update (2026-10-13):** aedilis is now a recursive resolver with recursion open to any
+> client (`DNS_SERVER_RECURSION=Allow`) and public plaintext 53 **firewalled off** (reachable only
+> over Tailscale). Rate limiting is therefore the **primary** abuse control for the open resolver —
+> not just a reflection blunting on an authoritative server. It remains enabled and applies to the
+> public encrypted transports (DoH/DoT/DoQ) and the Tailscale-only plain 53.
 
 **Implemented (2026-10-12).** Added a `rateLimit` option group
 (`services.technitium-server-complete.rateLimit.{enable,sampleMinutes,udpTruncationPercentage,ipv4,ipv6}`)
 and wired it into the provisioner's `settings/set` (`qpmLimitSampleMinutes`,
 `qpmLimitUdpTruncationPercentage`, `qpmPrefixLimitsIPv4/IPv6`). aedilis enables it with per-/32 (v4)
 and per-/64 (v6) UDP caps and 50% TC-truncation fallback, so over-limit UDP clients get a TCP retry
-rather than being dropped — blunting reflection/amplification without hurting legitimate clients.
+rather than being dropped — bounding DoS/abuse of the open resolver without hurting legitimate
+clients.
 
 Original finding retained for context:
 
@@ -94,13 +101,11 @@ dedicated `technitium-certs` group for the ACME certs so Caddy's membership is s
 
 **Validation side — implemented (2026-10-12).** Added a `dnssecValidation` option (default `true`)
 wired into the provisioner (`settings/set?dnssecValidation=`). aedilis enables it, so recursive
-answers served to trusted Tailscale clients are DNSSEC-validated against forged/poisoned upstream
-responses.
+answers served to clients are DNSSEC-validated against forged/poisoned upstream responses.
 
-**Signing side — still a per-zone decision.** For zones aedilis is _authoritative_ for, DNSSEC
-signing (sign zone → publish `DS` at the registrar → manage key rollovers) is done per-zone in the
-UI/API when zones are created. Not a global toggle; defer to the zones/HA follow-up. Documented so
-it isn't forgotten.
+**Signing side — not applicable to aedilis (recursive resolver).** aedilis no longer hosts
+authoritative zones, so DNSSEC _signing_ (sign zone → publish `DS` → key rollovers) is out of scope
+here; it belongs on the dedicated authoritative hosts. Only validation (above) applies to aedilis.
 
 ---
 
@@ -184,7 +189,10 @@ consumed on aedilis** (only augustus consumes it). Leaving it is harmless but mi
 
 ## Positive notes (things that are good)
 
-- **Recursion ACL** restricted to Tailscale CGNAT + ULA + loopback — correct anti-amplification model.
+- **Recursion open** to any client (`DNS_SERVER_RECURSION=Allow`) — personal recursive resolver.
+  Abuse is bounded by per-client QPM rate limiting + public plaintext 53 being firewalled off
+  (reachable only over Tailscale); public recursion is served only over non-spoofable encrypted
+  transports (DoH/DoT/DoQ).
 - **mTLS kept where it belongs** (metrics, which has no OIDC) and dropped where redundant (admin UI
   behind Tailscale + OIDC). Good least-surprise.
 - **Fail-fast provisioning** with per-call status/errorMessage checks — failures are visible.

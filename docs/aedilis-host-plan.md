@@ -2,18 +2,28 @@
 
 Status: **planning** (nothing implemented yet)
 
-`aedilis` is a new single-purpose NixOS host running [Technitium DNS Server](https://github.com/TechnitiumSoftware/DnsServer) on an OVHCloud VPS. It serves plain DNS publicly, encrypted DNS (DoH/DoT/DoQ) publicly, exposes an SSO-gated + client-cert-gated admin UI over Tailscale, and ships metrics/logs back to the augustus observability stack.
+> **Role change (2026-10-13):** aedilis has been re-scoped from a public **authoritative**
+> nameserver to a personal **recursive resolver**. It no longer serves plaintext DNS on the public
+> internet: port 53 (udp+tcp) is **closed at the public firewall** and reachable only over
+> Tailscale. Recursion is now **open to any client** (`DNS_SERVER_RECURSION=Allow`), but publicly
+> only over the encrypted transports (DoH/DoT/DoQ), with per-client QPM rate limiting as the primary
+> abuse control. Sections below describing authoritative behaviour / public plain 53 / recursion
+> ACLs are retained for history but superseded by this note (see §7a/§7b for the updated rationale).
+> Future authoritative DNS infrastructure will live on separate VPS hosts.
+
+`aedilis` is a new single-purpose NixOS host running [Technitium DNS Server](https://github.com/TechnitiumSoftware/DnsServer) on an OVHCloud VPS. It serves encrypted DNS (DoH/DoT/DoQ) publicly as a recursive resolver, plain DNS over Tailscale for personal devices, exposes an SSO-gated admin UI over Tailscale, and ships metrics/logs back to the augustus observability stack.
 
 ---
 
 ## 1. Architecture Overview
 
 ```
-Public internet ──► 53/udp, 53/tcp              → Technitium (plain DNS, recursion ACL-gated)
-                └─► 443 (DoH)                    → Caddy (public TLS) ─► Technitium :80 /dns-query
-                └─► 853/tcp (DoT), 853/udp (DoQ) → Technitium (own TLS cert, PKCS#12)
+Public internet ──► 443 (DoH)                    → Technitium (native TLS, recursion open)
+                └─► 853/tcp (DoT), 853/udp (DoQ) → Technitium (native TLS, recursion open)
+                  ✗ 53/udp, 53/tcp                → CLOSED to the public (firewalled)
 
-Tailscale only ──► dns-admin  (mTLS client-cert) → Caddy ─► Technitium :5380 (admin UI, also OIDC/SSO)
+Tailscale only ──► 53/udp, 53/tcp                → Technitium (plain DNS for personal devices)
+                └─► dns-admin  (OIDC/SSO)         → Caddy ─► Technitium :5380 (admin UI)
                 └─► dns-metrics (mTLS)            → Caddy ─► Technitium /api/dashboard/metrics/text (bearer)
                 └─► Alloy ships journald logs     → augustus Loki push endpoint (mTLS client cert)
 
@@ -32,7 +42,8 @@ Metrics scrape: augustus Prometheus ──► dns-metrics (mTLS + shared bearer 
 | `dns-admin.plato-splunk.media`   | Tailscale, mTLS | Technitium web admin UI (+ OIDC login)   | step-ca       |
 | `dns-metrics.plato-splunk.media` | Tailscale, mTLS | Prometheus metrics endpoint              | step-ca       |
 
-Plain DNS (53/tcp + 53/udp) is served directly by Technitium on the public IP.
+Plain DNS (53/tcp + 53/udp) is firewalled off the public internet and reachable only over Tailscale
+for personal devices. Public clients use the encrypted transports (DoH/DoT/DoQ).
 
 ---
 
@@ -178,9 +189,9 @@ Follows the multi-file feature pattern from `features/cicero-observability/`.
     - `DNS_SERVER_OPTIONAL_PROTOCOL_DNS_OVER_HTTP=true` (DoH behind Caddy)
     - `DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES=127.0.0.1`
     - `DNS_SERVER_ADMIN_PASSWORD_FILE=<sops path>`
-    - Recursion (amplification mitigation — see §7a):
-      - `DNS_SERVER_RECURSION=UseSpecifiedNetworkACL`
-      - `DNS_SERVER_RECURSION_NETWORK_ACL=100.64.0.0/10,fd7a:115c:a1e0::/48,127.0.0.1,::1` (Tailscale CGNAT range + ULA + loopback; adjust to trusted CIDRs)
+    - Recursion (open resolver; abuse mitigation via rate limiting + firewall — see §7a):
+      - `DNS_SERVER_RECURSION=Allow` (recursion open to any client)
+      - (no `DNS_SERVER_RECURSION_NETWORK_ACL` — gating is at the transport/firewall layer)
     - Forwarders: `DNS_SERVER_FORWARDERS=...` + `DNS_SERVER_FORWARDER_PROTOCOL=Https|Tls|Quic`
     - SSO: `DNS_SERVER_SSO_ENABLED=true`, `DNS_SERVER_SSO_AUTHORITY=https://idm.plato-splunk.media/oauth2/openid/technitium`, `DNS_SERVER_SSO_CLIENT_ID=technitium`, `DNS_SERVER_SSO_CLIENT_SECRET_FILE=<sops path>`, `DNS_SERVER_SSO_SCOPES=openid,profile,email`, `DNS_SERVER_SSO_ALLOW_SIGNUP_ONLY_FOR_MAPPED_USERS=true`, `DNS_SERVER_SSO_GROUP_MAP=Administrators:Administrators`
   - Exposes module options (`domain`, `forwarders`, `oidc.*`, `recursion.*`) so host config stays declarative.
@@ -232,9 +243,10 @@ Follows the multi-file feature pattern from `features/cicero-observability/`.
   - `nixpkgs.config.allowUnfree = true;`
   - `system.stateVersion = "23.11";` (match the installed base image to avoid state migration)
 - **`security.nix`** — firewall:
-  - Public `allowedTCPPorts`: 53, 443, 853, 80 (public ACME http-01)
-  - Public `allowedUDPPorts`: 53, 853 (DoQ)
-  - `tailscale0` interface only: 22 (SSH), dns-admin/dns-metrics ports, 5252 (TS metrics)
+  - Public `allowedTCPPorts`: 443, 853, 80 (public ACME http-01) — **no public 53**
+  - Public `allowedUDPPorts`: 853 (DoQ) — **no public 53**
+  - `tailscale0` interface only: 22 (SSH), 53 (plain DNS for personal devices, tcp+udp),
+    dns-admin/dns-metrics ports, 5252 (TS metrics)
   - `security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];`
   - Optional `services.ssh-cert-renewer` (gated on step-ca reachability).
 - **`users.nix`** — `jacob` + `rae`, `wheel`, YubiKey SSH keys (from base image + existing hosts).
@@ -427,37 +439,40 @@ scrape gaps). Suggested: 1 hour timeout, refresh timer every 20–30 min.
 
 ---
 
-## 7a. DNS Amplification Mitigation (recursion policy)
+## 7a. DNS Amplification Mitigation (recursion policy) — UPDATED 2026-10-13
 
-Goal: prevent `aedilis` from being abused as an open resolver for amplification/reflection attacks,
-while still letting trusted devices use it recursively. Layered defenses:
+Goal: run aedilis as a personal **recursive resolver** that any client may use, without letting it
+be abused as an open resolver for amplification/reflection DoS. Because public plaintext UDP/53 is
+the amplification vector, the design removes it from the public internet entirely and relies on
+connection-oriented encrypted transports + rate limiting for public recursion.
 
-1. **No open recursion over plain UDP/53.** Set `DNS_SERVER_RECURSION=UseSpecifiedNetworkACL` and
-   restrict `DNS_SERVER_RECURSION_NETWORK_ACL` to trusted CIDRs only:
-   - Tailscale CGNAT range `100.64.0.0/10`
-   - Tailscale ULA `fd7a:115c:a1e0::/48`
-   - loopback `127.0.0.1`, `::1`
-   - any explicitly trusted LAN.
-     Public clients then receive **authoritative** answers only (for zones aedilis hosts), never
-     recursion. This defeats the primary amplification vector, which depends on open recursion.
+1. **Recursion is open (`DNS_SERVER_RECURSION=Allow`).** Any client may get recursive answers. There
+   is no network ACL gating recursion anymore — the gating is done at the transport/firewall layer
+   instead (below).
 
-2. **Recursion only over connection-oriented / encrypted transports.** DoH (443), DoT (853/tcp),
-   and DoQ (853/udp QUIC) are TCP/QUIC — not source-spoofable like UDP/53 — so they can safely
-   carry recursion for trusted users without enabling reflection. Plain UDP/53 stays
-   authoritative-only.
+2. **No public plaintext UDP/53.** Port 53 (udp+tcp) is **closed at the public firewall** and
+   allowed only on the `tailscale0` interface. The public internet therefore cannot reach the
+   source-spoofable UDP/53 listener at all, which eliminates the classic amplification/reflection
+   vector regardless of the recursion setting. (Technitium cannot disable its plain-53 listener
+   selectively — DoH/DoT/DoQ bind to the same interface addresses on different ports, confirmed in
+   the vendored `DnsServer.cs` — so the firewall is the correct and only tool here.)
 
-3. **Per-client rate limiting (QPS cap).** Enable Technitium's built-in request rate limiting to
-   cap queries-per-client on UDP, blunting any residual amplification/abuse. (Configured in
-   Technitium settings/API; not an env var — fold into `provision.nix` or document as a one-time
-   setting.)
+3. **Public recursion only over encrypted transports.** DoH (443), DoT (853/tcp), and DoQ (853/udp
+   QUIC) are TCP/QUIC — connection-oriented and not blindly source-spoofable like UDP/53 — so they
+   can safely carry open recursion for the public internet without enabling reflection.
 
-4. **Firewall posture.** Keep 53/udp + 53/tcp public **only** if aedilis must be publicly
-   authoritative. If it's authoritative only for internal use, restrict 53 to `tailscale0` too.
-   853 and 443 are public for encrypted transports.
+4. **Per-client rate limiting (QPS/QPM cap).** Technitium's built-in request rate limiting caps
+   per-client queries (configured via the provisioner / `settings/set`). With recursion open this is
+   the **primary** abuse control, bounding DoS and residual amplification. Over-limit UDP gets TC=1
+   (TCP retry) rather than being dropped.
 
-**Net design:** plain 53 = authoritative-only, recursion disabled; recursion available only via
-encrypted transports restricted by ACL to trusted networks. This eliminates the amplification risk
-while preserving resolver functionality for your own devices.
+5. **DNSSEC validation on.** Recursive answers are DNSSEC-validated, protecting clients from forged
+   or poisoned upstream responses.
+
+**Net design:** public recursion is available only over encrypted, non-spoofable transports and is
+rate-limited; plaintext 53 is firewalled off the public internet and reachable only over Tailscale
+for personal devices. This preserves open-resolver convenience for your own use while removing the
+amplification surface.
 
 ---
 
@@ -493,12 +508,20 @@ primary, secondary, and catalog zones for exactly this.
 trusted LAN) alongside the encrypted transports. This is the most locked-down posture: nothing on
 plain 53 is reachable from the public internet, eliminating amplification surface completely.
 
-### Decision for this plan — CONFIRMED: authoritative
+### Decision for this plan — UPDATED 2026-10-13: recursive resolver
 
-aedilis is an **authoritative** nameserver (with intent to manage all owned domains on it over
-time). The plan **keeps public 53 as authoritative-only** (recursion disabled per §7a), HA-ready
-for a future primary + secondaries setup. Recursion remains available only over encrypted
-transports restricted to trusted ACLs.
+aedilis is a personal **recursive resolver**, NOT an authoritative nameserver. Public plaintext 53
+is **dropped entirely** (firewalled off the public internet; reachable only over `tailscale0` for
+personal devices). Public recursion is served only over the encrypted transports (DoH/DoT/DoQ) with
+per-client rate limiting (§7a). This is the most locked-down posture: nothing on plain UDP/53 is
+reachable from the public internet, eliminating the amplification surface.
+
+Authoritative DNS and any future high-availability authoritative setup (primary + secondaries, zone
+transfers) will be stood up on **separate VPS hosts** dedicated to that role, not on aedilis.
+
+> Previous decision (superseded): aedilis was planned as an authoritative nameserver keeping public
+> 53 open (authoritative-only) for HA readiness. That intent moved to dedicated hosts; aedilis is now
+> purely a recursive resolver.
 
 - `dprint fmt fmt .` on all new `.nix` files.
 - `nix build .#nixosConfigurations.aedilis.config.system.build.toplevel` — evaluate aedilis.

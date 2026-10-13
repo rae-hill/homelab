@@ -16,28 +16,37 @@
 
     # Public, internet-facing ports.
     #
-    # aedilis is an AUTHORITATIVE nameserver (recursion is locked down to trusted
-    # ACLs inside Technitium — see docs/aedilis-host-plan.md §7a/§7b), so plain 53
-    # is served publicly for authoritative answers and future HA (secondaries).
-    # DoH/DoT/DoQ are terminated natively by Technitium with a managed LE cert.
+    # aedilis is a personal RECURSIVE resolver (NOT authoritative). Recursion is
+    # open to any client (rate-limited — see docs/aedilis-host-plan.md §7a), but
+    # ONLY over the encrypted transports: DoH (443), DoT (853/tcp), DoQ (853/udp),
+    # all terminated natively by Technitium with a managed LE cert.
+    #
+    # Plain, plaintext DNS on port 53 is deliberately NOT exposed publicly. We
+    # cannot disable Technitium's plain-53 listener selectively (DoH/DoT/DoQ bind
+    # to the same interface addresses, only on different ports — confirmed in the
+    # vendored source, DnsServer.cs), so 53 is closed at the firewall instead and
+    # kept reachable only over Tailscale for our own devices.
     allowedTCPPorts = [
-      53 # DNS (authoritative, TCP fallback + future zone transfers)
       80 # Let's Encrypt HTTP-01 challenge (Caddy; Technitium does not use 80)
       443 # DoH (Technitium-native TLS)
       853 # DoT (Technitium-native TLS)
     ];
     allowedUDPPorts = [
-      53 # DNS (authoritative)
       853 # DoQ (Technitium-native TLS)
     ];
 
-    # Tailscale-only ports (admin UI, metrics, SSH, TS metrics exporter).
+    # Tailscale-only ports (plain DNS for our own devices, admin UI, metrics, SSH,
+    # TS metrics exporter).
     interfaces.tailscale0 = {
       allowedTCPPorts = [
         22 # SSH
+        53 # plain DNS over Tailscale (personal recursive resolver; TCP fallback)
         8443 # admin UI vhost (Caddy, OIDC-gated, no mTLS)
         9443 # dns-metrics endpoint (Caddy, mTLS); see service-registry dns-metrics.port
         5252 # Tailscale metrics exporter
+      ];
+      allowedUDPPorts = [
+        53 # plain DNS over Tailscale (personal recursive resolver)
       ];
     };
   };

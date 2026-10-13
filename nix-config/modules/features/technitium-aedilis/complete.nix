@@ -23,24 +23,24 @@ let
         adminPasswordFile = config.sops.secrets.technitium_admin_password.path;
 
         recursion = {
-          mode = "UseSpecifiedNetworkACL";
-          # Recursion only for trusted Tailscale networks (+ loopback). Public
-          # clients get authoritative-only answers over all transports.
-          networkACL = [
-            "100.64.0.0/10"
-            "fd7a:115c:a1e0::/48"
-            "127.0.0.1"
-            "::1"
-          ];
+          # Personal recursive resolver: recursion is open to ANY client. The
+          # anti-abuse control is per-client QPM rate limiting (below) plus the
+          # fact that plain plaintext DNS on 53 is firewalled off the public
+          # internet (reachable only over Tailscale) — so public recursion is
+          # available exclusively over the encrypted transports (DoH/DoT/DoQ),
+          # which are connection-oriented/QUIC and not source-spoofable, defeating
+          # UDP reflection/amplification. See docs/aedilis-host-plan.md §7a/§7b.
+          mode = "Allow";
         };
 
-        # DNSSEC validation on the recursive side (protects trusted clients from
-        # forged upstream answers). Zone signing is per-zone, done when zones exist.
+        # DNSSEC validation on the recursive side (protects clients from forged /
+        # poisoned upstream answers). This is the resolver's core safety control.
         dnssecValidation = true;
 
-        # Per-client QPM rate limiting to blunt UDP reflection/amplification on the
-        # public authoritative service. Over-limit UDP gets TC=1 (TCP retry) for 50%,
-        # the rest dropped. Defaults from the module are sane; set explicitly here.
+        # Per-client QPM rate limiting. With recursion now open to any client, this
+        # is the primary abuse control: it caps per-client query rates so the open
+        # recursive resolver can't be driven into reflection/amplification or DoS.
+        # Over-limit UDP gets TC=1 (TCP retry) for 50%, the rest dropped.
         rateLimit = {
           enable = true;
           sampleMinutes = 5;
