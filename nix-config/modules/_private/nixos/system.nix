@@ -1,7 +1,19 @@
-{ inputs, lib, config, pkgs, ... }:
+{
+  inputs,
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  # Bound the number of boot entries kept on the 511 MB ESP (/boot). Without this,
+  # systemd-boot copies every generation's kernel + initrd to the ESP, and with the
+  # daily autoUpgrade below that fills the small FAT32 partition and breaks the
+  # bootloader install step ("No space left on device"). 10 generations is plenty
+  # for rollback while leaving ample ESP headroom.
+  boot.loader.systemd-boot.configurationLimit = 10;
 
   boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 

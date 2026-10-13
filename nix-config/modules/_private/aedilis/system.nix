@@ -14,6 +14,10 @@
 
   # BIOS/GRUB boot on the OVH VPS (no EFI).
   boot.loader.grub.enable = true;
+  # Bound the GRUB generation menu. GRUB keeps kernels on the root fs (not a tiny
+  # ESP), so this is lower-risk than the systemd-boot hosts, but bounding the menu
+  # keeps /boot tidy and consistent with the rest of the fleet.
+  boot.loader.grub.configurationLimit = 10;
 
   networking.domain = "vps.ovh.us";
 

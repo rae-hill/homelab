@@ -1,7 +1,16 @@
-{ lib, config, pkgs, ... }:
+{
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 {
   boot.loader.grub.enable = false;
   boot.loader.generic-extlinux-compatible.enable = true;
+  # Bound the number of generations kept in /boot. extlinux copies each
+  # generation's kernel + initrd into the (small) boot partition, so an
+  # unbounded list can fill it over time. Mirrors the systemd-boot hosts.
+  boot.loader.generic-extlinux-compatible.configurationLimit = 10;
 
   networking.networkmanager.enable = true;
 
