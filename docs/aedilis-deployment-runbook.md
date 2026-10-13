@@ -1,15 +1,16 @@
 # Aedilis Deployment Runbook
 
 Status: **runbook** — step-by-step first deployment of the `aedilis` Technitium DNS host.
-Date: 2026-10-12 (updated for the configurable-module refactor:
-`services.technitium-server-complete`, native DoH/DoT/DoQ, admin UI on `:8443` OIDC-only,
-metrics on `:9443` mTLS).
+Date: 2026-10-13 (updated for the recursive-resolver role change:
+`DNS_SERVER_RECURSION=Allow`, public plaintext 53 firewalled off — Tailscale-only, public recursion
+served only over DoH/DoT/DoQ. Prior refactor: `services.technitium-server-complete`, native
+DoH/DoT/DoQ, admin UI on `:8443` OIDC-only, metrics on `:9443` mTLS.)
 
 This runbook covers the full bring-up sequence for `aedilis`, an OVHCloud VPS running Technitium
-DNS. It accounts for the bootstrapping ordering problem: **aedilis cannot reach Kanidm or step-ca
-over Tailscale until it has joined the tailnet and been added to the Tailscale ACLs, which happens
-_after_ the initial deploy.** The runbook is therefore staged so that each service comes up (or
-retries) in the right order.
+DNS as a personal **recursive resolver**. It accounts for the bootstrapping ordering problem:
+**aedilis cannot reach Kanidm or step-ca over Tailscale until it has joined the tailnet and been
+added to the Tailscale ACLs, which happens _after_ the initial deploy.** The runbook is therefore
+staged so that each service comes up (or retries) in the right order.
 
 > Related docs: `docs/aedilis-host-plan.md` (design), `docs/aedilis-implementation-audit.md` (gaps).
 
@@ -142,13 +143,13 @@ ls -l /run/secrets/                  # should list the technitium_* secrets
 - `ssh-cert-renewer` — needs step-ca over Tailscale → will fail until step 6 (daily timer retries).
 
 The core `technitium-dns-server` should be **running** (it does not depend on the certs to start;
-plain DNS on 53 works immediately, encrypted transports come online after provisioning):
+plain DNS on 53 is bound immediately, encrypted transports come online after provisioning):
 
 ```sh
 systemctl status technitium-dns-server
 sudo journalctl -u technitium-dns-server --no-pager | tail -50
-# Plain DNS should answer locally:
-dig @127.0.0.1 example.com
+# Recursion is open, so a local query should resolve recursively straight away:
+dig @127.0.0.1 example.com      # should return an answer (recursive resolve)
 ```
 
 ---
@@ -311,25 +312,31 @@ targets are **UP**.
 
 ## 9. Debugging cheatsheet
 
-| Symptom                                    | Check                                                                                                                                                                       |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `technitium-provision` keeps restarting    | `journalctl -u technitium-provision` — it fails fast with the Technitium `errorMessage`. Common causes: admin password mismatch (sops), public ACME cert not yet present.   |
-| Public cert won't issue                    | `journalctl -u acme-dns.plato-splunk.media` — ensure OVH security group allows inbound 80; Caddy's `:80` vhost proxies `/.well-known/acme-challenge` to the acme listener.  |
-| Admin/metrics cert won't issue             | step-ca unreachable → verify Tailscale ACLs (step 6); `journalctl -u acme-dns-admin.plato-splunk.media` / `acme-dns-metrics...`.                                            |
-| DoH/DoT/DoQ not listening (443/853)        | `technitium-provision` `settings/set` failed → check provision logs; confirm the PKCS#12 exists at `/var/lib/technitium-dns-server/dns.pfx` and the public cert is present. |
-| Admin UI unreachable                       | It's bound to `tailscale0:8443` — must be reached over Tailscale. Confirm the Tailscale ACL allows your device → `aedilis:8443`.                                            |
-| Admin SSO redirect error                   | OIDC `originUrl` in the Kanidm client must match Technitium's real callback. Check `journalctl -u kanidm` on augustus and Technitium web logs.                              |
-| Metrics scrape 401/invalid-token           | augustus token oneshot failed → `journalctl -u technitium-metrics-token`; verify TOTP seed + password match between hosts; re-run the service.                              |
-| Prometheus won't load config               | `/run/technitium-metrics/token` missing → start `technitium-metrics-token.service` before prometheus.                                                                       |
-| SSH host cert missing                      | `journalctl -u ssh-cert-renewer` — needs step-ca over Tailscale + the JWK provisioner key on the box.                                                                       |
-| sops secrets absent (`/run/secrets` empty) | aedilis host age key not a recipient, or `/home/admin/.config/sops/age/keys.txt` missing → `journalctl -u sops-nix`.                                                        |
+| Symptom                                    | Check                                                                                                                                                                                  |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `technitium-provision` keeps restarting    | `journalctl -u technitium-provision` — it fails fast with the Technitium `errorMessage`. Common causes: admin password mismatch (sops), public ACME cert not yet present.              |
+| Public cert won't issue                    | `journalctl -u acme-dns.plato-splunk.media` — ensure OVH security group allows inbound 80; Caddy's `:80` vhost proxies `/.well-known/acme-challenge` to the acme listener.             |
+| Admin/metrics cert won't issue             | step-ca unreachable → verify Tailscale ACLs (step 6); `journalctl -u acme-dns-admin.plato-splunk.media` / `acme-dns-metrics...`.                                                       |
+| DoH/DoT/DoQ not listening (443/853)        | `technitium-provision` `settings/set` failed → check provision logs; confirm the PKCS#12 exists at `/var/lib/technitium-dns-server/dns.pfx` and the public cert is present.            |
+| Public plain DNS (53) times out            | **By design.** Port 53 is firewalled off the public internet (Tailscale-only). Public clients must use DoH/DoT/DoQ. Do NOT reopen 53 publicly — see `docs/aedilis-host-plan.md` §7a.   |
+| Recursion refused for a client             | Recursion is `Allow` (open to all). If a client is refused, check per-client QPM rate limits (`settings/get`) — a client exceeding the cap gets throttled/truncated, not a config ACL. |
+| Admin UI unreachable                       | It's bound to `tailscale0:8443` — must be reached over Tailscale. Confirm the Tailscale ACL allows your device → `aedilis:8443`.                                                       |
+| Admin SSO redirect error                   | OIDC `originUrl` in the Kanidm client must match Technitium's real callback. Check `journalctl -u kanidm` on augustus and Technitium web logs.                                         |
+| Metrics scrape 401/invalid-token           | augustus token oneshot failed → `journalctl -u technitium-metrics-token`; verify TOTP seed + password match between hosts; re-run the service.                                         |
+| Prometheus won't load config               | `/run/technitium-metrics/token` missing → start `technitium-metrics-token.service` before prometheus.                                                                                  |
+| SSH host cert missing                      | `journalctl -u ssh-cert-renewer` — needs step-ca over Tailscale + the JWK provisioner key on the box.                                                                                  |
+| sops secrets absent (`/run/secrets` empty) | aedilis host age key not a recipient, or `/home/admin/.config/sops/age/keys.txt` missing → `journalctl -u sops-nix`.                                                                   |
 
 ### Useful one-liners (on aedilis)
 
 ```sh
 systemctl --failed
 sudo journalctl -u technitium-dns-server -u technitium-provision -u caddy -u alloy --since "10 min ago"
-sudo ss -tlnp | grep -E ':(53|80|443|853|5380|8443|9443|9100)'   # who is listening where
+# Who is listening where. NOTE: 53 WILL appear bound (Technitium always binds it);
+# it is firewalled off the public internet and reachable only over tailscale0.
+sudo ss -tlnp | grep -E ':(53|80|443|853|5380|8443|9443|9100)'
+# Confirm the public firewall drops 53 but allows the encrypted transports:
+sudo iptables -S | grep -E 'dpt:(53|443|853)' ; sudo ip6tables -S | grep -E 'dpt:(53|443|853)'
 sudo tailscale status
 ```
 
