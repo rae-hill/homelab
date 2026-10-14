@@ -98,17 +98,16 @@ let
 
         provision = {
           enable = true;
+          # Dedicated least-privilege API user (created manually — see runbook). The
+          # token broker logs in as this user; it holds Settings:Modify + Zones:Modify
+          # only (NOT admin). aedilis is a recursive resolver so ensureDnsRecords stays
+          # off; the provisioner is used for the settings + encrypted-DNS steps.
+          apiUser = "provisioner";
+          apiPasswordFile = config.sops.secrets.technitium_provisioner_password.path;
           provisionDoTDoQCert = true;
           # Order the provisioner after the public DNS cert exists (needed for the
           # PKCS#12 conversion), without the generic module touching security.acme.
           certReadyUnits = [ "acme-${tech.domain}.service" ];
-          metricsUser = {
-            enable = true;
-            username = "prometheus";
-            passwordFile = config.sops.secrets.technitium_metrics_user_password.path;
-            sessionTimeoutSeconds = 3600;
-            totp.enable = true;
-          };
         };
 
         caddy = {
@@ -143,6 +142,7 @@ in
   flake.modules.nixos.technitium-aedilis = {
     imports = [
       inputs.self.modules.nixos.technitium
+      inputs.self.modules.nixos.technitium-provisioning
       inputs.self.modules.nixos.technitium-aedilis-acme
       inputs.self.modules.nixos.technitium-aedilis-observability
       aedilisConfig

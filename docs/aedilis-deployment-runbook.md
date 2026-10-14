@@ -27,20 +27,28 @@ staged so that each service comes up (or retries) in the right order.
 - `secrets/aedilis.yaml` committed and encrypted to **both** your personal age key and the aedilis
   host age key (see `.sops.yaml`). Required: `technitium_admin_password`,
   `technitium_sso_client_secret`, `technitium_pkcs12_password`, `technitium_metrics_user_password`,
-  and `step_jwk_provisioner_password`. (The metrics **TOTP seed** is server-generated on aedilis
-  during provisioning — not pre-seeded here.)
+  `technitium_provisioner_password`, and `step_jwk_provisioner_password`. (The metrics **TOTP seed**
+  is captured when you enable 2FA on the metrics user — not pre-seeded here.)
+  - `technitium_admin_password` — the built-in `admin` account's bootstrap password. Used ONCE on
+    first boot and as break-glass; you also use it to **manually create** the two users below.
+  - `technitium_provisioner_password` — the password for the dedicated least-privilege
+    `provisioner` API user (Settings:Modify + Zones:Modify). The token broker logs in as this user;
+    it never uses `admin`. **You create this user manually** (step 6a) — the module does not.
+  - `technitium_metrics_user_password` — the password for the limited `prometheus` metrics user.
+    **You also create this user manually** (step 6a); the module no longer creates it.
 - On **augustus**, `secrets/augustus.yaml` must contain `technitium_client_secret`,
   `technitium_metrics_user_password`, and `technitium_metrics_totp_secret`. The TOTP secret value is
-  **not known yet** — it is generated on aedilis during provisioning (step 6). Seed it with a
-  placeholder for now and update it later.
+  **not known yet** — it is generated when you enable 2FA on the metrics user (step 6a). Seed it with
+  a placeholder for now and update it later.
 
 ### Secret value coordination (must match across hosts)
 
-| Secret                | aedilis key                        | augustus key                       | When set                                |
-| --------------------- | ---------------------------------- | ---------------------------------- | --------------------------------------- |
-| OIDC client secret    | `technitium_sso_client_secret`     | `technitium_client_secret`         | Now (generate once, put in both)        |
-| Metrics user password | `technitium_metrics_user_password` | `technitium_metrics_user_password` | Now (same value both)                   |
-| Metrics TOTP seed     | `technitium_metrics_totp_secret`   | `technitium_metrics_totp_secret`   | **After step 6** (generated on aedilis) |
+| Secret                | aedilis key                        | augustus key                       | When set                                    |
+| --------------------- | ---------------------------------- | ---------------------------------- | ------------------------------------------- |
+| OIDC client secret    | `technitium_sso_client_secret`     | `technitium_client_secret`         | Now (generate once, put in both)            |
+| Provisioner password  | `technitium_provisioner_password`  | — (aedilis only)                   | Now (used to create the provisioner user)   |
+| Metrics user password | `technitium_metrics_user_password` | `technitium_metrics_user_password` | Now (same value both)                       |
+| Metrics TOTP seed     | `technitium_metrics_totp_secret`   | `technitium_metrics_totp_secret`   | **After step 6a** (set on the metrics user) |
 
 ---
 
@@ -137,8 +145,10 @@ ls -l /run/secrets/                  # should list the technitium_* secrets
   actually SUCCEED here if the OVH firewall allows 80 inbound. If it fails, check port 80.
 - `acme-dns-admin.plato-splunk.media` and `acme-dns-metrics.plato-splunk.media` — step-ca certs,
   need step-ca over Tailscale → **will fail** until steps 5+6.
-- `technitium-provision` — needs the public ACME cert for the DoH/DoT/DoQ PKCS#12; retries
-  (`Restart=on-failure`).
+- `technitium-provision-encrypted-dns` — needs the public ACME cert for the DoH/DoT/DoQ PKCS#12;
+  retries (`Restart=on-failure`). Also `technitium-provision-settings` will fail until the
+  `provisioner` user exists (step 6a). The `technitium-provision-token.socket` is just listening at
+  this stage (socket-activated — it only runs on first connection).
 - `alloy` — needs the dns-metrics cert → will fail until step 6.
 - `ssh-cert-renewer` — needs step-ca over Tailscale → will fail until step 6 (daily timer retries).
 
@@ -202,16 +212,13 @@ Example ACL grant (adapt to your policy syntax):
 }
 ```
 
-After saving the ACLs, trigger the dependent units on aedilis:
+After saving the ACLs, trigger the internal certs on aedilis:
 
 ```sh
-# On aedilis — force the internal certs + provisioning now that step-ca is reachable:
+# On aedilis — force the internal certs now that step-ca is reachable:
 sudo systemctl start acme-dns-admin.plato-splunk.media.service
 sudo systemctl start acme-dns-metrics.plato-splunk.media.service
 sudo systemctl status acme-dns-metrics.plato-splunk.media.service
-
-sudo systemctl start technitium-provision.service
-sudo journalctl -u technitium-provision --no-pager    # watch for "completed successfully"
 
 sudo systemctl start alloy.service
 sudo systemctl status alloy.service
@@ -220,8 +227,9 @@ sudo systemctl start ssh-cert-renewer.service
 sudo journalctl -u ssh-cert-renewer --no-pager
 ```
 
-> `technitium-provision` will print an **ACTION REQUIRED** line with the server-generated TOTP seed
-> written to `/var/lib/technitium-dns-server/metrics-totp-seed`. Capture it in the next step.
+> **Do NOT start the provisioning units yet** — the `provisioner` and `prometheus` users do not
+> exist until you create them manually in step 6a. The token broker logs in as `provisioner`, so the
+> provisioning units will fail with a "provisioner login rejected" error until 6a is done.
 
 ### SSH host cert renewal note
 
@@ -232,18 +240,149 @@ authorized key as normal.
 
 ---
 
-## 7. Transfer the TOTP seed to augustus
+## 6a. Create the provisioning + metrics users (manual, one-time)
 
-The metrics `prometheus` user's TOTP seed is generated on aedilis (server-side) during provisioning.
-augustus needs the same seed to compute login codes for the metrics scrape.
+The provisioning module is **least-privilege and does not manage users**. You create two accounts
+manually against the built-in `admin` account:
+
+- **`provisioner`** — the account the token broker logs in as. Needs **Settings: Modify** (DNSSEC,
+  rate limits, DoH/DoT/DoQ) and, on authoritative hosts using `ensureDnsRecords`, **Zones: Modify**.
+  It must NOT have `Administration` — that is the whole point of not using `admin`.
+- **`prometheus`** — the limited metrics user augustus scrapes as. Needs **Dashboard: View** only,
+  plus TOTP 2FA.
+
+Technitium's API drives all of this. On aedilis, talk to the loopback web console
+(`http://127.0.0.1:5380`). Grab an admin token first:
 
 ```sh
-# On aedilis — read the seed (technitium-owned, root can read):
-sudo cat /var/lib/technitium-dns-server/metrics-totp-seed ; echo
+# On aedilis. ADMIN_PASS is the technitium_admin_password sops value.
+API=http://127.0.0.1:5380
+ADMIN_PASS="$(sudo cat /run/secrets/technitium_admin_password)"
+PROV_PASS="$(sudo cat /run/secrets/technitium_provisioner_password)"
+METRICS_PASS="$(sudo cat /run/secrets/technitium_metrics_user_password)"
+
+ADMIN_TOKEN="$(curl -fsS -G "$API/api/user/login" \
+  --data-urlencode "user=admin" --data-urlencode "pass=$ADMIN_PASS" \
+  --data-urlencode "includeInfo=false" | jq -r .token)"
+```
+
+**Create the `provisioner` user and a scoped group:**
+
+```sh
+# A group carrying exactly the sections the provisioner needs.
+curl -fsS -G "$API/api/admin/groups/create" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "group=provisioners" \
+  --data-urlencode "description=Least-privilege API provisioning (Settings + Zones)"
+
+# Grant Settings:Modify and Zones:Modify to the group. The permissions/set format is
+# section-scoped: groupPermissions=<group>|canView|canModify|canDelete.
+curl -fsS -G "$API/api/admin/permissions/set" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "section=Settings" \
+  --data-urlencode "groupPermissions=provisioners|true|true|false"
+
+curl -fsS -G "$API/api/admin/permissions/set" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "section=Zones" \
+  --data-urlencode "groupPermissions=provisioners|true|true|false"
+
+# Create the provisioner user and put it in the group.
+curl -fsS -G "$API/api/admin/users/create" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "displayName=provisioner" \
+  --data-urlencode "user=provisioner" \
+  --data-urlencode "pass=$PROV_PASS"
+
+curl -fsS -G "$API/api/admin/users/set" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "user=provisioner" \
+  --data-urlencode "memberOfGroups=provisioners"
+```
+
+> On a host that only drives settings (like aedilis, a recursive resolver with no `ensureDnsRecords`)
+> you can omit the `Zones` grant. On authoritative hosts that use `ensureDnsRecords`, keep both.
+
+**Create the `prometheus` metrics user (Dashboard view-only + TOTP):**
+
+```sh
+# Dashboard view-only group.
+curl -fsS -G "$API/api/admin/groups/create" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "group=metrics-readonly" \
+  --data-urlencode "description=Dashboard view-only for Prometheus"
+
+curl -fsS -G "$API/api/admin/permissions/set" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "section=Dashboard" \
+  --data-urlencode "groupPermissions=metrics-readonly|true|false|false"
+
+# Create the metrics user, restrict to the group, set a session timeout.
+curl -fsS -G "$API/api/admin/users/create" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "displayName=prometheus" \
+  --data-urlencode "user=prometheus" \
+  --data-urlencode "pass=$METRICS_PASS"
+
+curl -fsS -G "$API/api/admin/users/set" \
+  --data-urlencode "token=$ADMIN_TOKEN" \
+  --data-urlencode "user=prometheus" \
+  --data-urlencode "memberOfGroups=metrics-readonly" \
+  --data-urlencode "sessionTimeoutSeconds=3600"
+```
+
+**Enable TOTP on `prometheus` and capture the seed** (augustus needs the same seed — step 7):
+
+```sh
+# Log in as prometheus, init 2FA to get the server-generated secret.
+PROM_TOKEN="$(curl -fsS -G "$API/api/user/login" \
+  --data-urlencode "user=prometheus" --data-urlencode "pass=$METRICS_PASS" \
+  --data-urlencode "includeInfo=false" | jq -r .token)"
+
+SEED="$(curl -fsS -G "$API/api/user/2fa/init" \
+  --data-urlencode "token=$PROM_TOKEN" | jq -r '.response.secret')"
+echo "TOTP SEED (copy to augustus sops in step 7): $SEED"
+
+# Confirm 2FA with a current code (requires oathtool, in the devshell).
+CODE="$(oathtool --totp -b "$SEED")"
+curl -fsS -G "$API/api/user/2fa/enable" \
+  --data-urlencode "token=$PROM_TOKEN" --data-urlencode "totp=$CODE"
+```
+
+> Keep `$SEED` — you paste it into `secrets/augustus.yaml` as `technitium_metrics_totp_secret` in
+> step 7. (It is no longer written to a file on aedilis; capture it here.)
+
+### Now start the provisioning stack
+
+With the `provisioner` user in place, start the provisioning units (one target pulls in the whole
+stack; the token broker socket activates on first connection):
+
+```sh
+# On aedilis:
+sudo systemctl start technitium-provision.target
+# Watch each sub-unit; they fetch a token from the broker socket and apply their change:
+sudo journalctl -u 'technitium-provision-*' --no-pager | tail -40
+systemctl list-units 'technitium-provision-*'          # all should be active (exited)/listening
+```
+
+Expected units: `technitium-provision-token.socket` (listening),
+`technitium-provision-settings.service` and `technitium-provision-encrypted-dns.service` (active,
+exited). On an authoritative host, also `technitium-provision-records.service`.
+
+---
+
+## 7. Transfer the TOTP seed to augustus
+
+The metrics `prometheus` user's TOTP seed was captured when you enabled 2FA in step 6a. augustus
+needs the same seed to compute login codes for the metrics scrape.
+
+```sh
+# Use the $SEED you captured in step 6a (printed by the 2fa/init call). If you lost it,
+# disable + re-init 2FA on the prometheus user to get a fresh seed.
 
 # On your workstation — put it into augustus sops:
 sops nix-config/secrets/augustus.yaml
-#   set:  technitium_metrics_totp_secret: "<seed from above>"
+#   set:  technitium_metrics_totp_secret: "<seed from step 6a>"
 #   also confirm technitium_metrics_user_password matches aedilis's value.
 
 # Commit and redeploy augustus so the token oneshot can authenticate:
@@ -312,26 +451,29 @@ targets are **UP**.
 
 ## 9. Debugging cheatsheet
 
-| Symptom                                    | Check                                                                                                                                                                                  |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `technitium-provision` keeps restarting    | `journalctl -u technitium-provision` — it fails fast with the Technitium `errorMessage`. Common causes: admin password mismatch (sops), public ACME cert not yet present.              |
-| Public cert won't issue                    | `journalctl -u acme-dns.plato-splunk.media` — ensure OVH security group allows inbound 80; Caddy's `:80` vhost proxies `/.well-known/acme-challenge` to the acme listener.             |
-| Admin/metrics cert won't issue             | step-ca unreachable → verify Tailscale ACLs (step 6); `journalctl -u acme-dns-admin.plato-splunk.media` / `acme-dns-metrics...`.                                                       |
-| DoH/DoT/DoQ not listening (443/853)        | `technitium-provision` `settings/set` failed → check provision logs; confirm the PKCS#12 exists at `/var/lib/technitium-dns-server/dns.pfx` and the public cert is present.            |
-| Public plain DNS (53) times out            | **By design.** Port 53 is firewalled off the public internet (Tailscale-only). Public clients must use DoH/DoT/DoQ. Do NOT reopen 53 publicly — see `docs/aedilis-host-plan.md` §7a.   |
-| Recursion refused for a client             | Recursion is `Allow` (open to all). If a client is refused, check per-client QPM rate limits (`settings/get`) — a client exceeding the cap gets throttled/truncated, not a config ACL. |
-| Admin UI unreachable                       | It's bound to `tailscale0:8443` — must be reached over Tailscale. Confirm the Tailscale ACL allows your device → `aedilis:8443`.                                                       |
-| Admin SSO redirect error                   | OIDC `originUrl` in the Kanidm client must match Technitium's real callback. Check `journalctl -u kanidm` on augustus and Technitium web logs.                                         |
-| Metrics scrape 401/invalid-token           | augustus token oneshot failed → `journalctl -u technitium-metrics-token`; verify TOTP seed + password match between hosts; re-run the service.                                         |
-| Prometheus won't load config               | `/run/technitium-metrics/token` missing → start `technitium-metrics-token.service` before prometheus.                                                                                  |
-| SSH host cert missing                      | `journalctl -u ssh-cert-renewer` — needs step-ca over Tailscale + the JWK provisioner key on the box.                                                                                  |
-| sops secrets absent (`/run/secrets` empty) | aedilis host age key not a recipient, or `/home/admin/.config/sops/age/keys.txt` missing → `journalctl -u sops-nix`.                                                                   |
+| Symptom                                                   | Check                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| provisioning unit fails: "provisioner login rejected"     | The `provisioner` user doesn't exist / wrong password → do step 6a. `journalctl -u technitium-provision-token@*` shows the broker's login error. Verify `technitium_provisioner_password` sops value matches the user's password.                             |
+| provisioning unit fails: "token broker returned no token" | The broker socket isn't serving a token → `systemctl status technitium-provision-token.socket`; test manually: `sudo -u technitium socat - UNIX-CONNECT:/run/technitium-provision/token.sock`.                                                                |
+| provisioning unit: "API error ... Access was denied"      | The `provisioner` user is missing a section grant → in step 6a confirm `Settings: Modify` (and `Zones: Modify` for `ensureDnsRecords`). It must NOT need `Administration`.                                                                                    |
+| a provisioning sub-unit keeps restarting                  | `journalctl -u technitium-provision-settings -u technitium-provision-encrypted-dns -u technitium-provision-records` — each fails fast with the Technitium `errorMessage`. Common causes: provisioner perms, public ACME cert not yet present (encrypted-dns). |
+| Public cert won't issue                                   | `journalctl -u acme-dns.plato-splunk.media` — ensure OVH security group allows inbound 80; Caddy's `:80` vhost proxies `/.well-known/acme-challenge` to the acme listener.                                                                                    |
+| Admin/metrics cert won't issue                            | step-ca unreachable → verify Tailscale ACLs (step 6); `journalctl -u acme-dns-admin.plato-splunk.media` / `acme-dns-metrics...`.                                                                                                                              |
+| DoH/DoT/DoQ not listening (443/853)                       | `technitium-provision-encrypted-dns` `settings/set` failed → check its logs; confirm the PKCS#12 exists at `/var/lib/technitium-dns-server/dns.pfx` and the public cert is present.                                                                           |
+| Public plain DNS (53) times out                           | **By design.** Port 53 is firewalled off the public internet (Tailscale-only). Public clients must use DoH/DoT/DoQ. Do NOT reopen 53 publicly — see `docs/aedilis-host-plan.md` §7a.                                                                          |
+| Recursion refused for a client                            | Recursion is `Allow` (open to all). If a client is refused, check per-client QPM rate limits (`settings/get`) — a client exceeding the cap gets throttled/truncated, not a config ACL.                                                                        |
+| Admin UI unreachable                                      | It's bound to `tailscale0:8443` — must be reached over Tailscale. Confirm the Tailscale ACL allows your device → `aedilis:8443`.                                                                                                                              |
+| Admin SSO redirect error                                  | OIDC `originUrl` in the Kanidm client must match Technitium's real callback. Check `journalctl -u kanidm` on augustus and Technitium web logs.                                                                                                                |
+| Metrics scrape 401/invalid-token                          | augustus token oneshot failed → `journalctl -u technitium-metrics-token`; verify TOTP seed + password match between hosts; re-run the service.                                                                                                                |
+| Prometheus won't load config                              | `/run/technitium-metrics/token` missing → start `technitium-metrics-token.service` before prometheus.                                                                                                                                                         |
+| SSH host cert missing                                     | `journalctl -u ssh-cert-renewer` — needs step-ca over Tailscale + the JWK provisioner key on the box.                                                                                                                                                         |
+| sops secrets absent (`/run/secrets` empty)                | aedilis host age key not a recipient, or `/home/admin/.config/sops/age/keys.txt` missing → `journalctl -u sops-nix`.                                                                                                                                          |
 
 ### Useful one-liners (on aedilis)
 
 ```sh
 systemctl --failed
-sudo journalctl -u technitium-dns-server -u technitium-provision -u caddy -u alloy --since "10 min ago"
+sudo journalctl -u technitium-dns-server -u 'technitium-provision-*' -u caddy -u alloy --since "10 min ago"
 # Who is listening where. NOTE: 53 WILL appear bound (Technitium always binds it);
 # it is firewalled off the public internet and reachable only over tailscale0.
 sudo ss -tlnp | grep -E ':(53|80|443|853|5380|8443|9443|9100)'

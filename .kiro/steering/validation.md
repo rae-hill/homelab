@@ -2,6 +2,30 @@
 
 This document describes the validation steps to run after making changes.
 
+## CRITICAL: Git-track new `.nix` files before running Nix checks
+
+Nix flakes evaluate against the **git tree**, not the raw working directory. Any
+**newly created** file that is still untracked is **invisible** to flake evaluation —
+`import-tree` will not load it, `nix eval`/`nix build`/`nix flake check` will behave as
+if the file does not exist. This produces confusing failures: a module you just wrote
+appears "missing" (e.g. `error: attribute 'my-new-module' missing`), and no amount of
+re-reading the file explains why.
+
+**Before running any Nix check (`nix eval`, `nix build`, `nix flake check`,
+`remote-build-*`), stage newly created files:**
+
+```sh
+git add <new-files>        # or: git add -A
+```
+
+Staging (not committing) is sufficient — `git add` makes the files part of the tree
+Nix sees. Modified files that are already tracked do **not** need re-staging for Nix to
+see edits, but newly created files **always** do.
+
+> If a Nix evaluation fails with a "missing attribute / file" error for something you
+> know exists on disk, **check `git status` first** — an untracked new file is the most
+> common cause. Do not fall into a loop of re-editing a correct file; just `git add` it.
+
 ## Full Validation
 
 Run these commands from the repo root in order:

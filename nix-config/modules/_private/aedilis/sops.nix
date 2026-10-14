@@ -19,11 +19,20 @@
     owner = "technitium";
   };
 
-  # Credentials for the limited "prometheus" metrics user. The TOTP seed is NOT
-  # here: it is server-generated on first provisioning and persisted to a state
-  # file (/var/lib/technitium-dns-server/metrics-totp-seed) for out-of-band
-  # transfer to augustus. See docs/aedilis-deployment-runbook.md §7.
+  # Credentials for the limited "prometheus" metrics user. The metrics user is
+  # created MANUALLY (see runbook) — this is the password you set when creating it,
+  # also consumed by augustus to compute scrape logins. The TOTP seed is NOT here:
+  # you capture it when enabling 2FA on the metrics user and transfer it to augustus
+  # out-of-band. See docs/aedilis-deployment-runbook.md §7.
   sops.secrets.technitium_metrics_user_password = {
+    owner = "technitium";
+  };
+
+  # Password for the dedicated, least-privilege "provisioner" API user that the
+  # token broker logs in as (Settings:Modify + Zones:Modify only — NOT admin). The
+  # provisioner user is created MANUALLY against the admin account; see the runbook.
+  # Owner-only: only the broker service user (technitium) reads it.
+  sops.secrets.technitium_provisioner_password = {
     owner = "technitium";
   };
 

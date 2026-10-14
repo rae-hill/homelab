@@ -1,11 +1,30 @@
 # Technitium Provisioning Module + `ensureDnsRecords` — Plan
 
-Status: **planning** (nothing implemented yet)
-Date: 2026-10-13
+Status: **IMPLEMENTED** (2026-10-14)
+Date: 2026-10-13 (updated 2026-10-14)
+
+> **Implementation note (2026-10-14):** Delivered as `features/technitium-provisioning/`
+> with two refinements over the original plan:
+>
+> - **Record types are a tagged union (`lib.types.attrTag`)**, not a flat record with
+>   nullable fields. Each record is `{ <TYPE> = { name; ttl?; …type-specific fields }; }`
+>   (e.g. `{ A = { name = "@"; address = "100.64.0.1"; }; }`). Per-type required fields
+>   are enforced by the module system at eval time, so the runtime validation /
+>   assertions from the first cut are **removed** — an A record missing `address`, or an
+>   A record carrying an `exchange`, now fails `nix eval`. See §5.
+> - **The shared token is served by a socket-activated broker**, not a group-readable
+>   file. `technitium-provision-token.socket` (Accept=yes, `root:<tokenGroup>` mode 0660)
+>   spawns a per-connection `technitium-provision-token@` template that validates a
+>   cached token against a stored deadline, lazily refreshes via the admin password if
+>   elapsed (flock-guarded), and writes the token to the connection (`StandardOutput=socket`).
+>   Consumers fetch it with `socat - UNIX-CONNECT:<sock>`. Only the broker service user
+>   reads the admin password + token cache; the group gates socket access only. The
+>   previous `wait.service` is gone (the broker + each consumer's `wait_for_api` cover
+>   readiness). See §4.
 
 > **Decisions locked (2026-10-13):** O1 server-only generic module; O2 dedicated
-> token-refresher service + shared token file gated by service-account group; O3
-> plain-Nix values with a **shared public/private record source of truth** reusable
+> token broker gated by service-account group (refined to a socket broker — see note);
+> O3 plain-Nix values with a **shared public/private record source of truth** reusable
 > across hosts; O4 **upsert-only / strictly idempotent — never delete** (the "ensure"
 > semantics); O6 per-host provisioner, and provisioning units must surface failures
 > in Grafana (node-exporter `systemd` collector metrics + Alloy journald logs). See §4–§6, §9.

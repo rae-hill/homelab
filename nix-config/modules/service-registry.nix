@@ -47,6 +47,26 @@ in
       inherit mkOidcEndpoint;
     };
 
+    # Shared source of truth for declaratively-provisioned authoritative DNS records
+    # (consumed by hosts running the technitium-provisioning feature with
+    # services.technitium-server-complete.provision.ensureDnsRecords.enable = true).
+    #
+    #   dnsRecords.public  — records for PUBLIC authoritative servers (public IPs).
+    #   dnsRecords.private — records for PRIVATE (Tailscale) authoritative servers.
+    #                        These point at tailnet 100.x / ULA addresses and are
+    #                        NEVER published to Route53 — they only ever live here and
+    #                        are served by tailnet-only hosts.
+    #
+    # Each host references the slice it serves, e.g.:
+    #   provision.ensureDnsRecords.zones = config.constants.dnsRecords.private;
+    # The attrset shape matches services.technitium-server-complete.provision
+    #   .ensureDnsRecords.zones: { "<zone>" = { type?; useSoaSerialDateScheme?;
+    #   records = [ { name; type; ttl?; <value fields> } ]; }; }
+    dnsRecords = {
+      public = { };
+      private = { };
+    };
+
     postgres = {
       domain = mkDomain "postgres-augustus";
       port = 5432;
