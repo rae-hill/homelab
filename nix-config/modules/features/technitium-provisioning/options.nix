@@ -189,6 +189,18 @@
           description = "Run the API-driven provisioning units after first start.";
         };
 
+        # Internal: each provisioning unit appends its generated script package here so
+        # the flake-level `checks.shellcheck` gate can harvest and build them (which runs
+        # their writeShellApplication ShellCheck checkPhase) without building the whole
+        # host. Not meant to be set by consumers.
+        _lintScripts = mkOption {
+          type = types.listOf types.package;
+          default = [ ];
+          internal = true;
+          visible = false;
+          description = "Internal registry of provisioning script packages for the shellcheck gate.";
+        };
+
         apiUser = mkOption {
           type = types.str;
           description = ''

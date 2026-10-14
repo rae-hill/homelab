@@ -115,7 +115,7 @@
 
       zoneBlocks = concatStringsSep "\n" (mapAttrsToList renderZone ensure.zones);
 
-      recordsScript = pkgs.writeShellApplication {
+      recordsScript = topLevel.config.constants.shell.mkScript pkgs {
         name = "technitium-provision-records";
         runtimeInputs = provisionLib.baseRuntimeInputs pkgs;
         text =
@@ -135,6 +135,8 @@
     in
     {
       config = mkIf (cfg.enable && prov.enable && ensure.enable) {
+        services.technitium-server-complete.provision._lintScripts = [ recordsScript ];
+
         systemd.services.technitium-provision-records = {
           description = "Technitium provisioning: ensure authoritative zones + records";
           after = [

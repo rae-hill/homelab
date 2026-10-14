@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }@topLevel:
 {
   # Socket-activated session-token broker. The ONLY unit with access to the
   # provisioning user's password and the cached session token. Consumers connect to a
@@ -38,7 +38,7 @@
       deadlineCache = "${cacheDir}/deadline";
       lockFile = "${cacheDir}/.lock";
 
-      brokerScript = pkgs.writeShellApplication {
+      brokerScript = topLevel.config.constants.shell.mkScript pkgs {
         name = "technitium-provision-token-broker";
         runtimeInputs = with pkgs; [
           curl
@@ -117,6 +117,8 @@
     in
     {
       config = mkIf (cfg.enable && prov.enable) {
+        services.technitium-server-complete.provision._lintScripts = [ brokerScript ];
+
         # Dedicated service-account group permitted to connect to the broker socket.
         users.groups.${prov.tokenGroup} = { };
 

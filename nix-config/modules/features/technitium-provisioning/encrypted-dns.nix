@@ -21,7 +21,7 @@
 
       enabled = cfg.enable && prov.enable && cfg.encryptedDns.enable && prov.provisionDoTDoQCert;
 
-      encryptedDnsScript = pkgs.writeShellApplication {
+      encryptedDnsScript = topLevel.config.constants.shell.mkScript pkgs {
         name = "technitium-provision-encrypted-dns";
         runtimeInputs = (provisionLib.baseRuntimeInputs pkgs) ++ [ pkgs.openssl ];
         text =
@@ -63,6 +63,8 @@
     in
     {
       config = mkIf enabled {
+        services.technitium-server-complete.provision._lintScripts = [ encryptedDnsScript ];
+
         systemd.services.technitium-provision-encrypted-dns = {
           description = "Technitium provisioning: PKCS#12 + enable DoH/DoT/DoQ";
           after = [

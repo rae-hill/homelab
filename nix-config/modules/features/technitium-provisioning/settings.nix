@@ -30,7 +30,7 @@
       qpmV4 = renderQpm cfg.rateLimit.ipv4;
       qpmV6 = renderQpm cfg.rateLimit.ipv6;
 
-      settingsScript = pkgs.writeShellApplication {
+      settingsScript = topLevel.config.constants.shell.mkScript pkgs {
         name = "technitium-provision-settings";
         runtimeInputs = provisionLib.baseRuntimeInputs pkgs;
         text =
@@ -62,6 +62,8 @@
     in
     {
       config = mkIf (cfg.enable && prov.enable) {
+        services.technitium-server-complete.provision._lintScripts = [ settingsScript ];
+
         systemd.services.technitium-provision-settings = {
           description = "Technitium provisioning: DNSSEC validation + QPM rate limits";
           after = [
