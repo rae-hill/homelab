@@ -142,8 +142,9 @@
           };
         };
 
-        # Per-connection template. Runs as the service user (which can read the admin
-        # password + cache); validates/refreshes the token; prints it to the socket.
+        # Per-connection template. Runs as the service user (which can read the apiUser
+        # password + cache); logs in as apiUser, validates/refreshes the token, prints
+        # it to the socket.
         systemd.services."technitium-provision-token@" = {
           description = "Technitium provisioning: session-token broker (per connection)";
           after = [ "technitium-dns-server.service" ];

@@ -13,6 +13,22 @@ Status: **planning** (nothing implemented yet)
 
 `aedilis` is a new single-purpose NixOS host running [Technitium DNS Server](https://github.com/TechnitiumSoftware/DnsServer) on an OVHCloud VPS. It serves encrypted DNS (DoH/DoT/DoQ) publicly as a recursive resolver, plain DNS over Tailscale for personal devices, exposes an SSO-gated admin UI over Tailscale, and ships metrics/logs back to the augustus observability stack.
 
+> **Provisioning refactor (2026-10-14):** the provisioning design in §4.1/§4.2/§6 (a single
+> `technitium-provision.service` oneshot that logs in as `admin` and auto-creates the `prometheus`
+> metrics user + TOTP) has been **superseded**. Provisioning now lives in a separate
+> `technitium-provisioning` feature, split into a socket-activated **token broker**
+> (`technitium-provision-token.socket` + `technitium-provision-token@` template), plus
+> `technitium-provision-settings.service`, `technitium-provision-encrypted-dns.service`, and
+> `technitium-provision-records.service`, tied together by `technitium-provision.target`. It
+> authenticates as a **dedicated least-privilege `provisioner` user** (Settings:Modify +
+> Zones:Modify, created manually — NOT `admin`), whose password is the sops secret
+> `technitium_provisioner_password`. The `prometheus` metrics user and its TOTP are **created
+> manually** (the module no longer provisions them); the TOTP seed is captured at 2FA-enable time and
+> transferred to augustus out-of-band. `technitium_metrics_totp_secret` is **not** stored in aedilis
+> sops. See `docs/aedilis-deployment-runbook.md` (steps 6a/7) and
+> `docs/technitium-provisioning-plan.md` for the authoritative description. The §4.1/§4.2/§6 text
+> below is retained for historical design context only.
+
 ---
 
 ## 1. Architecture Overview

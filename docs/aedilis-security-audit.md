@@ -3,26 +3,33 @@
 Status: **audit** — quick review of the implemented configurable Technitium module + aedilis layer.
 Date: 2026-10-12
 
-Scope: `features/technitium/*`, `features/technitium-aedilis/*`, `_private/aedilis/*`, and the
-augustus-side wiring. Severity: **[HIGH]** act before/at deploy, **[MED]** worth doing soon,
-**[LOW]** nice-to-have / informational.
+Scope: `features/technitium/*`, `features/technitium-provisioning/*`, `features/technitium-aedilis/*`,
+`_private/aedilis/*`, and the augustus-side wiring. Severity: **[HIGH]** act before/at deploy,
+**[MED]** worth doing soon, **[LOW]** nice-to-have / informational.
+
+> **Provisioning update (2026-10-14):** provisioning was extracted into a separate
+> `technitium-provisioning` feature and now authenticates as a **dedicated least-privilege
+> `provisioner` user** (Settings:Modify + Zones:Modify) via a socket-activated token broker — **not**
+> the built-in `admin`. This materially changes findings #5 and #10 below; see the inline updates.
 
 ---
 
 ## Summary table
 
-| #  | Sev  | Area              | One-line                                                                     |
-| -- | ---- | ----------------- | ---------------------------------------------------------------------------- |
-| 1  | DONE | systemd hardening | ✅ added `SystemCallFilter`/`SystemCallArchitectures` on the DNS service     |
-| 2  | DONE | DNS abuse         | ✅ QPM rate limiting — primary control for the open recursive resolver       |
-| 3  | DONE | secrets           | ✅ dedicated `certGroup` for Caddy/Alloy; secrets are owner-only (no group)  |
-| 4  | DONE | DNSSEC            | ✅ validation implemented; zone signing is a per-zone follow-up              |
-| 5  | MED  | provisioning      | Admin password only set first-boot; break-glass local admin (manual disable) |
-| 6  | DONE | metrics token     | ✅ token file pre-created + blanked on failure (no silent stale-token 401s)  |
-| 7  | DONE | usability         | ✅ `provision.certReadyUnits` option orders the oneshot after the ACME unit  |
-| 8  | LOW  | usability         | Admin UI cert is step-ca (browser trust needs root CA imported)              |
-| 9  | DONE | usability         | ✅ provisioner polls `/api/status` for readiness (replaced fixed sleep)      |
-| 10 | DONE | hygiene           | ✅ removed unused `technitium_metrics_totp_secret` from aedilis sops         |
+| #  | Sev  | Area              | One-line                                                                         |
+| -- | ---- | ----------------- | -------------------------------------------------------------------------------- |
+| 1  | DONE | systemd hardening | ✅ added `SystemCallFilter`/`SystemCallArchitectures` on the DNS service         |
+| 2  | DONE | DNS abuse         | ✅ QPM rate limiting — primary control for the open recursive resolver           |
+| 3  | DONE | secrets           | ✅ dedicated `certGroup` for Caddy/Alloy; secrets are owner-only (no group)      |
+| 4  | DONE | DNSSEC            | ✅ validation implemented; zone signing is a per-zone follow-up                  |
+| 5  | MED  | provisioning      | Dedicated `provisioner` user (not admin); admin now disable-able post-setup      |
+| 6  | DONE | metrics token     | ✅ token file pre-created + blanked on failure (no silent stale-token 401s)      |
+| 7  | DONE | usability         | ✅ `provision.certReadyUnits` orders the encrypted-dns unit after the ACME unit  |
+| 8  | LOW  | usability         | Admin UI cert is step-ca (browser trust needs root CA imported)                  |
+| 9  | DONE | usability         | ✅ provisioning polls `/api/status` for readiness (replaced fixed sleep)         |
+| 10 | DONE | hygiene           | ✅ `technitium_metrics_totp_secret` not in aedilis sops (captured manually)      |
+| 11 | DONE | token broker      | ✅ socket root:tokenGroup 0660; cache 0700 broker-only; least-priv apiUser       |
+| 12 | DONE | API cred exposure | ✅ token→Bearer header, pkcs12→env:; residual login/cert-pass query (local-only) |
 
 ---
 
@@ -111,6 +118,16 @@ here; it belongs on the dedicated authoritative hosts. Only validation (above) a
 
 ## 5. [MED] Admin password lifecycle
 
+> **Update (2026-10-14): provisioning no longer uses `admin`.** The provisioner now authenticates
+> as a dedicated least-privilege `provisioner` user (sops `technitium_provisioner_password`) via the
+> token broker. The built-in `admin` is now needed **only** for (1) first-boot bootstrap
+> (`DNS_SERVER_ADMIN_PASSWORD_FILE`) and (2) the one-time **manual** creation of the `provisioner`
+> and `prometheus` users (runbook step 6a). Consequently the earlier footgun — "auto-disabling admin
+> breaks provisioning because the provisioner logs in as admin" — **no longer applies**: the local
+> `admin` CAN be disabled after setup for a true OIDC-only posture **without breaking** settings /
+> records / token-refresh (all of which run as `provisioner`). Re-enable admin only for break-glass.
+> This arguably lowers the severity of this finding.
+
 `DNS_SERVER_ADMIN_PASSWORD_FILE` only applies on **first boot**. Observations:
 
 - There is a window on first boot where the built-in `admin` account exists with the provided
@@ -119,18 +136,19 @@ here; it belongs on the dedicated authoritative hosts. Only validation (above) a
   Tailscale-only UI is possible.
 - No rotation path: changing the sops value post-first-boot does nothing (state dir already exists).
 
-**Fix options:** (a) after OIDC is confirmed working, disable the local `admin` account **manually**
-(or via a one-off break-glass procedure) — NOT via the provisioner, since the provisioner itself
-authenticates as `admin` on every run (cert renewals re-trigger it), so auto-disabling admin would
-break subsequent provisioning runs (a footgun we deliberately avoided). (b) Keep the admin password
-a long random sops value, never used interactively, treated as break-glass. At minimum, document
-that the local admin is a break-glass account and keep its sops secret high-value.
+**Fix options:** (a) after OIDC is confirmed working **and** the `provisioner`/`prometheus` users
+have been created (step 6a), disable the local `admin` account **manually** — this is now safe
+because provisioning runs as `provisioner`, not `admin`. (b) Keep the admin password a long random
+sops value, never used interactively, treated as break-glass. At minimum, document that the local
+admin is a break-glass account and keep its sops secret high-value.
 
 > **Note on "avoid the password entirely":** not possible — Technitium always has a built-in local
-> `admin`, and the provisioner needs a credential to drive the API. A non-expiring API token would
-> be strictly worse (long-lived bearer on disk). The sops admin password, used only at provision
-> time + as break-glass, is the right tradeoff. If you want OIDC-only interactive login, disable the
-> local admin manually post-deploy and re-enable via API for break-glass.
+> `admin`, and bootstrapping/break-glass needs a credential. But the _provisioner_ credential is now
+> a **separate, least-privilege** `provisioner` password served via an on-demand token broker over a
+> group-locked socket — not the admin password, and not a non-expiring API token (which would be a
+> long-lived bearer on disk). The admin sops password is used only at first-boot + for the one-time
+> manual user creation + as break-glass. For OIDC-only interactive login, disable the local admin
+> post-setup and re-enable via API for break-glass.
 
 ---
 
@@ -176,14 +194,63 @@ robust than a fixed sleep and would make the first-boot ordering deterministic.
 
 ---
 
-## 10. [LOW] Unused aedilis sops secret
+## 10. [DONE] Unused aedilis sops secret
 
-Since the TOTP seed is now **server-generated** on aedilis (persisted to a state file), the
-`technitium_metrics_totp_secret` sops secret declared in `_private/aedilis/sops.nix` is **no longer
-consumed on aedilis** (only augustus consumes it). Leaving it is harmless but misleading.
+The `prometheus` metrics user is created **manually** (runbook step 6a), and its TOTP seed is
+captured at `2fa/enable` time and transferred to augustus **out-of-band** — it is **not** stored in
+aedilis sops (and there is no server-generated seed state file). So `technitium_metrics_totp_secret`
+belongs only on augustus (which computes scrape login codes), not on aedilis.
 
-**Fix:** remove `technitium_metrics_totp_secret` from `_private/aedilis/sops.nix` (keep it in
-`augustus.yaml`). Also consider removing it from `secrets/aedilis.yaml` on the next re-key.
+**Status: done.** `technitium_metrics_totp_secret` is **not** declared in
+`_private/aedilis/sops.nix`; it lives only in `augustus.yaml`. Consider removing it from
+`secrets/aedilis.yaml` on the next re-key if any stale value remains there.
+
+> The earlier rationale in this finding ("TOTP seed is server-generated on aedilis / persisted to a
+> state file") was never implemented and is obsolete — the seed is a manual-capture step, not a
+> provisioner-written state file.
+
+---
+
+## 11. [DONE] Token broker — secret-at-rest & socket lockdown (new, 2026-10-14)
+
+The socket-activated token broker (`features/technitium-provisioning/token.nix`) was reviewed:
+
+- **Socket lockdown:** `technitium-provision-token.socket` is `root:<tokenGroup>` mode `0660`
+  (`SocketMode = "0660"`, `SocketGroup = provision.tokenGroup`). Only members of the dedicated
+  `tokenGroup` can connect; consumers join it via `SupplementaryGroups`. ✅
+- **Credential isolation:** only the broker service user reads `apiPasswordFile`; the token cache is
+  a `StateDirectory` mode `0700` (broker-user-only, never group-exposed). Consumers receive only the
+  session token over the socket — never the password or the cache. ✅
+- **Least privilege:** the broker logs in as the dedicated `provisioner` user
+  (`Settings:Modify` + `Zones:Modify`, no `Administration`), so a leak of the broker credential
+  cannot create users or escalate. ✅
+- **Concurrency:** refresh is `flock`-guarded, so concurrent connections can't race the cache or
+  double-mint. ✅
+- **Lazy refresh:** no long-lived timer; the token refreshes on-connect once `tokenTtlSeconds`
+  elapses, bounding the on-disk token's validity window. ✅
+
+No action required.
+
+---
+
+## 12. [DONE/LOW] API credential exposure on process argv / query strings (new, 2026-10-14)
+
+Reviewed how the provisioning scripts pass secrets to the loopback Technitium API:
+
+- **Session token — hardened.** `api_call` (shared `preamble` in `lib.nix`) now authenticates with
+  the `Authorization: Bearer <token>` header fed via curl `--config` on stdin, so the token appears
+  neither on the process argv (`ps`/`/proc`) nor in Technitium's query-string access logs. (Was
+  previously a `token=` query param.) ✅
+- **PKCS#12 export password — hardened.** `encrypted-dns.nix` now passes the password to `openssl`
+  via `-passout env:PKCS12_PASS` instead of `pass:` on argv, keeping it off the process listing. ✅
+- **Residual [LOW], accepted:** two secrets still transit as `--data-urlencode` query params because
+  the Technitium API has no header-based alternative for them: the `provisioner` password on the
+  `user/login` call (`token.nix`) and `dnsTlsCertificatePassword` on the `settings/set` call
+  (`encrypted-dns.nix`). Both are momentarily visible on the local curl argv and may be written to
+  Technitium's web access log as query params. Exposure is **local-only** (loopback API, single-tenant
+  Tailscale-gated host) and short-lived. Mitigations if ever desired: route these specific calls
+  through curl `--config` stdin as well, and/or disable/scrub Technitium web request logging. Left as
+  a low-priority accepted risk given the single-tenant, loopback, Tailscale-only threat model.
 
 ---
 

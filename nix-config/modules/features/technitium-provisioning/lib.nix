@@ -53,8 +53,11 @@
         }
 
         # --- api_call <description> <path> [curl --data-urlencode args...] --------
-        # Fails fast on HTTP error or a JSON body whose status != "ok". Automatically
-        # appends the shared token.
+        # Fails fast on HTTP error or a JSON body whose status != "ok". Authenticates
+        # with the Bearer header (Technitium accepts `Authorization: Bearer <token>` as
+        # an alternative to the `token=` query param). The header is fed via curl
+        # `--config` on stdin so the token never appears on the process argv or in the
+        # server's query-string access logs.
         api_call() {
           local desc="$1"
           shift
@@ -63,7 +66,7 @@
 
           local resp
           if ! resp="$(curl -fsS -G "$API/$path" "$@" \
-            --data-urlencode "token=''${TOKEN:-}")"; then
+            --config <(printf 'header = "Authorization: Bearer %s"\n' "''${TOKEN:-}"))"; then
             echo "technitium-provision: HTTP failure during: $desc" >&2
             exit 1
           fi

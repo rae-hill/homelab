@@ -38,11 +38,13 @@
               exit 1
             fi
             umask 027
-            openssl pkcs12 -export \
+            # Pass the PKCS#12 password via env (openssl `env:`) rather than `pass:` on
+            # argv, so it is not visible in the process listing (/proc, ps).
+            PKCS12_PASS="$PKCS12_PASS" openssl pkcs12 -export \
               -out "${pkcs12Path}" \
               -inkey "${cfg.encryptedDns.certKeyFile}" \
               -in "${cfg.encryptedDns.certPemFile}" \
-              -passout "pass:$PKCS12_PASS"
+              -passout "env:PKCS12_PASS"
 
             # --- enable DoH/DoT/DoQ with the PKCS#12 cert ----------------------------
             api_call "enable DoH/DoT/DoQ with PKCS#12 cert" \
