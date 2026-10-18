@@ -158,7 +158,7 @@
                 {
                   name = "remote-build-aedilis";
                   help = "Rebuild Aedilis over ssh";
-                  command = "nixos-rebuild --target-host jacob@aedilis.neko-bicolor.ts.net switch --flake .#aedilis --sudo --ask-sudo-password";
+                  command = "nixos-rebuild --target-host admin@aedilis.neko-bicolor.ts.net switch --flake .#aedilis --sudo --ask-sudo-password";
                 }
               ];
             };

@@ -129,10 +129,17 @@ in
             settings = {
               "aedilis.plato-splunk.media" = {
                 inherit identityAgent;
-                user = "ubuntu";
+                user = "admin";
                 addKeysToAgent = "yes";
                 forwardAgent = true;
-                identityFile = "~/.ssh/id_ed25519_signing.pub";
+                identityFile = "~/.ssh/yk_ssh_keys/id_ed25519_sk";
+              };
+              "aedilis.neko-bicolor.ts.net" = {
+                inherit identityAgent;
+                user = "admin";
+                addKeysToAgent = "yes";
+                forwardAgent = true;
+                identityFile = "~/.ssh/yk_ssh_keys/id_ed25519_sk";
               };
               "augustus.plato-splunk.media" = {
                 inherit identityAgent;
