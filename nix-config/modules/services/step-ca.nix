@@ -214,6 +214,22 @@ in
                   enableSSHCA = true;
                 };
               }
+              {
+                type = "JWK";
+                name = "aedilis.${c.baseDomain}";
+                key = {
+                  "use" = "sig";
+                  "kty" = "EC";
+                  "kid" = "iJAqWVCaXIXV_H_z6mH2Gd6W_ENRHRen1mJrMWToaYc";
+                  "crv" = "P-256";
+                  "alg" = "ES256";
+                  "x" = "TC-MMy6c7RMmr9rUGbz6VbYuLMY4v7smHryzhzNiWWE";
+                  "y" = "HNAl458VyGk6Y95ngfmx2xPuYPkkaRyCQQ4SdlWtCc8";
+                };
+                claims = {
+                  enableSSHCA = true;
+                };
+              }
             ];
             template = { };
             backdate = "1m0s";
