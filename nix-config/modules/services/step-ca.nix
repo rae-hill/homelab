@@ -220,11 +220,11 @@ in
                 key = {
                   "use" = "sig";
                   "kty" = "EC";
-                  "kid" = "iJAqWVCaXIXV_H_z6mH2Gd6W_ENRHRen1mJrMWToaYc";
+                  "kid" = "Q5xqaHiNciXj8P5FhFq6pxZ21aCyg4B753_B-aojOSk";
                   "crv" = "P-256";
                   "alg" = "ES256";
-                  "x" = "TC-MMy6c7RMmr9rUGbz6VbYuLMY4v7smHryzhzNiWWE";
-                  "y" = "HNAl458VyGk6Y95ngfmx2xPuYPkkaRyCQQ4SdlWtCc8";
+                  "x" = "9frwGuTTeBfCjFVcfFyTbfTg1iHGIOvTt5J-BVpTO-c";
+                  "y" = "VMAV3oyd2-CsNZIT3z59ykeiKu-HUnnsa8Lmohht7gg";
                 };
                 claims = {
                   enableSSHCA = true;
