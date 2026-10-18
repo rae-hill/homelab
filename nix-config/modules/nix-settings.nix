@@ -1,6 +1,11 @@
 {
   flake.modules.nixos.nix-settings =
-    { inputs, lib, config, ... }:
+    {
+      inputs,
+      lib,
+      config,
+      ...
+    }:
     let
       flakeInputs = lib.filterAttrs (_: lib.isType "flake") inputs;
     in
@@ -10,7 +15,10 @@
           experimental-features = "nix-command flakes pipe-operators";
           flake-registry = "";
           allowed-users = [ "@wheel" ];
-          trusted-users = [ "jacob" ];
+          trusted-users = [
+            "jacob"
+            "admin"
+          ];
         };
 
         channel.enable = false;
