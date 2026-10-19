@@ -18,7 +18,7 @@ in
       services.kanidm.provision.systems.oauth2."${tech.clientId}" = {
         # NOTE: confirm the exact redirect/callback path Technitium expects for its
         # OIDC sign-in flow against the running version (docs/aedilis-host-plan.md §7).
-        originUrl = "${tech.adminUrl}/";
+        originUrl = "${tech.adminUrl}/sso/callback";
         originLanding = "${tech.adminUrl}/";
         displayName = "Technitium DNS";
 
