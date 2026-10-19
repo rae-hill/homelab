@@ -25,6 +25,7 @@
         DNS_SERVER_SSO_CLIENT_SECRET_FILE = cfg.oidc.clientSecretFile;
         DNS_SERVER_SSO_SCOPES = concatStringsSep "," cfg.oidc.scopes;
         DNS_SERVER_SSO_ALLOW_SIGNUP = boolStr cfg.oidc.allowSignup;
+        DNS_SERVER_SSO_METADATA_ADDRESS = "${cfg.oidc.authority}/.well-known/openid-configuration";
         DNS_SERVER_SSO_ALLOW_SIGNUP_ONLY_FOR_MAPPED_USERS = boolStr cfg.oidc.allowSignupOnlyForMappedUsers;
         DNS_SERVER_SSO_GROUP_MAP = concatStringsSep "," (
           mapAttrsToList (remote: local: "${remote}:${local}") cfg.oidc.groupMap
