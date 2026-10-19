@@ -68,13 +68,11 @@
             # Allow binding privileged DNS/TLS ports (53, 443, 853).
             AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
             CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
-            # Additional syscall hardening on top of the upstream sandbox (which is
-            # retained via module merge). @system-service minus privileged/raw-io.
-            SystemCallFilter = [
-              "@system-service"
-              "~@privileged"
-              "~@resources"
-            ];
+            # The man page's recommended baseline for system services.
+            # Don't exclude @resources: it contains the sched_* parameter
+            # calls that the .NET PAL uses at startup (kills the CLR).
+            SystemCallFilter = [ "@system-service" ];
+            SystemCallErrorNumber = "EPERM";
             SystemCallArchitectures = "native";
           };
 
