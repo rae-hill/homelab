@@ -35,7 +35,7 @@
 
 buildPythonPackage rec {
   pname = "xonsh";
-  version = "0.24.0";
+  version = "0.24.2";
   pyproject = true;
 
   # PyPI package ships incomplete tests
@@ -43,7 +43,7 @@ buildPythonPackage rec {
     owner = "xonsh";
     repo = "xonsh";
     tag = version;
-    hash = "sha256-lavVT3NRsBtf6efTeZOeFwPiS7VZvsCjVZiQhl17zkE=";
+    hash = "sha256-6dLl2VDUyfoFVbnSpDxXgEhp+GpYab3yewMuq6Nd6oQ=";
   };
 
   build-system = [
@@ -160,6 +160,9 @@ buildPythonPackage rec {
     changelog = "https://github.com/xonsh/xonsh/blob/${version}/CHANGELOG.md";
     license = lib.licenses.bsd3;
     mainProgram = "xonsh";
-    maintainers = with lib.maintainers; [ samlukeyes123 ];
+    maintainers = with lib.maintainers; [
+      samlukeyes123
+      infinidoge
+    ];
   };
 }

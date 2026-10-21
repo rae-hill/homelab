@@ -19,20 +19,20 @@
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "wealthfolio";
-  version = "3.6.1";
+  version = "3.10.0";
 
   src = fetchFromGitHub {
-    owner = "afadil";
+    owner = "wealthfolio";
     repo = "wealthfolio";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-7RX5u4Qr5OSBCQvsf9F0LlIVd9VycpvoVvIKj08xA3A=";
+    hash = "sha256-dwZaPQh9qA7KOl0pw3yKOl5uDBYy4YzaRpEA9e+1hOM=";
   };
 
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) src pname version;
     pnpm = pnpm_10;
     fetcherVersion = 4;
-    hash = "sha256-dpxUdXqRbYPwq/wKu8XFdcjhDSGYo5ory9rIovHGJwk=";
+    hash = "sha256-hRIe3OuIlvCsLbaIpurAHfTV/oA+mBWWsP8XPKGcE/0=";
   };
 
   cargoRoot = ".";
@@ -45,7 +45,7 @@ stdenv.mkDerivation (finalAttrs: {
       src
       cargoRoot
       ;
-    hash = "sha256-vNFYouLMP462N6G8cJppnKMBp9Wphh4mrMVO4WWaPJ4=";
+    hash = "sha256-+ct0reGkqHytMdq+frEi+s5zvd0PdP0kR5Mqr3IrXVI=";
   };
 
   nativeBuildInputs = [
@@ -66,6 +66,8 @@ stdenv.mkDerivation (finalAttrs: {
     webkitgtk_4_1
   ];
 
+  env.OPENSSL_NO_VENDOR = "1";
+
   postPatch = ''
     jq \
       '.plugins.updater.endpoints = [ ]
@@ -80,7 +82,7 @@ stdenv.mkDerivation (finalAttrs: {
     description = "Beautiful Private and Secure Desktop Investment Tracking Application";
     homepage = "https://wealthfolio.app/";
     license = lib.licenses.agpl3Only;
-    mainProgram = "wealthfolio";
+    mainProgram = "Wealthfolio";
     maintainers = with lib.maintainers; [ kilianar ];
     platforms = lib.platforms.linux;
   };

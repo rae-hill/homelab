@@ -9,16 +9,15 @@
 
 buildGoModule (finalAttrs: {
   pname = "explo";
-  version = "1.1.2";
+  version = "1.2.0";
 
-  strictDeps = true;
   __structuredAttrs = true;
 
   src = fetchFromGitHub {
     owner = "LumePart";
     repo = "Explo";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-7FIDRNZn+Yh2c/oLU3Ggb4A9y+5q3vv17eVLmGR2Zeo=";
+    hash = "sha256-T0EYPiidK/qUaCCKePDT8KIbMnu3j7Z3ADmgtuhUb/o=";
   };
 
   webui = buildNpmPackage {

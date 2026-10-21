@@ -7,16 +7,16 @@
 
 buildGoModule (finalAttrs: {
   pname = "feishu-cli";
-  version = "1.35.0";
+  version = "1.43.0";
 
   src = fetchFromGitHub {
     owner = "riba2534";
     repo = "feishu-cli";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-0FEVwpONZcN2DsYVzlY5EDsQwN81DjP9Xc857ro4quw=";
+    hash = "sha256-GvmZAQf2yAfFmJmCr+nJQpdvegvnSknjTtFt31HecLM=";
   };
 
-  vendorHash = "sha256-vRefU38o9Q4Q96aXoUXUggcRsfQePjlUrSsNERJH3YU=";
+  vendorHash = "sha256-RdgOYh4DeGW2YOj4HBQUCCh8u1ekNPYEvn7KRGSXW78=";
 
   subPackages = [ "." ];
 

@@ -196,7 +196,7 @@ in
     # that do not specify any nodes, or an empty attr set as nodes) will not
     # have the QEMU module loaded and thuse these options can't and should not
     # be set.
-    virtualisation = lib.optionalAttrs (options ? virtualisation.qemu) {
+    virtualisation = lib.optionalAttrs (options ? virtualisation.qemu.package) {
       qemu = {
         # NOTE: optionalAttrs
         #       test-instrumentation.nix appears to be used without qemu-vm.nix, so
@@ -233,11 +233,11 @@ in
     environment.systemPackages = [ pkgs.xwininfo ];
 
     # Log everything to the serial console.
-    services.journald.extraConfig = ''
-      ForwardToConsole=yes
-      TTYPath=/dev/${qemu-common.qemuSerialDevice}
-      MaxLevelConsole=debug
-    '';
+    services.journald.settings.Journal = {
+      ForwardToConsole = true;
+      TTYPath = "/dev/${qemu-common.qemuSerialDevice}";
+      MaxLevelConsole = "debug";
+    };
 
     systemd.settings.Manager = managerSettings;
     systemd.user.settings.Manager = {

@@ -259,7 +259,23 @@ in
 
   options.systemd = {
 
-    package = mkPackageOption pkgs "systemd" { };
+    package = mkPackageOption pkgs "systemd" { } // {
+      # HORRIBLE HACK
+      # Put back the patch that completely broke most networkd setups.
+      # This needs to be reverted and either reinstated in the package
+      # proper, or fixed within the networkd NixOS module, but right now
+      # we just need things to stop being on fire. -K900
+      #
+      # DO NOT remove this without verifying at least
+      # nixosTests.predictable-interface-names.predictableNetworkdSystemdStage1
+      apply =
+        pkg:
+        pkg.overrideAttrs (prevAttrs: {
+          patches = prevAttrs.patches or [ ] ++ [
+            ./systemd-search-path.patch
+          ];
+        });
+    };
 
     enableStrictShellChecks = mkEnableOption "" // {
       description = ''
@@ -820,6 +836,10 @@ in
     systemd.services.systemd-random-seed.restartIfChanged = false;
     systemd.services.systemd-remount-fs.restartIfChanged = false;
     systemd.services.systemd-update-utmp.restartIfChanged = false;
+    # `systemd-bless-boot good` fails once the current boot has been blessed.
+    systemd.services.systemd-bless-boot = lib.mkIf cfg.package.withBootloader {
+      restartIfChanged = false;
+    };
     systemd.targets.local-fs.unitConfig.X-StopOnReconfiguration = true;
     systemd.targets.remote-fs.unitConfig.X-StopOnReconfiguration = true;
     systemd.services.systemd-importd = lib.mkIf cfg.package.withImportd {

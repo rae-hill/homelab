@@ -7,16 +7,16 @@
 
 buildGoModule (finalAttrs: {
   pname = "fake-gcs-server";
-  version = "1.55.0";
+  version = "1.56.1";
 
   src = fetchFromGitHub {
     owner = "fsouza";
     repo = "fake-gcs-server";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-XbwiPWhudTUhiCA91n8av7oQ0USPA/vXHePfS7/jnOg=";
+    hash = "sha256-jCQHVp+N9Hazz+ceuajCF1rRvxXkneL900pHLHOzzwA=";
   };
 
-  vendorHash = "sha256-9zovcKQ3eiYWHCxUBXI39kgnjD4mR/4GGAZz65f7Of4=";
+  vendorHash = "sha256-huKQv51wDVhagX86j3qbe9c3NHwAJX/izMIkFqXP41Y=";
 
   # Unit tests fail to start the emulator server in some environments (e.g. Hydra) for some reason.
   #

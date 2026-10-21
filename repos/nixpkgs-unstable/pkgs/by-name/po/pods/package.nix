@@ -23,18 +23,18 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "pods";
-  version = "3.1.0";
+  version = "3.2.0";
 
   src = fetchFromGitHub {
     owner = "marhkb";
     repo = "pods";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-GMFrcWFozRR0G0+7g5JJyMkWzPY79cVF4Go1Wd/4HtA=";
+    hash = "sha256-9uZMERhCh3OFdJ7XnVDRm0ponRuSIIj/7lq3vVopv0s=";
   };
 
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit (finalAttrs) pname version src;
-    hash = "sha256-P0teC048Z61pMrl5cvlvrGaPcccxTki/AIthyzQusGI=";
+    hash = "sha256-Qje5GJG6LnFQAPIZkxo7xinU1AlFUXHMK/yBLO7+mPw=";
   };
 
   nativeBuildInputs = [

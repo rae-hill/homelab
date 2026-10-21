@@ -31,6 +31,7 @@
   fontconfig,
   imagemagick,
   libdbusmenu,
+  libpulseaudio,
   glib,
   wayland,
   libglvnd,
@@ -181,7 +182,6 @@ stdenv.mkDerivation (
       buildFHSEnv customizedArgs;
   in
   {
-
     inherit
       pname
       version
@@ -199,8 +199,16 @@ stdenv.mkDerivation (
         updateScript
         vscodeVersion
         ;
-      fhs = fhs { };
-      fhsWithPackages = f: fhs { additionalPkgs = f; };
+      fhs = (fhs { }).overrideAttrs (old: {
+        strictDeps = true;
+        __structuredAttrs = true;
+      });
+      fhsWithPackages =
+        f:
+        (fhs { additionalPkgs = f; }).overrideAttrs (old: {
+          strictDeps = true;
+          __structuredAttrs = true;
+        });
     }
     // lib.optionalAttrs (vscodeServer != null) {
       inherit rev vscodeServer;
@@ -221,6 +229,11 @@ stdenv.mkDerivation (
           "TextEditor"
           "Development"
           "IDE"
+        ];
+        mimeTypes = [
+          "application/x-code-workspace"
+          "text/plain"
+          "inode/directory"
         ];
         keywords = [ "vscode" ];
         actions.new-empty-window = {
@@ -276,6 +289,9 @@ stdenv.mkDerivation (
       libdbusmenu
       wayland
       libsecret
+      # dlopen()ed by Chromium; without it audio falls back to ALSA and
+      # accessibility signal sounds stay silent on PipeWire/PulseAudio setups
+      libpulseaudio
     ];
 
     nativeBuildInputs = [
@@ -414,12 +430,22 @@ stdenv.mkDerivation (
         + ''
           ln -rs "$unpacked" "$packed"
         ''
+        # Some resources, such as Tree-Sitter WASM, are loaded directly from this directory.
+        # Keep it available without duplicating the extracted files.
+        + ''
+          rm -rf "resources/app/node_modules.asar.unpacked"
+          ln -rs "$unpacked" "resources/app/node_modules.asar.unpacked"
+        ''
       )
       + (
         let
           nodeModulesPath =
             if stdenv.hostPlatform.isDarwin then
-              if lib.versionAtLeast vscodeVersion "1.94.0" then
+              # 1.129 moved node_modules back into app.asar, shipping native
+              # binaries in the asar.unpacked directory like before 1.94
+              if lib.versionAtLeast vscodeVersion "1.129.0" then
+                "Contents/Resources/app/node_modules.asar.unpacked"
+              else if lib.versionAtLeast vscodeVersion "1.94.0" then
                 "Contents/Resources/app/node_modules"
               else
                 "Contents/Resources/app/node_modules.asar.unpacked"
@@ -433,6 +459,7 @@ stdenv.mkDerivation (
               armv7l-linux = "linux-arm";
               aarch64-linux = "linux-arm64";
               i686-linux = "linux-ia32";
+              loongarch64-linux = "linux-loong64";
               powerpc64-linux = "linux-ppc64";
               riscv64-linux = "linux-riscv64";
               s390x-linux = "linux-s390x";
@@ -474,6 +501,7 @@ stdenv.mkDerivation (
         patchelf \
           --add-needed ${lib.getLib openssl}/lib/libssl.so.3 \
           $out/lib/vscode/resources/app/node_modules/@vscode/vsce-sign/bin/vsce-sign
+        chmod +x $out/lib/vscode/resources/app/node_modules/@vscode/vsce-sign/bin/vsce-sign
       '')
     );
 

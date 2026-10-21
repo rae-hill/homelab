@@ -40,9 +40,12 @@
   requests,
 }:
 
+let
+  common = import ./common.nix { inherit lib; };
+in
 buildPythonPackage (finalAttrs: {
   pname = "mcp";
-  version = "1.27.1";
+  version = "1.29.0";
   pyproject = true;
   __structuredAttrs = true;
 
@@ -50,7 +53,7 @@ buildPythonPackage (finalAttrs: {
     owner = "modelcontextprotocol";
     repo = "python-sdk";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-LhoLcFC5+7xOCfud23sbHyTMxKYmdeZh0c+UtGdvzCs=";
+    hash = "sha256-lRlj5RT/R5zrYL5XpdQR2l9t99G94WTsubN0gSQekMc=";
   };
 
   # time.sleep(0.1) feels a bit optimistic and it has been flaky whilst
@@ -109,6 +112,10 @@ buildPythonPackage (finalAttrs: {
   ]
   ++ lib.flatten (builtins.attrValues finalAttrs.passthru.optional-dependencies);
 
+  pytestFlags = [
+    "-Wignore::pytest.PytestRemovedIn10Warning"
+  ];
+
   disabledTests = [
     # attempts to run the package manager uv
     "test_command_execution"
@@ -153,14 +160,7 @@ buildPythonPackage (finalAttrs: {
 
   __darwinAllowLocalNetworking = true;
 
-  meta = {
+  meta = common.meta // {
     changelog = "https://github.com/modelcontextprotocol/python-sdk/releases/tag/${finalAttrs.src.tag}";
-    description = "Official Python SDK for Model Context Protocol servers and clients";
-    homepage = "https://github.com/modelcontextprotocol/python-sdk";
-    license = lib.licenses.mit;
-    maintainers = with lib.maintainers; [
-      bryanhonof
-      josh
-    ];
   };
 })

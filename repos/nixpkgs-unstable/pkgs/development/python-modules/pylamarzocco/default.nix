@@ -1,6 +1,7 @@
 {
   lib,
   aiohttp,
+  aiointercept,
   aioresponses,
   bleak,
   bleak-retry-connector,
@@ -16,14 +17,14 @@
 
 buildPythonPackage (finalAttrs: {
   pname = "pylamarzocco";
-  version = "2.4.2";
+  version = "2.4.4";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "zweckj";
     repo = "pylamarzocco";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-9wqSF67MNxnGvDDDVY9epI3hoV8M20L3Fyz80/x8G74=";
+    hash = "sha256-urKFdze1WRg3lm8W55mn6yUC014P+ZDE2eDeiMQ0PtA=";
   };
 
   build-system = [ setuptools ];
@@ -37,6 +38,7 @@ buildPythonPackage (finalAttrs: {
   ];
 
   nativeCheckInputs = [
+    aiointercept
     aioresponses
     pytest-asyncio
     pytestCheckHook
@@ -44,6 +46,8 @@ buildPythonPackage (finalAttrs: {
   ];
 
   pythonImportsCheck = [ "pylamarzocco" ];
+
+  __darwinAllowLocalNetworking = true;
 
   meta = {
     description = "Library to interface with La Marzocco's cloud";

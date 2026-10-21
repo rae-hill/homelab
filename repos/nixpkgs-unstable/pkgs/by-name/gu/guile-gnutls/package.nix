@@ -12,11 +12,11 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "guile-gnutls";
-  version = "5.0.1";
+  version = "5.0.2";
 
   src = fetchurl {
     url = "mirror://gnu/gnutls/guile-gnutls-${finalAttrs.version}.tar.gz";
-    hash = "sha256-zABn8+60IbwXJHFAlipJCG31RQ8NPnHFW/VBotK57ys=";
+    hash = "sha256-droqD0ft3n/S9YP8EWLtHOgzm9r36dnMOTh/zJX7k1s=";
   };
 
   strictDeps = true;
@@ -43,6 +43,8 @@ stdenv.mkDerivation (finalAttrs: {
     "--with-guile-site-ccache-dir=${placeholder "out"}/${guile.siteCcacheDir}"
     "--with-guile-extension-dir=${placeholder "out"}/lib/guile/${guile.effectiveVersion}/extensions"
   ];
+
+  guileImportsCheck = [ "gnutls" ];
 
   meta = {
     homepage = "https://gitlab.com/gnutls/guile/";

@@ -9,6 +9,7 @@
   semver,
   pytestCheckHook,
   pythonOlder,
+  stdenv, # for meta.broken
 }:
 
 buildPythonPackage rec {
@@ -51,7 +52,9 @@ buildPythonPackage rec {
     homepage = "https://github.com/landscapeio/requirements-detector";
     changelog = "https://github.com/landscapeio/requirements-detector/releases/tag/${version}";
     license = lib.licenses.mit;
-    maintainers = with lib.maintainers; [ kamadorueda ];
+    maintainers = [ ];
     mainProgram = "detect-requirements";
+    # last successful hydra build on darwin was in 2025
+    broken = stdenv.hostPlatform.isDarwin;
   };
 }

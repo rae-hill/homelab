@@ -185,6 +185,7 @@ let
       X86_INTEL_LPSS = yes;
       X86_INTEL_PSTATE = yes;
       X86_AMD_PSTATE = whenAtLeast "5.17" yes;
+      AMD_PMF_UTIL_SUPPORT = whenAtLeast "7.3" yes;
       # Intel DPTF (Dynamic Platform and Thermal Framework) Support
       ACPI_DPTF = yes;
 
@@ -235,6 +236,7 @@ let
       DAMON_RECLAIM = whenAtLeast "5.16" yes;
       DAMON_LRU_SORT = whenAtLeast "6.0" yes;
       DAMON_STAT = whenAtLeast "6.17" yes;
+      DAMON_STAT_ENABLED_DEFAULT = whenAtLeast "6.17" no;
       # Support recovering from memory failures on systems with ECC and MCA recovery.
       MEMORY_FAILURE = yes;
 
@@ -303,6 +305,7 @@ let
       XDP_SOCKETS = yes;
       XDP_SOCKETS_DIAG = yes;
       WAN = yes;
+      TCP_AO = whenAtLeast "6.7" yes;
       TCP_CONG_ADVANCED = yes;
       TCP_CONG_CUBIC = yes; # This is the default congestion control algorithm since 2.6.19
       # Required by systemd per-cgroup firewalling
@@ -408,6 +411,9 @@ let
       # HAM radio
       HAMRADIO = whenOlder "7.1" yes;
       AX25 = whenOlder "7.1" module;
+
+      # Gate for the DINGHAI_PF module
+      DINGHAI = whenAtLeast "7.3" yes;
     }
     // lib.optionalAttrs (stdenv.hostPlatform.system == "aarch64-linux") {
       # Not enabled by default, hides modules behind it
@@ -669,7 +675,7 @@ let
 
       USB_EHCI_ROOT_HUB_TT = yes; # Root Hub Transaction Translators
       USB_EHCI_TT_NEWSCHED = yes; # Improved transaction translator scheduling
-      USB_HIDDEV = yes; # USB Raw HID Devices (like monitor controls and Uninterruptable Power Supplies)
+      USB_HIDDEV = yes; # USB Raw HID Devices (like monitor controls and Uninterruptible Power Supplies)
 
       # default to dual role mode
       USB_DWC2_DUAL_ROLE = yes;
@@ -716,6 +722,7 @@ let
 
       NTFS_FS = whenBetween "5.15" "6.9" no;
       NTFS_FS_POSIX_ACL = whenAtLeast "7.1" yes;
+      NTFS_FS_WOF_COMPRESSION = whenAtLeast "7.3" yes;
       NTFS3_LZX_XPRESS = whenAtLeast "5.15" yes;
       NTFS3_FS_POSIX_ACL = whenAtLeast "5.15" yes;
 
@@ -849,12 +856,36 @@ let
       # only when compiled as yes, TPM 2.0 will automatically seed the kernel RNG
       HW_RANDOM = yes;
 
-      MODULE_SIG = no; # r13y, generates a random key during build and bakes it in
-      # Depends on MODULE_SIG and only really helps when you sign your modules
-      # and enforce signatures which we don't do by default.
-      SECURITY_LOCKDOWN_LSM = no;
+      MODULE_SIG = yes;
+      # We use kmodigest to produce a deterministic single‐module
+      # certificate for each module. This prevents the kernel from
+      # generating its own ephemeral module signing key at build time.
+      MODULE_SIG_KEY = freeform "";
+
+      # Support ECDSA and ML‐DSA module signatures.
+      CRYPTO_ECDSA = yes;
+      CRYPTO_MLDSA = whenAtLeast "7.0" yes;
+
+      # Reserve enough space for 12000 single‐module certificates.
+      # Current `allmodconfig` builds produce in the region of ~7500 to
+      # ~9000 in‐tree modules, so this should be sufficient margin.
+      SYSTEM_EXTRA_CERTIFICATE = yes;
+      SYSTEM_EXTRA_CERTIFICATE_SIZE = freeform (toString (12000 * 260));
+
+      SECONDARY_TRUSTED_KEYRING = yes;
+      SYSTEM_BLACKLIST_KEYRING = yes;
+
+      SECURITY_LOCKDOWN_LSM = yes;
+      SECURITY_LOCKDOWN_LSM_EARLY = yes;
 
       IMA = yes;
+
+      INTEGRITY_SIGNATURE = yes;
+      INTEGRITY_ASYMMETRIC_KEYS = yes;
+      INTEGRITY_PLATFORM_KEYRING = yes;
+      INTEGRITY_MACHINE_KEYRING = whenAtLeast "6.4" yes;
+      INTEGRITY_CA_MACHINE_KEYRING = whenAtLeast "6.4" yes;
+      INTEGRITY_CA_MACHINE_KEYRING_MAX = whenAtLeast "6.4" yes;
 
       # provides a register of persistent per-UID keyrings, useful for encrypting storage pools in stratis
       PERSISTENT_KEYRINGS = yes;
@@ -1136,6 +1167,11 @@ let
         useZstd = stdenv.buildPlatform.is64bit;
       in
       {
+        # Increase the default kernel log buffer size to 1 MiB. This
+        # prevents it from filling up with lines about loading X.509
+        # certificates when using single‐module certificates.
+        LOG_BUF_SHIFT = freeform "20";
+
         # The default target assumes uncompressed on RISC-V.
         KERNEL_UNCOMPRESSED = lib.mkIf stdenv.hostPlatform.isRiscV yes;
 
@@ -1181,6 +1217,7 @@ let
         ];
         MODULE_COMPRESS_ALL = whenAtLeast "6.12" yes;
         MODULE_COMPRESS_XZ = yes;
+        MODULE_DECOMPRESS = whenAtLeast "6.0" yes;
 
         SYSVIPC = yes; # System-V IPC
 
@@ -1211,6 +1248,9 @@ let
         SCSI_LOWLEVEL = yes; # enable lots of SCSI devices
         SCSI_LOWLEVEL_PCMCIA = yes;
         SCSI_SAS_ATA = yes; # added to enable detection of hard drive
+
+        # Required for booting our ISO in qemu's IBM pSeries machine emulation mode via '-cdrom'.
+        SCSI_IBMVSCSI = lib.mkIf (stdenv.hostPlatform.isPower64 && stdenv.hostPlatform.isBigEndian) yes;
 
         SPI = yes; # needed for many devices
         SPI_MASTER = yes;
@@ -1291,13 +1331,15 @@ let
         KEXEC_HANDOVER = whenAtLeast "6.16" (option yes);
         LIVEUPDATE = whenAtLeast "6.19" (option yes);
 
-        PARTITION_ADVANCED = yes; # Needed for LDM_PARTITION
+        PARTITION_ADVANCED = yes; # Needed for LDM_PARTITION and BSD_DISKLABEL
         # Windows Logical Disk Manager (Dynamic Disk) support
         LDM_PARTITION = yes;
         LOGIRUMBLEPAD2_FF = yes; # Logitech Rumblepad 2 force feedback
         LOGO = no; # not needed
         MEDIA_ATTACH = yes;
         MEGARAID_NEWGEN = yes;
+
+        BSD_DISKLABEL = yes;
 
         MLX5_CORE_EN = option yes;
 
@@ -1377,6 +1419,7 @@ let
         BINFMT_SCRIPT = yes;
         # For systemd-binfmt
         BINFMT_MISC = option yes;
+        BINFMT_MISC_BPF = whenAtLeast "7.3" (whenPlatformHasEBPFJit (option yes));
 
         # Required for EDID overriding
         FW_LOADER = yes;
@@ -1389,9 +1432,11 @@ let
         HOTPLUG_PCI_ACPI = yes; # PCI hotplug using ACPI
         HOTPLUG_PCI_PCIE = yes; # PCI-Expresscard hotplug support
 
-        # Allos PCIe devices report errors with Advanced Error Reporting (AER).
+        # Allows PCIe devices to report errors with Advanced Error Reporting (AER).
         PCIEAER = yes;
         ACPI_APEI_PCIEAER = yes;
+        # PCIe link training status, e.g. on Cix P1
+        PCIE_CADENCE_DEBUGFS = whenAtLeast "7.3" (option yes);
 
         # Enable all available thermal governors
         THERMAL_GOV_BANG_BANG = yes;
@@ -1507,8 +1552,8 @@ let
             ACPI_HOTPLUG_CPU = yes;
             ACPI_HOTPLUG_MEMORY = yes;
             MEMORY_HOTPLUG = yes;
-            MEMORY_HOTPLUG_DEFAULT_ONLINE = whenOlder "6.14" yes;
-            MHP_DEFAULT_ONLINE_TYPE_ONLINE_AUTO = whenAtLeast "6.14" yes;
+            MEMORY_HOTPLUG_DEFAULT_ONLINE = whenOlder "6.12" yes;
+            MHP_DEFAULT_ONLINE_TYPE_ONLINE_AUTO = whenAtLeast "6.12" yes;
             MEMORY_HOTREMOVE = lib.mkIf (
               with stdenv.hostPlatform;
               isLoongArch64
@@ -1523,8 +1568,8 @@ let
             SPARSEMEM = yes;
 
             # Bump the maximum number of CPUs to support systems like EC2 x1.*
-            # instances and Xeon Phi.
-            NR_CPUS = freeform "384";
+            # instances and Xeon Phi or AMD EPYC.
+            NR_CPUS = freeform "512";
 
             # Enable LEDS to display link-state status of PHY devices (i.e. eth lan/wan interfaces)
             LED_TRIGGER_PHY = yes;

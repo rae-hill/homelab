@@ -13,6 +13,8 @@
   _experimental-update-script-combinators,
   writeShellApplication,
   nix,
+  curl,
+  common-updater-scripts,
   jq,
   gnugrep,
 }:
@@ -22,16 +24,16 @@ let
 in
 buildNpmPackage (finalAttrs: {
   pname = "shogihome";
-  version = "1.28.0";
+  version = "1.29.1";
 
   src = fetchFromGitHub {
     owner = "sunfish-shogi";
     repo = "shogihome";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-icFWpyfdnm0wIkTVa2ijcnBcDmxrutV38vN3/8AY4cg=";
+    hash = "sha256-F13rgUdquKJHz41Gz2ou8cAk3FmZF/FjA19DKtkJr2E=";
   };
 
-  npmDepsHash = "sha256-SSpw8bBbf6saWwR3ZpqMrbrdjDJTCeARBAlHO65O+Zc=";
+  npmDepsHash = "sha256-9pitop6ZGw4JlN/iUfQ7xqY7jN5PyffTSH2Tc/coi+c=";
 
   postPatch = ''
     substituteInPlace package.json \
@@ -130,9 +132,26 @@ buildNpmPackage (finalAttrs: {
 
   passthru = {
     updateScript = _experimental-update-script-combinators.sequence [
+      (lib.getExe (writeShellApplication {
+        name = "${finalAttrs.pname}-version-updater";
+
+        runtimeInputs = [
+          curl
+          jq
+          common-updater-scripts
+        ];
+
+        # Use release.json as the primary source rather than git tags or GitHub releases:
+        # https://github.com/sunfish-shogi/shogihome/issues/1704#issuecomment-5105936699
+        text = ''
+          version="$(curl -s 'https://sunfish-shogi.github.io/shogihome/release.json' | jq -r '.latest.version')"
+          update-source-version '${finalAttrs.pname}' "$version"
+        '';
+      }))
+      # Update src.hash and npmDepsHash
       (nix-update-script {
         extraArgs = [
-          "--version-regex=^v([\\d\\.]+)$"
+          "--version=skip"
         ];
       })
       (lib.getExe (writeShellApplication {

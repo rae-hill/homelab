@@ -10,13 +10,13 @@
 
 buildNpmPackage (finalAttrs: {
   pname = "snyk";
-  version = "1.1306.1";
+  version = "1.1308.0";
 
   src = fetchFromGitHub {
     owner = "snyk";
     repo = "cli";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-L2aR09o2FVYKDXdbRr9cw93cerWybw3b6Tdvs5Q1atQ=";
+    hash = "sha256-l5mzyxpxbuUIof+hZUcVqpFbHEjj5HqJ+OLoukCkhCs=";
 
     # TODO: Remove once https://github.com/snyk/cli/pull/6924 is released.
     postFetch = ''
@@ -24,9 +24,9 @@ buildNpmPackage (finalAttrs: {
     '';
   };
 
-  npmDepsFetcherVersion = 3;
+  npmDepsFetcherVersion = 2;
 
-  npmDepsHash = "sha256-AmJNFEw7IF9PjgeRma6vp3I7a60ZkekfRkPXJtjVIik=";
+  npmDepsHash = "sha256-HSNW5mVuU+B3aRWc4KXlhb+PzPyqM76zSsKa79E+Zrs=";
 
   nodejs = nodejs_24;
 

@@ -7,16 +7,16 @@
 
 buildGoModule (finalAttrs: {
   pname = "olm";
-  version = "1.7.0";
+  version = "1.10.1";
 
   src = fetchFromGitHub {
     owner = "fosrl";
     repo = "olm";
     tag = finalAttrs.version;
-    hash = "sha256-kPxFjGpwFjz5BZfgtbo5o/NveFLjAGjOh4o1h2RtGWI=";
+    hash = "sha256-/FhfpVwBEwx7HoaTzdgqSdN0rd2rqkx/FwC+GWofSlo=";
   };
 
-  vendorHash = "sha256-OSW7WRIIHg0xXp7Zanxy9PJEthMSsHYWn8WdPjzt0fc=";
+  vendorHash = "sha256-L0317eHaf0mt79kcquIh1IN5vVsGn3XyVQC6rdrayPA=";
 
   nativeInstallCheckInputs = [ versionCheckHook ];
 

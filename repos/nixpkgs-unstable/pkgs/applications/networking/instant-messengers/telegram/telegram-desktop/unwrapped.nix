@@ -16,7 +16,7 @@
   kcoreaddons,
   lz4,
   xxhash,
-  ffmpeg_6,
+  ffmpeg,
   protobuf,
   openal-soft,
   minizip-ng-compat,
@@ -28,13 +28,15 @@
   microsoft-gsl,
   boost,
   ada,
-  cmark-gfm,
+  pango,
+  tlottie,
+  libfido2,
   libavif,
   libheif,
   libjxl,
   libicns,
+  wallet-engine,
   apple-sdk_15,
-  llvmPackages,
   nix-update-script,
 }:
 
@@ -47,14 +49,14 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "telegram-desktop-unwrapped";
-  version = "7.0.2";
+  version = "7.3.1";
 
   src = fetchFromGitHub {
     owner = "telegramdesktop";
     repo = "tdesktop";
     rev = "v${finalAttrs.version}";
     fetchSubmodules = true;
-    hash = "sha256-G/A5J2m1sXHD50zDmMD9ehnorAGRjnQ+YGMv6DEiJcQ=";
+    hash = "sha256-QoIfRLlNljoINAN28YgyP/6+E65bghNYD+H0U5lPQhs=";
   };
 
   nativeBuildInputs = [
@@ -66,11 +68,6 @@ stdenv.mkDerivation (finalAttrs: {
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     gobject-introspection
-  ]
-  # Work around ld64's libc++ hardening issue causing Trace/BPT trap: 5
-  # TODO: Remove once nixpkgs#536365 reaches this branch.
-  ++ lib.optionals stdenv.hostPlatform.isDarwin [
-    llvmPackages.lld
   ];
 
   buildInputs = [
@@ -78,7 +75,7 @@ stdenv.mkDerivation (finalAttrs: {
     qtsvg
     lz4
     xxhash
-    ffmpeg_6
+    ffmpeg
     openal-soft
     minizip-ng-compat
     range-v3
@@ -88,14 +85,17 @@ stdenv.mkDerivation (finalAttrs: {
     microsoft-gsl
     boost
     ada
-    cmark-gfm
+    libfido2
     (tdlib.override { tde2eOnly = true; })
+    tlottie
+    wallet-engine
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     protobuf
     qtwayland
     kcoreaddons
     hunspell
+    pango
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     apple-sdk_15
@@ -106,12 +106,6 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   dontWrapQtApps = true;
-
-  # Work around ld64's libc++ hardening issue causing Trace/BPT trap: 5
-  # TODO: Remove once nixpkgs#536365 reaches this branch.
-  env = lib.optionalAttrs stdenv.hostPlatform.isDarwin {
-    NIX_CFLAGS_LINK = "-fuse-ld=lld";
-  };
 
   cmakeFlags = [
     # We're allowed to used the API ID of the Snap package:

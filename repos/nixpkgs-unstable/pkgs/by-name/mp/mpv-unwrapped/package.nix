@@ -5,7 +5,6 @@
   alsa-lib,
   bash,
   buildPackages,
-  config,
   docutils,
   fetchFromGitHub,
   ffmpeg,
@@ -21,7 +20,6 @@
   libarchive,
   libass,
   libbluray,
-  libbs2b,
   libcaca,
   libcdio,
   libcdio-paranoia,
@@ -37,7 +35,7 @@
   libva,
   libvdpau,
   libxkbcommon,
-  lua,
+  lua5_2_compat,
   makeBinaryWrapper,
   libgbm,
   meson,
@@ -61,13 +59,11 @@
   wayland-protocols,
   wayland-scanner,
   zimg,
-  llvmPackages,
 
   # Boolean
   alsaSupport ? stdenv.hostPlatform.isLinux,
   archiveSupport ? true,
   bluraySupport ? true,
-  bs2bSupport ? true,
   cacaSupport ? true,
   cddaSupport ? false,
   cmsSupport ? true,
@@ -78,7 +74,7 @@
   javascriptSupport ? true,
   openalSupport ? true,
   pipewireSupport ? !stdenv.hostPlatform.isDarwin,
-  pulseSupport ? config.pulseaudio or (!stdenv.hostPlatform.isDarwin),
+  pulseSupport ? !stdenv.hostPlatform.isDarwin,
   rubberbandSupport ? true,
   sdl2Support ? false,
   sixelSupport ? false,
@@ -93,6 +89,7 @@
 }:
 
 let
+  lua = lua5_2_compat;
   luaEnv = lua.withPackages (ps: with ps; [ luasocket ]);
 in
 stdenv.mkDerivation (finalAttrs: {
@@ -131,12 +128,6 @@ stdenv.mkDerivation (finalAttrs: {
     ''
   ];
 
-  # Ensure we reference 'lib' (not 'out') of Swift.
-  # TODO: Remove this once the Swift wrapper doesn’t include these.
-  preConfigure = lib.optionalString stdenv.hostPlatform.isDarwin ''
-    export SWIFT_LIB_DYNAMIC="${lib.getLib swift.swift}/lib/swift/macosx"
-  '';
-
   mesonFlags = [
     (lib.mesonOption "default_library" "shared")
     (lib.mesonOption "sysconfdir" "/etc")
@@ -164,8 +155,6 @@ stdenv.mkDerivation (finalAttrs: {
     buildPackages.darwin.sigtool
     swift
     makeBinaryWrapper
-    # TODO: Remove once #536365 reaches this branch
-    llvmPackages.lld
   ]
   ++ lib.optionals waylandSupport [ wayland-scanner ];
 
@@ -183,7 +172,6 @@ stdenv.mkDerivation (finalAttrs: {
   ++ lib.optionals alsaSupport [ alsa-lib ]
   ++ lib.optionals archiveSupport [ libarchive ]
   ++ lib.optionals bluraySupport [ libbluray ]
-  ++ lib.optionals bs2bSupport [ libbs2b ]
   ++ lib.optionals cacaSupport [ libcaca ]
   ++ lib.optionals cddaSupport [
     libcdio
@@ -231,24 +219,10 @@ stdenv.mkDerivation (finalAttrs: {
   ++ lib.optionals zimgSupport [ zimg ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [ nv-codec-headers-11 ];
 
-  # https://github.com/mpv-player/mpv/issues/15591#issuecomment-2764797522
-  # In file included from ../player/clipboard/clipboard-mac.m:19:
-  # ./osdep/mac/swift.h:270:9: fatal error: '.../app_bridge_objc-1.pch' file not found
-  env = lib.optionalAttrs (stdenv.hostPlatform.isDarwin) {
-    NIX_SWIFTFLAGS_COMPILE = "-disable-bridging-pch";
-
-    # TODO: Remove once #536365 reaches this branch
-    NIX_CFLAGS_LINK = "-fuse-ld=lld";
-  };
-
   postBuild = lib.optionalString stdenv.hostPlatform.isDarwin ''
     pushd .. # Must be run from the source dir because it uses relative paths
     python3 TOOLS/osxbundle.py -s build/mpv
     popd
-  '';
-
-  sandboxProfile = lib.optionalString stdenv.hostPlatform.isDarwin ''
-    (allow mach-lookup (global-name "com.apple.coreservices.launchservicesd"))
   '';
 
   postInstall = ''

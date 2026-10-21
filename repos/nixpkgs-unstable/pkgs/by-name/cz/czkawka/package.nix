@@ -15,6 +15,7 @@
   libxi,
   libxkbcommon,
   libxrandr,
+  lld,
   pango,
   pkg-config,
   rustPlatform,
@@ -29,21 +30,24 @@
 let
   self = rustPlatform.buildRustPackage {
     pname = "czkawka";
-    version = "12.0.0";
+    version = "12.0.2";
 
     src = fetchFromGitHub {
       owner = "qarmin";
       repo = "czkawka";
       tag = self.version;
-      hash = "sha256-KbGcaeQcpf2IL3I2PmsBpg8n+IfSuJl5tkLOxNCtYaQ=";
+      hash = "sha256-adatuaG4sR1OJkjJdVgzm+wYqDAYBjId/thQj5rs3nI=";
     };
 
-    cargoHash = "sha256-+1K2a64XcbBePiQ/LeaSVCU/Ih0Fr4EjzNU5xpzfz2Q=";
+    cargoHash = "sha256-nTqzQrEWqN89XjQ4bgdCfWAXdyfB7UTQ3tAuL7LtNhA=";
 
     nativeBuildInputs = [
       gobject-introspection
       pkg-config
       wrapGAppsHook4
+    ]
+    ++ lib.optionals stdenv.hostPlatform.isDarwin [
+      lld # ld crashes
     ];
 
     buildInputs = [
@@ -62,8 +66,6 @@ let
     ];
 
     nativeCheckInputs = [ xvfb-run ];
-
-    strictDeps = true;
 
     doCheck = stdenv.hostPlatform.isLinux && (stdenv.hostPlatform == stdenv.buildPlatform);
 

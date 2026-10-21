@@ -7,6 +7,7 @@
   fftw,
   fftwSinglePrec,
   hdf5,
+  libaec,
   libjpeg,
   libpng,
   libtiff,
@@ -43,6 +44,9 @@ stdenv.mkDerivation (finalAttrs: {
     (hdf5.override {
       apiVersion = "v110";
     })
+    # Satisfy the HDF5_SZLIB_OK check in the source's config/FindHDF5.cmake
+    # libaec is a drop-in replacement of szip.
+    libaec
     libjpeg
     libpng
     libtiff
@@ -81,7 +85,7 @@ stdenv.mkDerivation (finalAttrs: {
   meta = {
     description = "Novel computer vision C++ library with customizable algorithms and data structures";
     mainProgram = "vigra-config";
-    homepage = "https://hci.iwr.uni-heidelberg.de/vigra";
+    homepage = "https://ukoethe.github.io/vigra/";
     license = lib.licenses.mit;
     maintainers = with lib.maintainers; [
       ShamrockLee

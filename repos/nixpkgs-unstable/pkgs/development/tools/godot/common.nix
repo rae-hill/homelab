@@ -38,7 +38,6 @@
   libxkbcommon,
   libxrandr,
   libxrender,
-  llvmPackages,
   makeWrapper,
   mbedtls,
   miniupnpc,
@@ -102,6 +101,7 @@ let
 
   harfbuzz-raster = harfbuzz.override {
     withRaster = lib.versionAtLeast version "4.7";
+    withVector = lib.versionAtLeast version "4.7";
     withCairo = lib.versionAtLeast version "4.7";
   };
 
@@ -326,7 +326,7 @@ let
 
                     # stripping dlls results in:
                     # Failed to load System.Private.CoreLib.dll (error code 0x8007000B)
-                    stripExclude = lib.optional withMono [ "*.dll" ];
+                    stripExclude = lib.optionals withMono [ "*.dll" ];
 
                     runtimeDependencies =
                       prev.runtimeDependencies or [ ]
@@ -399,8 +399,6 @@ let
             "-I${lib.getDev harfbuzz-icu}/include/harfbuzz"
             "-I${lib.getDev recastnavigation}/include/recastnavigation"
           ];
-          # TODO: Remove when NixOS/nixpkgs#536365 reaches master.
-          NIX_CFLAGS_LINK = "--ld-path=${lib.getExe' llvmPackages.lld "ld64.lld"}";
         };
 
         preConfigure = lib.optionalString (editor && withMono) ''
@@ -646,8 +644,6 @@ let
         ++ lib.optionals stdenv.hostPlatform.isDarwin (
           [
             darwin.sigtool
-            # TODO: Remove when NixOS/nixpkgs#536365 reaches master.
-            llvmPackages.lld
           ]
           ++ lib.optionals (!editor) [
             strip-nondeterminism
