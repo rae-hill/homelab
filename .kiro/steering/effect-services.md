@@ -4,14 +4,17 @@
 
 Upstream monorepos are vendored at `./repos/` as read-only reference material via git subtrees.
 
-| Directory                 | Source                                       | Purpose                                 |
-| ------------------------- | -------------------------------------------- | --------------------------------------- |
-| `repos/effect/`           | https://github.com/Effect-TS/effect.git      | Effect runtime & platform               |
-| `repos/kobalte/`          | https://github.com/kobaltedev/kobalte.git    | SolidJS UI component library            |
-| `repos/astro/`            | https://github.com/withastro/astro.git       | Astro framework                         |
-| `repos/nanostores/`       | https://github.com/nanostores/nanostores.git | Nanostores state management             |
-| `repos/nixpkgs-26.05/`    | https://github.com/NixOS/nixpkgs.git         | NixOS packages & modules (stable 26.05) |
-| `repos/nixpkgs-unstable/` | https://github.com/NixOS/nixpkgs.git         | NixOS packages & modules (unstable)     |
+| Directory                     | Source                                              | Purpose                                 |
+| ----------------------------- | --------------------------------------------------- | --------------------------------------- |
+| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform               |
+| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library            |
+| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                         |
+| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management             |
+| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05) |
+| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)     |
+| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source          |
+| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | step-ca / smallstep crypto library      |
+| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source            |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`
@@ -40,6 +43,53 @@ git subtree add \
 ```
 
 Use `--squash` to avoid bringing in the full upstream commit history.
+
+### Keeping Vendored Subtrees Up To Date
+
+The vendored subtrees are **not** refreshed automatically and drift stale over
+time. Before relying on vendored source as a reference — especially for an
+upstream whose behavior changed across versions — **pull the latest first**,
+then confirm it matches the version this repo actually builds.
+
+> **Critical: corroborate the vendored version with the pinned Nix distro.**
+> Reference source is only trustworthy if it matches the version NixOS builds.
+> The main `nixpkgs` input is pinned to **`nixos-26.05`** (see `flake.lock`),
+> and app-specific packages pin an exact upstream version. A vendored checkout
+> at `master`/`-dev` can describe APIs, CLI flags, or module options that do
+> **not** exist in the version you deploy — leading to confidently wrong
+> guidance. Always check the version skew.
+
+Refresh branch-tracking subtrees (nixpkgs follows release branches):
+
+```sh
+git subtree pull --prefix=repos/nixpkgs-26.05 \
+  https://github.com/NixOS/nixpkgs.git nixos-26.05 --squash
+git subtree pull --prefix=repos/nixpkgs-unstable \
+  https://github.com/NixOS/nixpkgs.git nixos-unstable --squash
+```
+
+For an application vendored to match a Nix-built version (e.g. kanidm), pin the
+subtree to the **tag** nixpkgs builds, not `master`:
+
+```sh
+# 1. find the version nixpkgs 26.05 builds:
+#    repos/nixpkgs-26.05/pkgs/servers/kanidm/1_11.nix -> version = "1.11.2";
+# 2. pull that exact tag:
+git subtree pull --prefix=repos/kanidm \
+  https://github.com/kanidm/kanidm.git v1.11.2 --squash
+```
+
+Notes:
+
+- Subtree pulls create a **merge commit** and require a clean _tracked_
+  working tree (untracked files are fine). Treat it as a history-modifying
+  action.
+- Never reformat or edit files under `repos/` — they are read-only upstream.
+- After a nixpkgs bump that changes an app's pinned version, re-pull that app's
+  subtree to the new tag so the two stay corroborated.
+- Quick version check after pulling: compare the app's `Cargo.toml`/`go.mod`/
+  `package.json` version against the `version = "..."` in the corresponding
+  `repos/nixpkgs-26.05/pkgs/.../<name>.nix`.
 
 ## Service Architecture
 

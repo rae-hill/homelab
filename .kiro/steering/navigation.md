@@ -85,6 +85,11 @@ git subtree pull --prefix=repos/nixpkgs-26.05 https://github.com/NixOS/nixpkgs.g
 git subtree pull --prefix=repos/nixpkgs-unstable https://github.com/NixOS/nixpkgs.git nixos-unstable --squash
 ```
 
+> These subtrees go stale (not auto-refreshed). For the full refresh workflow —
+> including pinning app subtrees (e.g. `repos/kanidm`) to the **tag** nixpkgs
+> 26.05 actually builds and corroborating the version skew — see
+> `.kiro/steering/effect-services.md` → "Keeping Vendored Subtrees Up To Date".
+
 ## Hosts
 
 | Name        | Role                                                                              |
