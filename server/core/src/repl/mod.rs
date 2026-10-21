@@ -55,11 +55,16 @@ enum ReplConsumerCtrl {
     Refresh(Arc<Mutex<(bool, mpsc::Sender<()>)>>),
 }
 
+pub(crate) struct ReplicationServerHandles {
+    pub repl_handle: tokio::task::JoinHandle<()>,
+    pub ctrl_tx: mpsc::Sender<ReplCtrl>,
+}
+
 pub(crate) async fn create_repl_server(
     idms: Arc<IdmServer>,
     repl_config: &ReplicationConfiguration,
     rx: broadcast::Receiver<CoreAction>,
-) -> Result<(tokio::task::JoinHandle<()>, mpsc::Sender<ReplCtrl>), ()> {
+) -> Result<ReplicationServerHandles, ()> {
     // We need to start the tcp listener. This will persist over ssl reloads!
     let listener = TcpListener::bind(&repl_config.bindaddress)
         .await
@@ -87,7 +92,10 @@ pub(crate) async fn create_repl_server(
     ));
 
     info!("Created replication interface");
-    Ok((repl_handle, ctrl_tx))
+    Ok(ReplicationServerHandles {
+        repl_handle,
+        ctrl_tx,
+    })
 }
 
 #[instrument(level = "debug", skip_all)]
@@ -952,7 +960,12 @@ async fn repl_acceptor(
             Some(TlsAcceptor::from(Arc::new(tls_server_config)))
         };
 
-        loop {
+        // IMPORTANT: We have to drop the retry timeout else the renew
+        // cert times out. This is a HACK until I swap in the new actors
+        // framework.
+        retry_timeout = Duration::from_secs(1);
+
+        'event_inner: loop {
             // This is great to diagnose when spans are entered or present and they capture
             // things incorrectly.
             // eprintln!("🔥 C ---> {:?}", tracing::Span::current());
@@ -962,7 +975,7 @@ async fn repl_acceptor(
                 Ok(action) = rx.recv() => {
                     match action {
                         CoreAction::Shutdown => break 'event,
-                        CoreAction::Reload => {}
+                        CoreAction::Reload => continue 'event,
                     }
                 }
                 Some(ctrl_msg) = ctrl_rx.recv() => {
@@ -976,6 +989,7 @@ async fn repl_acceptor(
                             } else {
                                 trace!("Sent server certificate via control channel");
                             }
+                            continue 'event_inner
                         }
                         ReplCtrl::RenewCertificate {
                             respond
@@ -1036,6 +1050,7 @@ async fn repl_acceptor(
                             } else {
                                 trace!("Sent refresh comms channel to requester");
                             }
+                            continue 'event_inner
                         }
                     }
                 }
@@ -1068,6 +1083,7 @@ async fn repl_acceptor(
                             error!("replication acceptor error, continuing -> {:?}", e);
                         }
                     }
+                    continue 'event_inner
                 }
             } // end select
               // Continue to poll/loop
@@ -1085,5 +1101,5 @@ async fn repl_acceptor(
         }
     }
 
-    info!("Stopped {}", super::TaskName::Replication);
+    info!("Stopped {}", super::TaskName::ReplicationSupervisor);
 }
