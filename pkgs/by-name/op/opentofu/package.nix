@@ -1,7 +1,7 @@
 {
   stdenv,
   lib,
-  buildGoModule,
+  buildGo127Module,
   fetchFromGitHub,
   makeWrapper,
   runCommand,
@@ -14,18 +14,18 @@
 }:
 
 let
-  package = buildGoModule rec {
+  package = buildGo127Module rec {
     pname = "opentofu";
-    version = "1.12.4";
+    version = "1.13.1";
 
     src = fetchFromGitHub {
       owner = "opentofu";
       repo = "opentofu";
       tag = "v${version}";
-      hash = "sha256-WuSvKev+kLbW0TVRJacEtX2o0fueZ5c2UYcVXQo4Q9Q=";
+      hash = "sha256-F9F8/g3Ge7YDUgI6beB/DeinliuHr+sRM/14eHc02uo=";
     };
 
-    vendorHash = "sha256-t4RVH90TSTwxNPR2tKQsk8qd6d2OP8MmjAjgIZx7OVY=";
+    vendorHash = "sha256-NwHu+t6GFPCGMLt9PHdz+PMAzcrUBGXwmi5vvl2NsEw=";
     ldflags = [
       "-s"
       "-w"
@@ -35,11 +35,6 @@ let
 
     nativeBuildInputs = [ installShellFiles ];
     patches = [ ./provider-path-1_12.patch ];
-
-    postPatch = ''
-      substituteInPlace go.mod \
-        --replace-fail "go 1.26.4" "go 1.26.3"
-    '';
 
     passthru = {
       inherit plugins;

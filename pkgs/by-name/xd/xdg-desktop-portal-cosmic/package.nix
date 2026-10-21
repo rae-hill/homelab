@@ -14,21 +14,22 @@
   cosmic-wallpapers,
   nix-update-script,
   nixosTests,
+  enableHardwareAcceleration ? false,
 }:
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "xdg-desktop-portal-cosmic";
-  version = "1.2.0";
+  version = "1.10.0";
 
   # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "pop-os";
     repo = "xdg-desktop-portal-cosmic";
     tag = "epoch-${finalAttrs.version}";
-    hash = "sha256-/2pn+snrXnPTPbcwg+pg/zcn9WxE3/3xXpNFlN/RITM=";
+    hash = "sha256-GuaSy/N0DsH+J636DwJj6hyjUi58oJzNz1UvYSWAVf4=";
   };
 
-  cargoHash = "sha256-wSwXzaU872KqcRgAIKRuQFvG9f/q4z0OysysLyYMwdg=";
+  cargoHash = "sha256-BjQbC8nEouu8MI4pf+4LNQ/JR3BsHpt4WppkOkE6BrI=";
 
   separateDebugInfo = true;
 
@@ -66,6 +67,8 @@ rustPlatform.buildRustPackage (finalAttrs: {
     "cargo-target-dir"
     "target/${stdenv.hostPlatform.rust.cargoShortTarget}"
   ];
+
+  buildFeatures = lib.optional enableHardwareAcceleration "wgpu";
 
   passthru = {
     tests = {

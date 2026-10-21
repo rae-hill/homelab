@@ -15,7 +15,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     owner = "~tsdh";
     repo = "swayr";
     tag = "swayrbar-${finalAttrs.version}";
-    sha256 = "sha256-uT8MYgH9kANQ0t+7jqjOOvQIZf5ImdQruZLLlCejwcc=";
+    hash = "sha256-uT8MYgH9kANQ0t+7jqjOOvQIZf5ImdQruZLLlCejwcc=";
   };
 
   cargoHash = "sha256-Aj4U2xyfNhf3HDSEd1SQ5TyO2MXn2/hrfnG0ZayzMtU=";
@@ -29,7 +29,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     export HOME=$TMPDIR
   '';
 
-  postInstall = lib.optionals withPulseaudio ''
+  postInstall = lib.optionalString withPulseaudio ''
     wrapProgram "$out/bin/swayrbar" \
       --prefix PATH : "$out/bin:${lib.makeBinPath [ pulseaudio ]}"
   '';

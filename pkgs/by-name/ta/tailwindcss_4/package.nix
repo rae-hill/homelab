@@ -70,9 +70,12 @@ stdenv.mkDerivation {
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
     maintainers = with lib.maintainers; [
       adamcstephens
-      adamjhf
     ];
     mainProgram = "tailwindcss";
-    platforms = lib.platforms.darwin ++ lib.platforms.linux;
+    platforms = [
+      "aarch64-darwin"
+      "aarch64-linux"
+      "x86_64-linux"
+    ];
   };
 }

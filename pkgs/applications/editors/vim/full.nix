@@ -4,6 +4,7 @@
   lib,
   stdenv,
   ncurses,
+  pixman,
   pkg-config,
   gettext,
   writeText,
@@ -11,7 +12,7 @@
   glib,
   gtk2-x11,
   gtk3-x11,
-  lua,
+  lua5_5,
   python3,
   perl,
   tcl,
@@ -48,12 +49,11 @@
   darwinSupport ? config.vim.darwin or false, # Enable Darwin support
   ftNixSupport ? config.vim.ftNix or true, # Add nix indentation support from vim-nix (not needed for basic syntax highlighting)
   sodiumSupport ? config.vim.sodium or true, # Enable sodium based encryption
-
-  # TODO: Clean up on `staging`
-  llvmPackages,
 }:
 
 let
+  lua = lua5_5;
+
   nixosRuntimepath = writeText "nixos-vimrc" ''
     set nocompatible
     syntax on
@@ -172,13 +172,12 @@ stdenv.mkDerivation {
   ++ lib.optional nlsSupport gettext
   ++ lib.optional perlSupport perl
   ++ lib.optional (guiSupport == "gtk3") wrapGAppsHook3
-  ++ lib.optional waylandSupport wayland-scanner
-  # TODO: Clean up on `staging`
-  ++ lib.optional stdenv.hostPlatform.isDarwin llvmPackages.lld;
+  ++ lib.optional waylandSupport wayland-scanner;
 
   buildInputs = [
     ncurses
     glib
+    pixman
   ]
   # All X related dependencies
   ++ lib.optionals (guiSupport == "gtk2" || guiSupport == "gtk3") [
@@ -201,10 +200,7 @@ stdenv.mkDerivation {
   ++ lib.optional sodiumSupport libsodium;
 
   # error: '__declspec' attributes are not enabled; use '-fdeclspec' or '-fms-extensions' to enable support for __declspec attributes
-  # workaround for ld64 hardening issue
-  #
-  # TODO: Clean up on `staging`
-  env.NIX_CFLAGS_COMPILE = lib.optionalString stdenv.hostPlatform.isDarwin "-fdeclspec -fuse-ld=lld";
+  env.NIX_CFLAGS_COMPILE = lib.optionalString stdenv.hostPlatform.isDarwin "-fdeclspec";
 
   preConfigure = lib.optionalString ftNixSupport ''
     cp ${vimPlugins.vim-nix.src}/ftplugin/nix.vim runtime/ftplugin/nix.vim

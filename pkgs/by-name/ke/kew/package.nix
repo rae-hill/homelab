@@ -1,5 +1,4 @@
 {
-  config,
   lib,
   stdenv,
   alsa-lib,
@@ -24,7 +23,7 @@
 
   withALSA ? stdenv.hostPlatform.isLinux,
   withJACK ? false,
-  withPulseaudio ? config.pulseaudio or stdenv.hostPlatform.isLinux,
+  withPulseaudio ? stdenv.hostPlatform.isLinux,
 }:
 
 let
@@ -34,13 +33,13 @@ in
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "kew";
-  version = "4.1.8";
+  version = "4.4.0";
 
   src = fetchFromGitHub {
     owner = "ravachol";
     repo = "kew";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-qT1hroZPmZezAQ1PzpDMLDgN8PufwbFtuIYGqvAcvNo=";
+    hash = "sha256-klU1SBYj3T33sZie4/IliLSeJXO5treGQprBOe3gJ0E=";
   };
 
   postPatch = ''
@@ -106,6 +105,7 @@ stdenv.mkDerivation (finalAttrs: {
     license = lib.licenses.gpl2Only;
     maintainers = with lib.maintainers; [
       demine
+      ddogfoodd
       matteopacini
     ];
     mainProgram = "kew";

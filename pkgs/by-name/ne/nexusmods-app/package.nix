@@ -70,7 +70,7 @@ buildDotnetModule (finalAttrs: {
     substituteInPlace src/NexusMods.Networking.NexusWebApi/NexusMods.Networking.NexusWebApi.csproj \
       --replace-fail '$(BaseIntermediateOutputPath)games.json' ${./vendored/games.json}
 
-    ${lib.optionalString finalAttrs.doCheck ''
+    ${lib.optionalString finalAttrs.finalPackage.doCheck ''
       # For some reason these tests fail (intermittently?) with a zero timestamp
       touch tests/NexusMods.UI.Tests/WorkspaceSystem/*.verified.png
     ''}
@@ -188,6 +188,7 @@ buildDotnetModule (finalAttrs: {
     app = finalAttrs.finalPackage.overrideAttrs {
       pname = "${finalAttrs.pname}-tested";
       doCheck = true;
+      passthru.tests = { };
     };
   };
 

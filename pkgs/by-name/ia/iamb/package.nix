@@ -3,42 +3,28 @@
   rustPlatform,
   fetchFromGitHub,
   installShellFiles,
-  writableTmpDirAsHomeHook,
   versionCheckHook,
   nix-update-script,
-  llvmPackages,
-  stdenv,
 }:
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "iamb";
-  version = "0.0.11";
+  version = "0.0.12";
+
+  __structuredAttrs = true;
 
   src = fetchFromGitHub {
     owner = "ulyssa";
     repo = "iamb";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-nvEOtV1Y5K9E1Lj+bPnQ6k1AneDM9OT3RbV3Urm/1Qs=";
+    hash = "sha256-66DN5tIqR5ppTVDqo3xoG3gl6rZrnikLsls/hqXAhb8=";
   };
 
-  patches = [
-    ./0001-increase-recursion-limit-to-fix-matrix-sdk-sqlite.patch
-  ];
-
-  cargoHash = "sha256-uWYNFNoCiqw6gYuHZWmZmZVs7lKNvhzjwEyxgcbvv+8=";
+  cargoHash = "sha256-gtkloBKCFdKskKmHw0YWX/x13I/ZyUHycm/7ZrRQCBI=";
 
   nativeBuildInputs = [
     installShellFiles
-  ]
-  ++ lib.optionals stdenv.hostPlatform.isDarwin [
-    # TODO: Remove once #536365 reaches this branch
-    llvmPackages.lld
   ];
-
-  env = lib.optionalAttrs stdenv.hostPlatform.isDarwin {
-    # TODO: Remove once #536365 reaches this branch
-    NIX_CFLAGS_LINK = "-fuse-ld=lld";
-  };
 
   postInstall = ''
     installManPage $src/docs/iamb.{1,5}

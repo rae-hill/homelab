@@ -1,12 +1,12 @@
 {
   lib,
   stdenv,
-  buildGo126Module,
+  buildGo127Module,
   fetchFromGitHub,
   fetchNpmDeps,
   cacert,
   git,
-  go_1_26,
+  go_1_27,
   gokrazy,
   enumer,
   mockgen,
@@ -17,16 +17,16 @@
 }:
 
 let
-  version = "0.312.0";
+  version = "0.317.2";
 
   src = fetchFromGitHub {
     owner = "evcc-io";
     repo = "evcc";
     tag = version;
-    hash = "sha256-GUHKrjCGm9LRQX5INdzSMPBV19FtaV8DTN3HIEUrxR4=";
+    hash = "sha256-Le29d8YJbCyiVeiVrlVPx8n5l2z94Hp7YqqnoItP0E8=";
   };
 
-  vendorHash = "sha256-x4iwvzf7iv6TyLEkTnqztDQrBD+3lT1yycB7yTD4xO4=";
+  vendorHash = "sha256-0u3qIry84kZoj/pqL20uaVn2p+vRfmT5lYY43G0q9RI=";
 
   commonMeta = {
     license = lib.licenses.mit;
@@ -34,13 +34,13 @@ let
   };
 in
 
-buildGo126Module rec {
+buildGo127Module rec {
   pname = "evcc";
   inherit version src vendorHash;
 
   npmDeps = fetchNpmDeps {
     inherit src;
-    hash = "sha256-MhLc5RUjn8FYXiFQbGchRnf132QXwG0kSyyPsRRzu1A=";
+    hash = "sha256-WmUMaLPjEmP3bMLjohsMSRk7SLBVRBGX0M1l7ALgdKY=";
   };
 
   nativeBuildInputs = [
@@ -51,7 +51,7 @@ buildGo126Module rec {
   overrideModAttrs = _: {
     nativeBuildInputs = [
       enumer
-      go_1_26
+      go_1_27
       gokrazy
       git
       cacert
@@ -74,6 +74,8 @@ buildGo126Module rec {
   ];
 
   preBuild = ''
+    export PATH="$PWD/node_modules/.bin:$PATH"
+    export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
     make ui
   '';
 

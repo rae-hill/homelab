@@ -15,6 +15,9 @@
   pipewire,
   pulseaudio,
   udev,
+  dav1d,
+  pciutils,
+  desktop-file-utils,
   cosmic-randr,
   xkeyboard_config,
   nix-update-script,
@@ -27,23 +30,17 @@ let
 in
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "cosmic-settings";
-  version = "1.2.0";
+  version = "1.10.0";
 
   # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "pop-os";
     repo = "cosmic-settings";
     tag = "epoch-${finalAttrs.version}";
-    hash = "sha256-zs8QJc8bLbLLj1lqLsxdgkVOLIHqk+fOEyNEEmViv0g=";
+    hash = "sha256-Zjs3WzqZOeZ+XuG7IoJhGeRUuibIPw3IdEujqsLdsR8=";
   };
 
-  cargoPatches = [
-    # A different reference to the `libcosmic` crate was added
-    # Remove this patch once upstream fixes their lockfile.
-    ./dedup-libcosmic.patch
-  ];
-
-  cargoHash = "sha256-rYjizOCcLJ4aq3UB5xEwWq5+KvrSi5PCUTIwUM/wegM=";
+  cargoHash = "sha256-iFC5ZZOYA2fkMjvdRhjKlMYJX/k/CzHjFEFt6iepdwU=";
 
   separateDebugInfo = true;
   __structuredAttrs = true;
@@ -64,6 +61,9 @@ rustPlatform.buildRustPackage (finalAttrs: {
     pipewire
     pulseaudio
     udev
+    dav1d
+    pciutils
+    desktop-file-utils
   ];
 
   dontUseJustBuild = true;

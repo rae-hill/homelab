@@ -14,19 +14,25 @@
 
 python3Packages.buildPythonApplication rec {
   pname = "matrix-synapse";
-  version = "1.156.0";
+  version = "1.163.0";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "element-hq";
     repo = "synapse";
     rev = "v${version}";
-    hash = "sha256-x3EVmNPqcxtvt6ZaPsDCCcr7Z0LIO257s2gO3HCNmKA=";
+    hash = "sha256-SYqI8FYQOzDmdrSrdYJmkqFWTepNvpBPNncJOXDpXdY=";
   };
+
+  patches = [
+    # fix compatibility with authlib authlib 1.7+
+    # https://github.com/element-hq/synapse/pull/20330
+    ./authlib.patch
+  ];
 
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit pname version src;
-    hash = "sha256-N/JWRFz9OKcxigjp86AVVZGK63MdZmEzwHhBgBuWZcY=";
+    hash = "sha256-0pQAseSE9cbQsGzZ1vLrHGt4+FKvqTr0bR3JhQuKPtc=";
   };
 
   build-system =
@@ -110,7 +116,7 @@ python3Packages.buildPythonApplication rec {
       systemd-python
     ];
     url-preview = [
-      lxml
+      beautifulsoup4
     ];
     sentry = [
       sentry-sdk
@@ -126,6 +132,11 @@ python3Packages.buildPythonApplication rec {
       pympler
     ];
   };
+
+  pythonRemoveDeps = [
+    # part of saml2 extra but unused at runtime
+    "lxml-stubs"
+  ];
 
   nativeCheckInputs = [
     openssl
@@ -165,7 +176,7 @@ python3Packages.buildPythonApplication rec {
 
   meta = {
     homepage = "https://matrix.org";
-    changelog = "https://github.com/element-hq/synapse/releases/tag/v${version}";
+    changelog = "https://github.com/element-hq/synapse/blob/v${version}/CHANGES.md";
     description = "Matrix reference homeserver";
     license = lib.licenses.agpl3Plus;
     maintainers = with lib.maintainers; [ sumnerevans ];

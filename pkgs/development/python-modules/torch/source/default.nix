@@ -3,6 +3,7 @@
   lib,
   fetchFromGitHub,
   fetchFromGitLab,
+  fetchpatch,
   git-unroll,
   buildPythonPackage,
   python,
@@ -25,6 +26,8 @@
   # Use the system NCCL as long as we're targeting CUDA on a supported platform.
   useSystemNccl ? (cudaSupport && cudaPackages.nccl.meta.available || rocmSupport),
   withNvshmem ? (cudaSupport && cudaPackages.libnvshmem.meta.available),
+  withCusparselt ? (cudaSupport && cudaPackages.libcusparse_lt.meta.available),
+  withCufile ? (cudaSupport && cudaPackages.libcufile.meta.available),
   withTensorboard ? false,
   MPISupport ? false,
   mpi,
@@ -49,6 +52,7 @@
   pybind11,
   pkg-config,
   removeReferencesTo,
+  rdma-core,
 
   # buildInputs
   openssl,
@@ -65,12 +69,10 @@
   typing-extensions,
 
   binutils,
-  expecttest,
   hypothesis,
   psutil,
-  types-dataclasses,
   # ROCm build and `torch.compile` requires `triton`
-  tritonSupport ? (!stdenv.hostPlatform.isDarwin),
+  tritonSupport ? (lib.meta.availableOn stdenv.hostPlatform triton),
   triton,
 
   # TODO: 1. callPackage needs to learn to distinguish between the task
@@ -290,7 +292,7 @@ in
 buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
   pname = "torch";
   # Don't forget to update torch-bin to the same version.
-  version = "2.12.0";
+  version = "2.13.0";
   pyproject = true;
   __structuredAttrs = true;
 
@@ -318,7 +320,20 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
   ]
   ++ lib.optionals cudaSupport [
     ./fix-cmake-cuda-toolkit.patch
+
+    # Let CMake find CUPTI through the variables we export in `preConfigure`, so that the
+    # `CUDA::cupti` target kineto requires gets defined
+    ./forward-cupti-env-vars.patch
+
     ./nvtx3-hpp-path-fix.patch
+
+    # Don't emit both `sm_103` and `sm_103f` gencode flags, which nvcc rejects:
+    # https://github.com/pytorch/pytorch/pull/187006
+    (fetchpatch {
+      name = "avoid-duplicate-sm_103-codegen.patch";
+      url = "https://github.com/pytorch/pytorch/commit/94079bfd49e1d8a458a8d7714a8bf7379bba947a.patch";
+      hash = "sha256-PFj8RihqeKTAogoCt59ikTbQ8wwpPJvUXGFlpBs8gE0=";
+    })
   ]
   ++ lib.optionals (lib.getName blas.provider == "mkl") [
     # The CMake install tries to add some hardcoded rpaths, incompatible
@@ -334,9 +349,7 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
 
   postPatch = ''
     substituteInPlace pyproject.toml \
-      --replace-fail "setuptools>=70.1.0,<82" "setuptools"
-    substituteInPlace setup.py \
-      --replace-fail "setuptools<82" setuptools
+      --replace-fail "setuptools>=77.0.0,<82" "setuptools"
   ''
   # Provide path to openssl binary for inductor code cache hash
   # InductorError: FileNotFoundError: [Errno 2] No such file or directory: 'openssl'
@@ -381,6 +394,7 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
   + lib.optionalString rocmSupport ''
     substituteInPlace third_party/kineto/libkineto/CMakeLists.txt \
       --replace-fail "\''$ENV{ROCM_SOURCE_DIR}" "${rocmtoolkit_joined}"
+    patchShebangs aten/src/ATen/native/transformers/hip/flash_attn/ck/add_make_kernel_pt.sh
   ''
   # When possible, composable kernel as dependency, rather than built-in third-party
   + lib.optionalString (rocmSupport && !vendorComposableKernel) ''
@@ -412,8 +426,8 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
   preConfigure =
     lib.optionalString cudaSupport ''
       export TORCH_CUDA_ARCH_LIST="${gpuTargetString}"
-      export CUPTI_INCLUDE_DIR=${lib.getDev cudaPackages.cuda_cupti}/include
-      export CUPTI_LIBRARY_DIR=${lib.getLib cudaPackages.cuda_cupti}/lib
+      export CUDAToolkit_CUPTI_INCLUDE_DIR=${lib.getInclude cudaPackages.cuda_cupti}/include
+      export CUDA_cupti_LIBRARY=${lib.getLib cudaPackages.cuda_cupti}/lib/libcupti.so
     ''
     + lib.optionalString (cudaSupport && cudaPackages ? cudnn) ''
       export CUDNN_INCLUDE_DIR=${lib.getLib cudnn}/include
@@ -478,6 +492,9 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
 
     USE_NVSHMEM = setBool withNvshmem;
 
+    # CMake defaults USE_MPI to ON and silently disables it when MPI isn't found; make the choice explicit.
+    USE_MPI = setBool MPISupport;
+
     # Set the correct Python library path, broken since
     # https://github.com/pytorch/pytorch/commit/3d617333e
     PYTHON_LIB_REL_PATH = "${placeholder "out"}/${python.sitePackages}";
@@ -495,6 +512,12 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
       ]
     );
     USE_VULKAN = setBool vulkanSupport;
+  }
+  // lib.optionalAttrs cudaSupport {
+    USE_CUSPARSELT = setBool withCusparselt;
+    # torch's cuDSS backend doesn't build against cuDSS >= 0.8
+    USE_CUDSS = setBool false;
+    USE_CUFILE = setBool withCufile;
   }
   // lib.optionalAttrs vulkanSupport {
     VULKAN_SDK = shaderc.bin;
@@ -566,6 +589,8 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
     ]
   )
   ++ lib.optionals isCudaJetson [ cudaPackages.autoAddCudaCompatRunpath ]
+  # FindMPI locates MPI through its compiler wrappers (mpicc, mpicxx), which must be on PATH.
+  ++ lib.optionals MPISupport [ mpi ]
   ++ lib.optionals rocmSupport [ rocmtoolkit_joined ];
 
   buildInputs = [
@@ -587,11 +612,9 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
       cuda_nvtx # -llibNVToolsExt
       libcublas
       libcufft
-      libcufile
       libcurand
       libcusolver
       libcusparse
-      libcusparse_lt
     ]
     ++ lists.optionals (cudaPackages ? cudnn) [ cudnn ]
     ++ lists.optionals useSystemNccl [
@@ -602,6 +625,8 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
     ++ lists.optionals withNvshmem [
       cudaPackages.libnvshmem
     ]
+    ++ lists.optionals withCufile [ cudaPackages.libcufile ]
+    ++ lists.optionals withCusparselt [ cudaPackages.libcusparse_lt ]
     ++ [
       cuda_profiler_api # <cuda_profiler_api.h>
     ]
@@ -736,11 +761,16 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
   #
   # This is a quick hack to add `libnvrtc` to the runpath so that torch can find
   # it when it is needed at runtime.
-  extraRunpaths = lib.optionals cudaSupport [ "${lib.getLib cudaPackages.cuda_nvrtc}/lib" ];
+  extraRunpaths =
+    lib.optionals cudaSupport [ "${lib.getLib cudaPackages.cuda_nvrtc}/lib" ]
+    # TensorPipe (torch.distributed.rpc) dlopens libibverbs.so.1 for its InfiniBand transport (TP_ENABLE_IBV) and, with
+    # CUDA, its GPUDirect RDMA channel (TP_ENABLE_CUDA_GDR); both are built by default on Linux and are silently
+    # unavailable when the library can't be found.
+    ++ lib.optionals stdenv.hostPlatform.isLinux [ "${lib.getLib rdma-core}/lib" ];
   postPhases = lib.optionals stdenv.hostPlatform.isLinux [ "postPatchelfPhase" ];
   postPatchelfPhase = ''
     while IFS= read -r -d $'\0' elf ; do
-      for extra in $extraRunpaths ; do
+      for extra in "''${extraRunpaths[@]}" ; do
         echo patchelf "$elf" --add-rpath "$extra" >&2
         patchelf "$elf" --add-rpath "$extra"
       done
@@ -761,10 +791,13 @@ buildPythonPackage.override { inherit stdenv; } (finalAttrs: {
       unroll-src
       gpuTargetString
       rocmtoolkit_joined
+      withCusparselt
+      withCufile
       ;
     cudaCapabilities = if cudaSupport then supportedCudaCapabilities else [ ];
     # At least for 1.10.2 `torch.fft` is unavailable unless BLAS provider is MKL. This attribute allows for easy detection of its availability.
     blasProvider = blas.provider;
+    triton = _tritonEffective;
     # To help debug when a package is broken due to CUDA support
     inherit brokenConditions;
     tests = callPackage ../tests {

@@ -43,6 +43,7 @@
   xz,
   yasm,
   glslang,
+  wrapGAppsHook3,
   nixosTests,
   # If open-watcom-bin is not passed, VirtualBox will fall back to use
   # the shipped alternative sources (assembly).
@@ -55,7 +56,7 @@
   python3,
   extensionPack ? null,
   fakeroot,
-  pulseSupport ? config.pulseaudio or stdenv.hostPlatform.isLinux,
+  pulseSupport ? stdenv.hostPlatform.isLinux,
   libpulseaudio,
   enableHardening ? false,
   headless ? false,
@@ -72,13 +73,13 @@ let
   buildType = "release";
   # Use maintainers/scripts/update.nix to update the version and all related hashes or
   # change the hashes in extpack.nix and guest-additions/default.nix as well manually.
-  virtualboxVersion = "7.2.12";
+  virtualboxVersion = "7.2.20";
   virtualboxSubVersion = "";
-  virtualboxSha256 = "64a4843677e42010e7799e951883fbbefc56bf2bc162e4970edea04f142f8b25";
+  virtualboxSha256 = "5c2138213b72f36c129b92c2c267f2a40e9c98513f4c86a584327f09f9be706d";
 
-  kvmPatchVboxVersion = "7.2.6";
-  kvmPatchVersion = "20260201";
-  kvmPatchHash = "sha256-pq4DPLwHRRAMJjmfXympDxJK9+d+LwTOxBqxAm0pl3o=";
+  kvmPatchVboxVersion = "7.2.20";
+  kvmPatchVersion = "20260930";
+  kvmPatchHash = "sha256-gqfAsW2AQFXC0MAss0NfucKYAbpxvT9eYdStYAunwbk=";
 
   # The KVM build is not compatible to VirtualBox's kernel modules. So don't export
   # modsrc at all.
@@ -133,10 +134,14 @@ stdenv.mkDerivation (finalAttrs: {
     yasm
     glslang
   ]
-  ++ optional (!headless) wrapQtAppsHook;
+  ++ optionals (!headless) [
+    wrapQtAppsHook
+    wrapGAppsHook3
+  ];
 
   # Wrap manually because we wrap just a small number of executables.
   dontWrapQtApps = true;
+  dontWrapGApps = true;
 
   buildInputs = [
     acpica-tools
@@ -385,6 +390,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   preFixup =
     optionalString (!headless) ''
+      qtWrapperArgs+=("''${gappsWrapperArgs[@]}")
       wrapQtApp $out/bin/VirtualBox
     ''
     # If hardening is disabled, wrap the VirtualBoxVM binary instead of patching
@@ -415,6 +421,7 @@ stdenv.mkDerivation (finalAttrs: {
     homepage = "https://www.virtualbox.org/";
     maintainers = with lib.maintainers; [
       friedrichaltheide
+      parthy
     ];
     platforms = [ "x86_64-linux" ];
     mainProgram = "VirtualBox";

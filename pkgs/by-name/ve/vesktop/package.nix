@@ -8,12 +8,12 @@
   makeDesktopItem,
   copyDesktopItems,
   vencord,
-  electron_42,
+  electron_43,
   libicns,
   pipewire,
   libpulseaudio,
   autoPatchelfHook,
-  pnpm_10,
+  pnpm_11,
   fetchPnpmDeps,
   pnpmConfigHook,
   nodejs,
@@ -26,17 +26,17 @@
   withSystemVencord ? false,
 }:
 let
-  electron = electron_42;
+  electron = electron_43;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "vesktop";
-  version = "1.6.5";
+  version = "1.6.7";
 
   src = fetchFromGitHub {
     owner = "Vencord";
     repo = "Vesktop";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-YPDlqiO+0BtDgC7aFl8B2KPYsT41WqzOQ7et2Tejs3M=";
+    hash = "sha256-Y74FIqcY26Dizz+DoY+r8caOfX+4/VmiEbmhcOpMHqE=";
   };
 
   pnpmDeps = fetchPnpmDeps {
@@ -46,15 +46,15 @@ stdenv.mkDerivation (finalAttrs: {
       src
       patches
       ;
-    pnpm = pnpm_10;
-    fetcherVersion = 3;
-    hash = "sha256-Ue1K1KmRi4gF7E519deVY7QH+22dqlECMjdA7Z7qDCA=";
+    pnpm = pnpm_11;
+    fetcherVersion = 4;
+    hash = "sha256-AK+ZbylpG7iKWKsIA0nfFfZYP7HaTCTSeDbNUFx/iY4=";
   };
 
   nativeBuildInputs = [
     nodejs
     pnpmConfigHook
-    pnpm_10
+    pnpm_11
     jq
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
@@ -91,8 +91,8 @@ stdenv.mkDerivation (finalAttrs: {
     # Validate electron version matches upstream package.json
     expectedMajor="$(jq -r '.devDependencies.electron | ltrimstr("^") | split(".") | .[0]' < package.json)"
     actualMajor="${lib.versions.major electron.version}"
-    if [ "$actualMajor" -lt "$expectedMajor" ] 2>/dev/null; then
-      echo "ERROR: nixpkgs electron version (major $actualMajor) is older than upstream package.json requirement (major $expectedMajor)"
+    if [ "$actualMajor" != "$expectedMajor" ] 2>/dev/null; then
+      echo "ERROR: electron version mismatch between package.json (major $expectedMajor) and nixpkgs (major $actualMajor)"
       exit 1
     fi
 
@@ -163,6 +163,7 @@ stdenv.mkDerivation (finalAttrs: {
     icon = "vesktop";
     startupWMClass = "Vesktop";
     genericName = "Internet Messenger";
+    comment = "Alternative Discord client with Vencord built-in";
     keywords = [
       "discord"
       "vencord"
@@ -185,7 +186,7 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   meta = {
-    description = "Alternate client for Discord with Vencord built-in";
+    description = "Alternative Discord client with Vencord built-in";
     homepage = "https://github.com/Vencord/Vesktop";
     changelog = "https://github.com/Vencord/Vesktop/releases/tag/${finalAttrs.src.rev}";
     license = lib.licenses.gpl3Only;

@@ -2,16 +2,14 @@
   lib,
   stdenv,
   acl,
-  buildGoModule,
   cmake,
   fcitx5,
   fetchFromGitHub,
   gettext,
-  go,
   hicolor-icon-theme,
   kdePackages,
+  libevdev,
   libinput,
-  libx11,
   nix-update-script,
   pkg-config,
   python3,
@@ -30,20 +28,22 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "fcitx5-lotus";
-  version = "3.4.0";
+  version = "5.0.4";
 
   src = fetchFromGitHub {
     owner = "LotusInputMethod";
     repo = "fcitx5-lotus";
-    rev = "v${finalAttrs.version}";
-    hash = "sha256-MN83U0/o+vDGCxpYgFxfXAf+Iw59OaXyB7770ppLmEQ=";
-    fetchSubmodules = true;
+    tag = "v${finalAttrs.version}";
+    hash = "sha256-E1A9PviA9V4I8f/3iLsiLA1nb4EM+nh+WG8sXwbudCA=";
+  };
+
+  passthru = {
+    updateScript = nix-update-script { };
   };
 
   nativeBuildInputs = [
     cmake
     gettext
-    go
     hicolor-icon-theme
     kdePackages.extra-cmake-modules
     pkg-config
@@ -54,68 +54,41 @@ stdenv.mkDerivation (finalAttrs: {
     acl
     fcitx5
     kdePackages.extra-cmake-modules
+    libevdev
     libinput
-    libx11
     pythonEnv
     qt6.qtbase
+    qt6.qtsvg
     udev
   ];
 
   strictDeps = true;
+
   __structuredAttrs = true;
 
   dontWrapQtApps = true;
 
-  vendorDir =
-    (buildGoModule {
-      pname = "fcitx5-lotus-go-modules";
-      inherit (finalAttrs) version src;
-      modRoot = "bamboo";
-      vendorHash = "sha256-HjVMGil4bNMTFifxFYtHELdkeKhrumHGrde4msbxvJc=";
-    }).goModules;
-
-  preConfigure = ''
-    export GOCACHE=$TMPDIR/go-cache
-    export GOPATH=$TMPDIR/go
-
-    rm -rf bamboo/vendor
-    cp -r $vendorDir bamboo/vendor
-  '';
-
-  postPatch = ''
-    substituteInPlace src/lotus-monitor.cpp \
-      --replace-fail 'strcmp(exe_path, "/usr/bin/fcitx5-lotus-server") == 0' \
-                     '(strncmp(exe_path, "/nix/store/", 11) == 0 && strlen(exe_path) >= 24 && strcmp(exe_path + strlen(exe_path) - 24, "/bin/fcitx5-lotus-server") == 0)'
-
-    substituteInPlace server/lotus-server.cpp \
-      --replace-fail 'strcmp(exe_path, "/usr/bin/fcitx5") == 0' \
-                     '(strncmp(exe_path, "/nix/store/", 11) == 0 && strlen(exe_path) >= 11 && strcmp(exe_path + strlen(exe_path) - 11, "/bin/fcitx5") == 0)'
-  '';
-
-  postInstall = ''
-    substituteInPlace $out/lib/udev/rules.d/99-lotus.rules \
-      --replace-fail "/usr/bin/setfacl" "${acl}/bin/setfacl"
-
-    substituteInPlace $out/lib/systemd/system/fcitx5-lotus-server@.service \
-      --replace-fail "/usr/bin/setfacl" "${acl}/bin/setfacl" \
-      --replace-fail "/usr/bin/fcitx5-lotus-server" "$out/bin/fcitx5-lotus-server"
-  '';
+  cmakeFlags = [
+    "-DLOTUS_ALT_EXECUTABLE_PREFIX=/nix/store/"
+    "-DLOTUS_SETFACL_EXECUTABLE=${acl}/bin/setfacl"
+  ];
 
   postFixup = ''
     patchShebangs $out/share/fcitx5-lotus/settings-gui
-    wrapQtApp $out/bin/fcitx5-lotus-settings
+    wrapQtApp $out/bin/fcitx5-lotus-settings \
+      --prefix XDG_DATA_DIRS : "${hicolor-icon-theme}/share"
   '';
-
-  passthru.updateScript = nix-update-script { };
 
   meta = {
     description = "Vietnamese input method engine for Fcitx5";
     homepage = "https://github.com/LotusInputMethod/fcitx5-lotus";
     license = with lib.licenses; [
       gpl3Plus
-      lgpl21Plus
     ];
-    maintainers = with lib.maintainers; [ imcvampire ];
+    maintainers = with lib.maintainers; [
+      imcvampire
+      justanoobcoder
+    ];
     platforms = lib.platforms.linux;
   };
 })

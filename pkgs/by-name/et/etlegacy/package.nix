@@ -20,7 +20,7 @@ let
 in
 symlinkJoin {
   pname = "etlegacy";
-  version = "2.84.0";
+  version = "2.86.1";
 
   paths = [
     etlegacy-assets

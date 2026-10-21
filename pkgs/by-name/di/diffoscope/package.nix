@@ -50,7 +50,7 @@
   lz4,
   lzip,
   mono,
-  ocaml,
+  ocaml-ng,
   odt2txt,
   oggvideotools,
   openssh,
@@ -66,7 +66,7 @@
   R,
   sng,
   sqlite,
-  squashfsTools,
+  squashfs-tools,
   systemdUkify,
   tcpdump,
   ubootTools,
@@ -98,6 +98,11 @@ let
             tag = version;
             hash = "sha256-ZYEjT/yShfA4+zpbGOtaFOx1nSSOWPtMvskPhHv3c9U=";
           };
+
+          postPatch = ''
+            substituteInPlace py_ext/setup.py \
+              --replace-fail "0.2.0" "${version}"
+          '';
         }
       );
     };
@@ -107,12 +112,12 @@ in
 # Note: when upgrading this package, please run the list-missing-tools.sh script as described below!
 python.pkgs.buildPythonApplication rec {
   pname = "diffoscope";
-  version = "325";
+  version = "333";
   pyproject = true;
 
   src = fetchurl {
     url = "https://diffoscope.org/archive/diffoscope-${version}.tar.bz2";
-    hash = "sha256-z8mdVWYo/UHfNIQy/XSDYSMAytIwXk/R3FRm4IsikIc=";
+    hash = "sha256-KHjYLCd2f5DRQRhG0L97Og8b20dZUyJq4BtWShVKFos=";
   };
 
   outputs = [
@@ -121,15 +126,13 @@ python.pkgs.buildPythonApplication rec {
   ];
 
   patches = [
+    ./androguard-4.1.4.patch
     ./ignore_links.patch
   ];
 
   postPatch = ''
     # When generating manpage, use the installed version
     substituteInPlace doc/Makefile --replace-fail "../bin" "$out/bin"
-
-    substituteInPlace diffoscope/comparators/apk.py \
-      --replace-fail "from androguard.core.bytecodes import apk" "from androguard.core import apk"
   '';
 
   nativeBuildInputs = [
@@ -151,9 +154,7 @@ python.pkgs.buildPythonApplication rec {
   # otool
   # Other tools:
   # docx2txt (needs Debian's package called this, not the python package)
-  # radare2
-  # > FAILED tests/comparators/test_elf_decompiler.py::test_radare2_diff - KeyError: 'offset'
-  # > FAILED tests/comparators/test_macho_decompiler.py::test_radare2_diff - KeyError: 'offset'
+  # radare2 (the exact output of the r2 version debian ships is expected, and our more recent version has a slightly different one)
   #
   # We filter automatically all packages for the host platform (some dependencies are not supported on Darwin, aarch64, etc.).
   # Packages which are marked broken for a platform are not automatically filtered to avoid accidentally removing them without noticing it.
@@ -185,7 +186,7 @@ python.pkgs.buildPythonApplication rec {
       pgpdump
       sng
       sqlite
-      squashfsTools
+      squashfs-tools
       unzip
       xxd
       xz
@@ -228,7 +229,7 @@ python.pkgs.buildPythonApplication rec {
         libcaca
         llvm
         mono
-        ocaml
+        ocaml-ng.ocamlPackages_5_4.ocaml
         odt2txt
         oggvideotools
         openssh
@@ -276,10 +277,16 @@ python.pkgs.buildPythonApplication rec {
 
   makeWrapperArgs = lib.optionals enableBloat (
     [
-      "--prefix PATH : ${lib.makeBinPath [ hdf5 ]}"
+      "--prefix"
+      "PATH"
+      ":"
+      (lib.makeBinPath [ hdf5 ])
     ]
     ++ lib.optionals stdenv.hostPlatform.isDarwin [
-      "--prefix DYLD_LIBRARY_PATH : ${lib.makeLibraryPath [ hdf5 ]}"
+      "--prefix"
+      "DYLD_LIBRARY_PATH"
+      ":"
+      (lib.makeLibraryPath [ hdf5 ])
     ]
   );
 
@@ -327,12 +334,12 @@ python.pkgs.buildPythonApplication rec {
   passthru = {
     updateScript = writeScript "update-diffoscope" ''
       #!/usr/bin/env nix-shell
-      #!nix-shell -i bash -p curl pcre common-updater-scripts
+      #!nix-shell -i bash -p curl pcre2 common-updater-scripts
 
       set -eu -o pipefail
 
       # Expect the text in format of "Latest release: 198 (31 Dec 2021)"'.
-      newVersion="$(curl -s https://diffoscope.org/ | pcregrep -o1 'Latest release: ([0-9]+)')"
+      newVersion="$(curl -s https://diffoscope.org/ | pcre2grep -o1 'Latest release: ([0-9]+)')"
       update-source-version ${pname} "$newVersion"
     '';
   };

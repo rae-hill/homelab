@@ -1,19 +1,17 @@
 {
   lib,
-  swiftPackages,
+  apple-sdk_26,
   fetchFromGitHub,
   darwin,
   actool,
   ibtool,
-  # TODO: Clean up on `staging`
-  llvmPackages,
   makeWrapper,
   nix-update-script,
+  swift,
+  stdenv,
 }:
 
 let
-  inherit (swiftPackages) stdenv swift;
-
   masShortcutSrc = fetchFromGitHub {
     owner = "rxhanson";
     repo = "MASShortcut";
@@ -46,7 +44,7 @@ let
       {
         CFBundleInfoDictionaryVersion = "6.0";
         CFBundlePackageType = "APPL";
-        LSMinimumSystemVersion = "10.15";
+        LSMinimumSystemVersion = "14.0";
         NSMainStoryboardFile = "Main";
         NSPrincipalClass = "NSApplication";
       }
@@ -124,25 +122,16 @@ let
       SUPublicEDKey = "lpt9M3PhocbZ3MZiLH+crEqRfU11kfoNzGxSqiEIdvM=";
       SUScheduledCheckInterval = 172800;
     };
-
-  launcherInfoPlist = mkAppPlist {
-    CFBundleExecutable = "RectangleLauncher";
-    CFBundleIdentifier = "com.knollsoft.RectangleLauncher";
-    CFBundleName = "RectangleLauncher";
-    CFBundleShortVersionString = "1.0";
-    CFBundleVersion = "1";
-    LSBackgroundOnly = true;
-  };
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "rectangle";
-  version = "0.98";
+  version = "2.0.3";
 
   src = fetchFromGitHub {
     owner = "rxhanson";
     repo = "Rectangle";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-GGK9mMxllVg0rfcrTg5aUYaECwV7mNCPLwXM+tKazN8=";
+    hash = "sha256-pcDl+GHBgPHysS5q0pQgQbbMOAzsTvA/KJ2N+OlPIoA=";
   };
 
   nativeBuildInputs = [
@@ -151,9 +140,23 @@ stdenv.mkDerivation (finalAttrs: {
     ibtool
     darwin.autoSignDarwinBinariesHook
     makeWrapper
-    # TODO: Clean up on `staging`
-    llvmPackages.lld
   ];
+
+  buildInputs = [
+    apple-sdk_26
+  ];
+
+  postPatch = ''
+    # Requires the macOS 27 SDK, whose Swift interfaces are too new for our Swift
+    substituteInPlace Rectangle/AppDelegate.swift \
+      --replace-fail "newMenuItem.preferredImageVisibility = .visible" ""
+
+    # Annotate the closure type, otherwise the type checker times out
+    substituteInPlace Rectangle/MultiWindow/GridTiling.swift \
+      --replace-fail \
+        "let candidates = (0..<stages.count).map { step in" \
+        "let candidates = (0..<stages.count).map { (step: Int) -> Int in"
+  '';
 
   dontConfigure = true;
 
@@ -165,8 +168,6 @@ stdenv.mkDerivation (finalAttrs: {
     commonSwiftFlags=(
       -O -disable-bridging-pch
       -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker 26.0
-      # TODO: Clean up on `staging`
-      -use-ld=lld
     )
 
     nixLog "building Sparkle stub framework"
@@ -199,12 +200,9 @@ stdenv.mkDerivation (finalAttrs: {
     ) masShortcutSources}
 
     nixLog "linking MASShortcut dylib"
-    # `-fuse-ld=lld`: fix for ld64 hardening issue
-    # TODO: Clean up on `staging`
     clang -dynamiclib "''${masObjFiles[@]}" \
       -framework AppKit -framework Carbon -framework Foundation \
       -install_name "@rpath/MASShortcut.framework/MASShortcut" \
-      -fuse-ld=lld \
       -o "$buildDir/libMASShortcut.dylib"
 
     rectSwiftFiles=()
@@ -225,14 +223,6 @@ stdenv.mkDerivation (finalAttrs: {
       -F /System/Library/PrivateFrameworks \
       -Xlinker -rpath -Xlinker "@executable_path/../Frameworks" \
       "''${rectSwiftFiles[@]}" -o "$buildDir/Rectangle"
-
-    nixLog "compiling RectangleLauncher"
-    swiftc "''${commonSwiftFlags[@]}" -emit-executable \
-      -module-name RectangleLauncher \
-      -parse-as-library \
-      -framework AppKit \
-      RectangleLauncher/AppDelegate.swift \
-      -o "$buildDir/RectangleLauncher"
 
     runHook postBuild
   '';
@@ -293,15 +283,6 @@ stdenv.mkDerivation (finalAttrs: {
       --platform macosx --minimum-deployment-target 14.0 \
       --app-icon AppIcon --output-partial-info-plist /dev/null \
       Rectangle/Assets.xcassets
-
-    # RectangleLauncher.app
-    ${mkAppBundle {
-      name = "RectangleLauncher";
-      binary = "$buildDir/RectangleLauncher";
-      sourceDir = "RectangleLauncher";
-      plist = launcherInfoPlist;
-      destDir = "$app/Contents/Library/LoginItems";
-    }}
 
     makeWrapper "$app/Contents/MacOS/Rectangle" "$out/bin/rectangle"
 

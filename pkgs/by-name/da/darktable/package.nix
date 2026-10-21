@@ -54,6 +54,7 @@
   libtiff,
   libwebp,
   libxml2,
+  libxslt,
   lua5_4,
   onnxruntime,
   util-linux,
@@ -85,26 +86,26 @@ let
   pugixml-shared = pugixml.override { shared = true; };
 in
 stdenv.mkDerivation rec {
-  version = "5.6.0";
+  version = "5.6.2";
   pname = "darktable";
 
   src = fetchurl {
     url = "https://github.com/darktable-org/darktable/releases/download/release-${version}/darktable-${version}.tar.xz";
-    hash = "sha256-FX1tOEevivyr54lERUeG9zqIbgilBLS9YRTCBl/gBuQ=";
+    hash = "sha256-0tqSxnBAHTULV2Qx8h5YvuQDSOH1B4IBqKG4wnBYWDQ=";
   };
 
   nativeBuildInputs = [
     cmake
     desktop-file-utils
     intltool
+    libxslt # xsltproc, used by tools/generate_styles_string.sh
     llvmPackages.llvm
     ninja
     perl
     pkg-config
     wrapGAppsHook3
     saxon # Use Saxon instead of libxslt to fix XSLT generate-id() consistency issues
-  ]
-  ++ lib.optionals stdenv.hostPlatform.isDarwin [ llvmPackages.lld ];
+  ];
 
   buildInputs = [
     SDL2
@@ -174,7 +175,10 @@ stdenv.mkDerivation rec {
   ++ lib.optional stdenv.cc.isClang llvmPackages.openmp;
 
   cmakeFlags = [
+    # Prevents -march=native.
+    "-DBINARY_PACKAGE_BUILD=1"
     "-DBUILD_USERMANUAL=False"
+    "-DRAWSPEED_MARCH=-mtune=generic"
   ]
   ++ lib.optionals withAi [
     (lib.cmakeBool "USE_AI" true)
@@ -184,12 +188,6 @@ stdenv.mkDerivation rec {
     "-DUSE_COLORD=OFF"
     "-DUSE_KWALLET=OFF"
   ];
-
-  env = lib.optionalAttrs stdenv.hostPlatform.isDarwin {
-    # Work around ld64's libc++ hardening issue.
-    # TODO: Remove once #536365 reaches this branch.
-    NIX_CFLAGS_LINK = "-fuse-ld=lld";
-  };
 
   # darktable changed its rpath handling in commit
   # 83c70b876af6484506901e6b381304ae0d073d3c and as a result the
@@ -217,10 +215,12 @@ stdenv.mkDerivation rec {
     patchShebangs ./tools/generate_styles_string.sh
   '';
 
+  # darktable hangs in versionCheckHook on darwin for an unknown reason, use darktable-cli instead
+  # (possibly related to accessing /var/empty/.config/darktable, but writableTmpDirAsHomeHook did not help as of v5.6.2
+  doInstallCheck = !stdenv.hostPlatform.isDarwin;
   nativeInstallCheckInputs = [
     versionCheckHook
   ];
-  doInstallCheck = true;
 
   passthru.updateScript = gitUpdater {
     rev-prefix = "release-";
@@ -232,6 +232,7 @@ stdenv.mkDerivation rec {
     description = "Virtual lighttable and darkroom for photographers";
     homepage = "https://www.darktable.org";
     changelog = "https://github.com/darktable-org/darktable/releases/tag/release-${version}";
+    mainProgram = "darktable";
     license = lib.licenses.gpl3Plus;
     platforms = with lib.platforms; linux ++ darwin;
     maintainers = with lib.maintainers; [

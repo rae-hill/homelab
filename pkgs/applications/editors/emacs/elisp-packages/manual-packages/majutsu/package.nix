@@ -6,22 +6,26 @@
   magit,
   transient,
   with-editor,
+  consult,
+  plz,
 }:
 melpaBuild {
   pname = "majutsu";
-  version = "0.6.0-unstable-2026-07-09";
+  version = "0.6.0-unstable-2026-09-14";
 
   src = fetchFromGitHub {
     owner = "0WD0";
     repo = "majutsu";
-    rev = "59aff9b93eac575fbccc1f4ab2d48d048e0ead9b";
-    hash = "sha256-GJ62hsHgLEFIY0ghij0VPFt1jMUGRKhI2eCroBjkxtc=";
+    rev = "0fdb3c2b3ab826724949cd2cc714f2eff32ec152";
+    hash = "sha256-4K5pSnSTh1GpdcQMPkhUouQQ3JM8vR22yBOBgPPo7vI=";
   };
 
   packageRequires = [
     magit
     transient
     with-editor
+    consult
+    plz
   ];
 
   passthru.updateScript = nix-update-script { extraArgs = [ "--version=branch=main" ]; };

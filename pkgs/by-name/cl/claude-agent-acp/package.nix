@@ -8,16 +8,16 @@
 
 buildNpmPackage (finalAttrs: {
   pname = "claude-agent-acp";
-  version = "0.58.1";
+  version = "0.88.0";
 
   src = fetchFromGitHub {
     owner = "agentclientprotocol";
     repo = "claude-agent-acp";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-9bnUVYfE3iMOcHFg9PK25MoMla978/YbkZLzWgVkd84=";
+    hash = "sha256-xLS5aCBOwFEaQgPiRhdUWV7rQFa7H0DQ1vFYtqZRERU=";
   };
 
-  npmDepsHash = "sha256-cqglQ/XW+E1U0CzhUBltKduwKdgvjH3hrPRb5MZJovM=";
+  npmDepsHash = "sha256-4rJRg46lpT5ts4JRQEd7FsyA6OUO5zAU41Ctnv9CjZ4=";
 
   nativeBuildInputs = [ makeWrapper ];
 
@@ -29,6 +29,7 @@ buildNpmPackage (finalAttrs: {
   meta = {
     description = "ACP-compatible coding agent powered by the Claude Agent SDK";
     homepage = "https://github.com/agentclientprotocol/claude-agent-acp";
+    changelog = "https://github.com/agentclientprotocol/claude-agent-acp/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.asl20;
     maintainers = with lib.maintainers; [
       amadejkastelic

@@ -14,16 +14,16 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "pimsync";
-  version = "0.5.10";
+  version = "0.6.0";
 
   src = fetchFromSourcehut {
     owner = "~whynothugo";
     repo = "pimsync";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-YqLOkv0I+1HOlWNA8HoKB6/3ccYbV8u/0BJ/+4xvde4=";
+    hash = "sha256-vpmms553q1mzxfkMGEjvTddQVksEAzu50g8bVudZsXg=";
   };
 
-  cargoHash = "sha256-9sEYeKZDMsbEUQc5V8xJzcKIzF6ugGsk3d5bTOCtYnw=";
+  cargoHash = "sha256-UwfsLEmeSINPDR4VK4P+z4R5VU20RoWUEFC+hRG7TiA=";
 
   env.PIMSYNC_VERSION = finalAttrs.version;
 

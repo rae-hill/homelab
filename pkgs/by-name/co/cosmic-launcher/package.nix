@@ -7,21 +7,22 @@
   libcosmicAppHook,
   nix-update-script,
   nixosTests,
+  enableHardwareAcceleration ? true,
 }:
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "cosmic-launcher";
-  version = "1.2.0";
+  version = "1.10.0";
 
   # nixpkgs-update: no auto update
   src = fetchFromGitHub {
     owner = "pop-os";
     repo = "cosmic-launcher";
     tag = "epoch-${finalAttrs.version}";
-    hash = "sha256-Dy1sOEe/Cb1wyXHETZ5wJt8IcJMGw19OeDGOhuv4kQg=";
+    hash = "sha256-QlAkEiq6kMIQdpIxYYPw1psJ6dcIpPZirRTHjiiU4yo=";
   };
 
-  cargoHash = "sha256-WnZAPQR8hGGNC5S7hPmcGSMs9HrOw4/wqJR151eIgHY=";
+  cargoHash = "sha256-W4set6miB69uLnQEs+Nl+FEpw62kzZ6FkH79idDgk9Y=";
 
   separateDebugInfo = true;
   __structuredAttrs = true;
@@ -44,6 +45,9 @@ rustPlatform.buildRustPackage (finalAttrs: {
     "cargo-target-dir"
     "target/${stdenv.hostPlatform.rust.cargoShortTarget}"
   ];
+
+  buildNoDefaultFeatures = true;
+  buildFeatures = lib.optional enableHardwareAcceleration "wgpu";
 
   passthru = {
     tests = {

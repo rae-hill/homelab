@@ -28,6 +28,8 @@
   libtiff,
   enableWebP ? true,
   libwebp,
+  enableJpegXL ? true,
+  libjxl,
   enableEXR ? !stdenv.hostPlatform.isDarwin,
   openexr,
   enableJPEG2000 ? true,
@@ -52,14 +54,13 @@
   enableIpp ? false,
   enablePython ? false,
   pythonPackages,
-  enableGtk2 ? false,
-  gtk2,
   enableGtk3 ? false,
   gtk3,
   enableVtk ? false,
   vtk,
   enableFfmpeg ? true,
-  ffmpeg-headless,
+  # FIXME: unpin once upstream has ffmpeg 9 support
+  ffmpeg_8-headless,
   enableGStreamer ? true,
   elfutils,
   gst_all_1,
@@ -89,9 +90,6 @@
 
   bzip2,
   callPackage,
-
-  # TODO: Clean up on `staging`.
-  llvmPackages,
 }@inputs:
 
 let
@@ -186,7 +184,7 @@ let
       owner = "opencv";
       repo = "opencv_3rdparty";
       rev = "34e4206aef44d50e6bbcd0ab06354b52e7466d26";
-      sha256 = "13yig1xhvgghvxspxmdidss5lqiikpjr0ddm83jsi0k85j92sn62";
+      hash = "sha256-wlgtkixogqjlQLU1kOWdMWJatG6x1X513/C9DXt40Y8=";
     };
     files = {
       "boostdesc_bgm.i" = "0ea90e7a8f3f7876d450e4149c97c74f";
@@ -308,6 +306,16 @@ effectiveStdenv.mkDerivation {
     [
       ./cuda_opt_flow.patch
     ]
+    ++ optionals (lib.versionOlder version "4.14.0") [
+      # Backport https://github.com/opencv/opencv_contrib/pull/4130
+      (fetchpatch {
+        name = "videostab-add-missing-include-to-fix-build-failure";
+        url = "https://github.com/opencv/opencv_contrib/commit/054007b78c8288ef2fd040e77dc0cf2e45f70c15.patch";
+        stripLen = 2;
+        extraPrefix = "opencv_contrib/";
+        hash = "sha256-vDW6kfDmwPB/tTurkDXuvViXrzXYV4njjDN6kLoIvJ4=";
+      })
+    ]
     ++ optionals (cudaPackages.cudaAtLeast "13.2") [
       # Backport https://github.com/opencv/opencv_contrib/pull/4097
       (fetchpatch {
@@ -361,9 +369,6 @@ effectiveStdenv.mkDerivation {
   ++ optionals (effectiveStdenv.buildPlatform == effectiveStdenv.hostPlatform) [
     hdf5
   ]
-  ++ optionals enableGtk2 [
-    gtk2
-  ]
   ++ optionals enableGtk3 [
     gtk3
   ]
@@ -382,6 +387,9 @@ effectiveStdenv.mkDerivation {
   ++ optionals enableWebP [
     libwebp
   ]
+  ++ optionals enableJpegXL [
+    libjxl
+  ]
   ++ optionals enableEXR [
     openexr
   ]
@@ -389,7 +397,7 @@ effectiveStdenv.mkDerivation {
     openjpeg
   ]
   ++ optionals enableFfmpeg [
-    ffmpeg-headless
+    ffmpeg_8-headless
   ]
   ++ optionals (enableGStreamer && effectiveStdenv.hostPlatform.isLinux) [
     elfutils
@@ -473,10 +481,6 @@ effectiveStdenv.mkDerivation {
   )
   ++ optionals enableCuda [
     cudaPackages.cuda_nvcc
-  ]
-  # TODO: Clean up on `staging`.
-  ++ optionals effectiveStdenv.hostPlatform.isDarwin [
-    llvmPackages.lld
   ];
 
   env = {
@@ -504,6 +508,7 @@ effectiveStdenv.mkDerivation {
     (cmakeBool "WITH_IPP" enableIpp)
     (cmakeBool "WITH_TIFF" enableTIFF)
     (cmakeBool "WITH_WEBP" enableWebP)
+    (cmakeBool "WITH_JPEGXL" enableJpegXL)
     (cmakeBool "WITH_JPEG" enableJPEG)
     (cmakeBool "WITH_PNG" enablePNG)
     (cmakeBool "WITH_OPENEXR" enableEXR)
@@ -536,7 +541,7 @@ effectiveStdenv.mkDerivation {
 
     # OpenCV respects at least three variables:
     # -DCUDA_GENERATION takes a single arch name, e.g. Volta
-    # -DCUDA_ARCH_BIN takes a semi-colon separated list of real arches, e.g. "8.0;8.6"
+    # -DCUDA_ARCH_BIN takes a semicolon-separated list of real arches, e.g. "8.0;8.6"
     # -DCUDA_ARCH_PTX takes the virtual arch, e.g. "8.6"
     (cmakeFeature "CUDA_ARCH_BIN" cmakeCudaArchitecturesString)
     (cmakeFeature "CUDA_ARCH_PTX" (last cudaCapabilities))
@@ -566,10 +571,6 @@ effectiveStdenv.mkDerivation {
   ]
   ++ optionals (enabledModules != [ ]) [
     (cmakeFeature "BUILD_LIST" (concatStringsSep "," enabledModules))
-  ]
-  # TODO: Clean up on `staging`.
-  ++ optionals effectiveStdenv.hostPlatform.isDarwin [
-    (cmakeFeature "CMAKE_LINKER_TYPE" "LLD")
   ];
 
   postBuild = optionalString enableDocs ''
@@ -654,7 +655,6 @@ effectiveStdenv.mkDerivation {
       opencv4-tests = callPackage ./tests.nix {
         inherit
           enableGStreamer
-          enableGtk2
           enableGtk3
           runAccuracyTests
           runPerformanceTests

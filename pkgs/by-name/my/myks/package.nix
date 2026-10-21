@@ -10,16 +10,16 @@
 
 buildGoModule (finalAttrs: {
   pname = "myks";
-  version = "5.13.2";
+  version = "5.14.0";
 
   src = fetchFromGitHub {
     owner = "mykso";
     repo = "myks";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-Ij1QmMr2JJSjs+5e80RxjZcCKoSqNb9mD+IKtQjX13w=";
+    hash = "sha256-mUcA6yQIQe9tkJRBcyzkfVpGFGJcZvsmHhVApY4+cKc=";
   };
 
-  vendorHash = "sha256-x5yCigeM4ltL1wphW8ufa0WB3nd14AOkXGLggAxKTrs=";
+  vendorHash = "sha256-2AHOnku2WPvJwotrp1fpA/g/YTH64cgxglsXBGStx28=";
 
   subPackages = ".";
 

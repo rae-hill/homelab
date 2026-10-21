@@ -1,52 +1,55 @@
 {
   rustPlatform,
   fetchFromGitHub,
-  pkg-config,
-  alsa-lib,
   cmake,
-  opus,
+  pkg-config,
+  makeWrapper,
+  nasm,
+  alsa-lib,
+  pipewire,
+  libva,
+  mesa,
   lib,
   stdenv,
-  # TODO: Clean up on `staging`
-  lld,
   nix-update-script,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "concord-tui";
-  version = "2.4.1";
+  version = "2.5.17";
 
   src = fetchFromGitHub {
     owner = "chojs23";
     repo = "concord";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-3c5jxpJrBr6vYnbcJIYD06d932Da94hXUZA5FLa3kkU=";
+    hash = "sha256-W/kpLLz9W9e5f4ja85MeaUGHGpOqiZmRIL4rmBvnT0Y=";
   };
 
-  cargoHash = "sha256-6iAyKsS+FoNCKkMvbL70vKSPoAaKQtUDiAQGaEMuxWk=";
+  cargoHash = "sha256-7YdNA6UPVaMT3vC6c91e4vnPN7q1p93ezI0PkNHpIME=";
 
-  buildInputs = [
-    opus
-  ]
-  ++ lib.optionals stdenv.hostPlatform.isLinux [
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
     alsa-lib
+    pipewire
+    libva
+    mesa
   ];
   nativeBuildInputs = [
-    pkg-config
     cmake
+    pkg-config
   ]
-  # TODO: Clean up on `staging`
-  ++ lib.optionals stdenv.hostPlatform.isDarwin [
-    lld
-  ];
+  ++ lib.optionals stdenv.hostPlatform.isLinux [
+    rustPlatform.bindgenHook
+    makeWrapper
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isx86_64 [ nasm ];
+
+  postFixup = lib.optionalString stdenv.hostPlatform.isLinux ''
+    wrapProgram "$out/bin/concord" \
+      --set-default PIPEWIRE_CONFIG_DIR "${pipewire}/share/pipewire"
+  '';
 
   __darwinAllowLocalNetworking = true;
 
   __structuredAttrs = true;
-
-  # TODO: Clean up on `staging`
-  env = lib.optionalAttrs stdenv.hostPlatform.isDarwin {
-    NIX_CFLAGS_LINK = "-fuse-ld=${lib.getExe' lld "ld64.lld"}";
-  };
 
   passthru.updateScript = nix-update-script { };
 
@@ -55,7 +58,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     homepage = "https://github.com/chojs23/concord";
     license = lib.licenses.gpl3Only;
     maintainers = with lib.maintainers; [
-      Simon-Weij
+      inomish
       neo
       Br1ght0ne
     ];

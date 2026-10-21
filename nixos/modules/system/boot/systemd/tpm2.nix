@@ -29,6 +29,9 @@
 
     boot.initrd.systemd.tpm2.pcrphases.enable =
       lib.mkEnableOption "systemd initrd boot phase measurements";
+
+    boot.initrd.systemd.tpm2.pcrosseparator.enable =
+      lib.mkEnableOption "systemd initrd boot phase OS userspace separator";
   };
 
   # TODO: pcrextend, pcrfs, pcrmachine
@@ -47,6 +50,16 @@
           "systemd-pcrextend@.service"
           "systemd-pcrlogin@.service"
         ];
+        # systemd-pcrlogin@.service will fail if the NvPCR hasn't been
+        # initialized, which is supposed to be done by
+        # systemd-tpm2-setup. But that initialization doesn't happen
+        # without /run/systemd/tpm2-pcr-public-key.pem and
+        # /run/systemd/tpm2-pcr-signature.json. This condition is
+        # added to skip the service when that initialization didn't
+        # happen. TODO: This should really solved somewhere other than
+        # NixOS.
+        systemd.services."systemd-pcrlogin@".unitConfig.ConditionPathExists =
+          "/run/systemd/nvpcr/login.auth";
       }
     )
     (
@@ -99,6 +112,18 @@
           "systemd-pcrphase-initrd.service"
         ];
         boot.initrd.systemd.services.systemd-pcrphase-initrd.wantedBy = [ "initrd.target" ];
+        boot.initrd.systemd.storePaths = [ "${cfg.package}/lib/systemd/systemd-pcrextend" ];
+      }
+    )
+    (
+      let
+        cfg = config.boot.initrd.systemd;
+      in
+      lib.mkIf (cfg.enable && cfg.tpm2.enable && cfg.tpm2.pcrosseparator.enable) {
+        boot.initrd.systemd.additionalUpstreamUnits = [
+          "systemd-pcrosseparator.service"
+        ];
+        boot.initrd.systemd.services.systemd-pcrosseparator.wantedBy = [ "initrd.target" ];
         boot.initrd.systemd.storePaths = [ "${cfg.package}/lib/systemd/systemd-pcrextend" ];
       }
     )

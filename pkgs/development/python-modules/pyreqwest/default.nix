@@ -20,19 +20,19 @@
 
 buildPythonPackage (finalAttrs: {
   pname = "pyreqwest";
-  version = "0.12.0";
+  version = "0.15.0";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "MarkusSintonen";
     repo = "pyreqwest";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-o33/KkPBl4ActDV0R8KqWll6F47HPO3amHFI00rHryE=";
+    hash = "sha256-vUjjOxNt6Rsjm29wqL0bd9xG9XJ7fzihUpbG6sjcQTE=";
   };
 
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit (finalAttrs) pname version src;
-    hash = "sha256-+flEikEImbiu/x+pJQz3rynYKmfjaS9N0/A1HSzH0jU=";
+    hash = "sha256-ru2xt9EpWFgtT9CtOkPGzG37vaMWDwpg8am5069TUFM=";
   };
 
   build-system = [
@@ -56,6 +56,12 @@ buildPythonPackage (finalAttrs: {
     syrupy
     trustme
     yarl
+  ];
+
+  disabledTests = [
+    # snapshot has different dict key ordering
+    "test_assert_called_exact_count_failure"
+    "test_assert_called_regex_matchers_display"
   ];
 
   disabledTestPaths = [

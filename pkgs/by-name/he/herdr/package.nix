@@ -3,7 +3,8 @@
   stdenv,
   rustPlatform,
   fetchFromGitHub,
-  zig_0_15,
+  zig_0_16,
+  installAgentSkills,
   installShellFiles,
   cctools,
   xcbuild,
@@ -12,34 +13,53 @@
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "herdr";
-  version = "0.7.4";
+  version = "0.9.5";
 
   __structuredAttrs = true;
 
   src = fetchFromGitHub {
-    owner = "ogulcancelik";
+    owner = "herdrdev";
     repo = "herdr";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-dBOQYLFitJ+E3XNz44Ag3CIrBxFj16CmVPp7qil0ssg=";
+    hash = "sha256-N7e7oCKxeCoxek6UT8Lweq16rSsQQi34QMb7C2iNpm8=";
   };
 
-  cargoHash = "sha256-XHzZy2tKLbMQy4POmXowUcGf77ZPunG/oQ3P2wOoVls=";
+  cargoHash = "sha256-a6DgQodo+qa5yg/d+yMfsM9EUv2LQRFrqZgmwgVxggE=";
 
-  zigDeps = zig_0_15.fetchDeps {
+  zigDeps = zig_0_16.fetchDeps {
     inherit (finalAttrs) pname version;
     src = "${finalAttrs.src}/vendor/libghostty-vt";
     fetchAll = true;
-    hash = "sha256-pgGu8+NwvFcj6SrN4VaTHLeHdA7QY731ctyrHZwgFAc=";
+    hash = "sha256-Cy0DdSvce+fhOFIfxHMQGF2b2j16UkS27UpGbfC42XI=";
   };
 
   nativeBuildInputs = [
-    zig_0_15.hook
+    zig_0_16
+    installAgentSkills
     installShellFiles
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     cctools
     xcbuild
   ];
+
+  postPatch =
+    lib.optionalString stdenv.hostPlatform.isLinux ''
+      substituteInPlace vendor/libghostty-vt/src/build/GhosttyLibVt.zig \
+        --replace-fail 'lib.bundle_compiler_rt = true;' 'lib.bundle_compiler_rt = false;' \
+        --replace-fail 'lib.bundle_ubsan_rt = true;' 'lib.bundle_ubsan_rt = false;'
+    ''
+    + lib.optionalString stdenv.hostPlatform.isDarwin ''
+      substituteInPlace vendor/libghostty-vt/pkg/apple-sdk/native_link.zig \
+        --replace-fail '"/usr/bin/xcrun"' '"xcrun"'
+
+      substituteInPlace vendor/libghostty-vt/src/build/GhosttyLibVt.zig \
+        --replace-fail '"/bin/ln"' '"ln"'
+
+      substituteInPlace vendor/libghostty-vt/src/build/LibtoolStep.zig \
+        --replace-fail '/bin/cp ' 'cp ' \
+        --replace-fail '/usr/bin/ranlib ' 'ranlib '
+    '';
 
   # Upstream binary tests are renamed, added, or changed between releases and
   # depend on host process details, so Nix-only patches for them are brittle.
@@ -75,9 +95,13 @@ rustPlatform.buildRustPackage (finalAttrs: {
   meta = {
     description = "Agent multiplexer that lives in your terminal";
     homepage = "https://herdr.dev";
-    changelog = "https://github.com/ogulcancelik/herdr/releases/tag/v${finalAttrs.version}";
-    license = lib.licenses.agpl3Plus;
-    maintainers = with lib.maintainers; [ kevinpita ];
+    changelog = "https://github.com/herdrdev/herdr/releases/tag/v${finalAttrs.version}";
+    license = lib.licenses.asl20;
+    maintainers = with lib.maintainers; [
+      agilesteel
+      faukah
+      kevinpita
+    ];
     mainProgram = "herdr";
     platforms = lib.platforms.unix;
   };

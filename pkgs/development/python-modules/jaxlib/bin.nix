@@ -5,20 +5,19 @@
 # See `python3Packages.jax.passthru` for CUDA tests.
 
 {
-  absl-py,
   autoPatchelfHook,
   buildPythonPackage,
   fetchPypi,
-  flatbuffers,
   lib,
   ml-dtypes,
+  numpy,
   python,
   scipy,
   stdenv,
 }:
 
 let
-  version = "0.10.2";
+  version = "0.11.2";
   inherit (python) pythonVersion;
 
   # As of 2023-06-06, google/jax upstream is no longer publishing CPU-only wheels to their GCS bucket. Instead the
@@ -40,74 +39,57 @@ let
             ;
           pname = "jaxlib";
           format = "wheel";
-          # See the `disabled` attr comment below.
           python = dist;
           abi = dist;
         };
     in
     {
-      "3.11-x86_64-linux" = getSrcFromPypi {
-        platform = "manylinux_2_27_x86_64";
-        dist = "cp311";
-        hash = "sha256-H6yjxdRmLLSmEwpoEF1ou1IHZIF+Fl1u6/1nhsDR8w8=";
-      };
-      "3.11-aarch64-linux" = getSrcFromPypi {
-        platform = "manylinux_2_27_aarch64";
-        dist = "cp311";
-        hash = "sha256-1EVl3P0bT2D3bZEcZRIRiopPx2S975JmP+y4v8zVTyM=";
-      };
-      "3.11-aarch64-darwin" = getSrcFromPypi {
-        platform = "macosx_11_0_arm64";
-        dist = "cp311";
-        hash = "sha256-WpiHP8hnYjuB8r7hXVVLjt1liKGD0B+lDSGx49uW/ys=";
-      };
-
       "3.12-x86_64-linux" = getSrcFromPypi {
         platform = "manylinux_2_27_x86_64";
         dist = "cp312";
-        hash = "sha256-/ojsRDcUxDeZaLbBCfn6YXx60ZuAKCjk17+GHNZtpLc=";
+        hash = "sha256-Yzih8JVvYNAlKUBKwzqAcAFaUmNc22u7FdDRmXVwd7s=";
       };
       "3.12-aarch64-linux" = getSrcFromPypi {
         platform = "manylinux_2_27_aarch64";
         dist = "cp312";
-        hash = "sha256-U7cpd65YLAOp6OHN7h77+OvBQYJwllsOaereV6z0AzE=";
+        hash = "sha256-1JcAToDaqRuYJY1kWzdOjf9IC/AX0sXz4wsTcayPVLE=";
       };
       "3.12-aarch64-darwin" = getSrcFromPypi {
         platform = "macosx_11_0_arm64";
         dist = "cp312";
-        hash = "sha256-R7t8ARUV6oYr5+gxP0D5xWy+wJ3Jig/LUBZ4X81FTAE=";
+        hash = "sha256-7KgOdFt2IzaadrX2hWduwjOjOlXWn2D6flfL78/Uetw=";
       };
 
       "3.13-x86_64-linux" = getSrcFromPypi {
         platform = "manylinux_2_27_x86_64";
         dist = "cp313";
-        hash = "sha256-nkgYtKh1b9ORh2bKKqU0ISWAn08Ipv5GAm1DhufCNkQ=";
+        hash = "sha256-XzysjXAwwfgKGCAl1xceo7EkUWKnEPbljSXuP+F0iqw=";
       };
       "3.13-aarch64-linux" = getSrcFromPypi {
         platform = "manylinux_2_27_aarch64";
         dist = "cp313";
-        hash = "sha256-RbKLAjhperdLvPIEEar7bbQqzDGDbML9cR5c8Fa/lVY=";
+        hash = "sha256-X504M8sr6l40a9ITi6dJkgF+CEHGPYkKAVehP5y/Q54=";
       };
       "3.13-aarch64-darwin" = getSrcFromPypi {
         platform = "macosx_11_0_arm64";
         dist = "cp313";
-        hash = "sha256-TfUwr6NUoi3BdHpdVgZARQy7iV1JiJM4o/WMdqTHbI4=";
+        hash = "sha256-dmvZDieg/1O4e7nXDHNWXsgLmxFlMgzLj3LeRrhVEN8=";
       };
 
       "3.14-x86_64-linux" = getSrcFromPypi {
         platform = "manylinux_2_27_x86_64";
         dist = "cp314";
-        hash = "sha256-yjTzYxl/sKxAglgsp1UAeRA2njP4qLo9Ne2UtxBwEH0=";
+        hash = "sha256-HzHYprH7Exgf8YB3V1BtEPbny6aycH9/gPc7hTyy/yI=";
       };
       "3.14-aarch64-linux" = getSrcFromPypi {
         platform = "manylinux_2_27_aarch64";
         dist = "cp314";
-        hash = "sha256-8Y9W/ukGmc+6m2YnBFp6KZcCyw4q+CzhgNmmp8gEgJM=";
+        hash = "sha256-BhRo61rGtiEyFf0RArI3vLyT8kSAyIEkW3NhnQwqMh4=";
       };
       "3.14-aarch64-darwin" = getSrcFromPypi {
         platform = "macosx_11_0_arm64";
         dist = "cp314";
-        hash = "sha256-cuuiixL+4CYW+kKqS4gbSrYtd1fHhDxGJAHT+zSie+Q=";
+        hash = "sha256-7a1rKhjWPcKWTMl6FtEm2tQWIe2sedZR4PbIeF2JE2k=";
       };
     };
 in
@@ -131,9 +113,8 @@ buildPythonPackage {
   buildInputs = [ (lib.getLib stdenv.cc.cc) ];
 
   dependencies = [
-    absl-py
-    flatbuffers
     ml-dtypes
+    numpy
     scipy
   ];
 
@@ -141,9 +122,15 @@ buildPythonPackage {
 
   meta = {
     description = "Prebuilt jaxlib backend from PyPi";
-    homepage = "https://github.com/google/jax";
+    homepage = "https://github.com/jax-ml/jax";
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     license = lib.licenses.asl20;
     maintainers = with lib.maintainers; [ samuela ];
+    # Keep in sync with `srcs` above
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+    ];
   };
 }
