@@ -25,10 +25,6 @@
 let
   gclientDeps = gclient2nix.importGclientDeps info.deps;
   yarn-berry = yarn-berry_4;
-
-  # Only apply to old versions after upstream updates to Yarn 4.14
-  # https://github.com/electron/electron/blob/main/package.json#L148
-  yarnPatch = ./yarn-4.14-support.patch;
 in
 
 ((chromium.override { upstream-info = info.chromium; }).mkDerivation (base: {
@@ -76,7 +72,6 @@ in
       null;
   yarnOfflineCache = yarn-berry.fetchYarnBerryDeps {
     src = gclientDeps."src/electron".path;
-    patches = [ yarnPatch ];
     hash = info.electron_yarn_data.hash;
     missingHashes =
       if (info.electron_yarn_data ? "missing_hashes") then
@@ -105,6 +100,13 @@ in
   };
 
   src = null;
+
+  patches =
+    base.patches
+    ++
+      # Restore fake libGLESv2.so which is patchelf'd by the chromium derivation
+      lib.optional (lib.versionAtLeast info.version "44")
+        ./0001-Revert-build-stop-shipping-dummy-ANGLE-libs-in-Linux.patch;
 
   postPatch = ''
     mkdir -p third_party/jdk/current/bin
@@ -151,16 +153,7 @@ in
     #endif  // GPU_WEBGPU_DAWN_COMMIT_HASH_H_
     EOF
     (
-      PATH=$PATH:${
-        lib.makeBinPath (
-          with pkgsBuildHost;
-          [
-            git
-          ]
-        )
-      }
       cd electron
-      git apply ${yarnPatch}
       YARN_ENABLE_SCRIPTS=0 yarnBerryConfigHook
     )
     (
@@ -225,16 +218,18 @@ in
     allow_runtime_configurable_key_storage = true;
     enable_cet_shadow_stack = false;
     is_cfi = false;
-    v8_builtins_profiling_log_file = "";
     enable_dangling_raw_ptr_checks = false;
-    dawn_use_built_dxc = false;
+    enable_dangling_raw_ptr_feature_flag = false;
     v8_enable_private_mapping_fork_optimization = true;
     v8_expose_public_symbols = true;
-    enable_dangling_raw_ptr_feature_flag = false;
-    clang_unsafe_buffers_paths = "";
-    enterprise_cloud_content_analysis = false;
     enable_linux_installer = false;
     enable_pdf_save_to_drive = false;
+    node_openssl_path = "//third_party/boringssl";
+  }
+  // lib.optionalAttrs (lib.versionOlder info.version "43") {
+    enterprise_cloud_content_analysis = false;
+  }
+  // {
 
     # other
     enable_widevine = false;

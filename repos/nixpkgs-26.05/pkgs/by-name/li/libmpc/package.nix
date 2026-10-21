@@ -45,9 +45,9 @@ stdenv.mkDerivation (finalAttrs: {
     '';
 
     homepage = "https://www.multiprecision.org/mpc/";
-    license = lib.licenses.lgpl2Plus;
+    license = lib.licenses.lgpl3Plus;
 
     platforms = lib.platforms.all;
-    maintainers = [ ];
+    maintainers = with lib.maintainers; [ coolcuber ];
   };
 })

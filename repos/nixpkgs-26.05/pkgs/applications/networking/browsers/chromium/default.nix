@@ -22,7 +22,7 @@
   lib,
   libkrb5,
   widevine-cdm,
-  electron-source, # for warnObsoleteVersionConditional
+  rustPackages_1_98,
 
   # package customization
   # Note: enable* flags should not require full rebuilds (i.e. only affect the wrapper)
@@ -42,45 +42,76 @@ let
   stdenv = pkgs.rustc.llvmPackages.stdenv;
 
   # Helper functions for changes that depend on specific versions:
-  warnObsoleteVersionConditional =
-    min-version: result:
-    let
-      min-supported-version = (lib.head (lib.attrValues electron-source)).unwrapped.info.chromium.version;
-      # Warning can be toggled by changing the value of enabled:
-      enabled = false;
-    in
-    lib.warnIf (enabled && lib.versionAtLeast min-supported-version min-version)
-      "chromium: min-supported-version ${min-supported-version} is newer than a conditional bounded at ${min-version}. You can safely delete it."
-      result;
-  chromiumVersionAtLeast =
-    min-version:
-    let
-      result = lib.versionAtLeast upstream-info.version min-version;
-    in
-    warnObsoleteVersionConditional min-version result;
+  chromiumVersionAtLeast = min-version: lib.versionAtLeast upstream-info.version min-version;
   versionRange =
     min-version: upto-version:
-    let
-      inherit (upstream-info) version;
-      result = lib.versionAtLeast version min-version && lib.versionOlder version upto-version;
-    in
-    warnObsoleteVersionConditional upto-version result;
+    lib.versionAtLeast upstream-info.version min-version
+    && lib.versionOlder upstream-info.version upto-version;
 
   callPackage = newScope chromium;
 
   chromium = rec {
     inherit stdenv upstream-info;
 
-    mkChromiumDerivation = callPackage ./common.nix {
-      inherit chromiumVersionAtLeast versionRange;
-      inherit
-        proprietaryCodecs
-        cupsSupport
-        pulseSupport
-        ungoogled
-        ;
-      gnChromium = buildPackages.gn.override upstream-info.deps.gn;
-    };
+    mkChromiumDerivation = callPackage ./common.nix (
+      {
+        inherit chromiumVersionAtLeast versionRange;
+        inherit
+          proprietaryCodecs
+          cupsSupport
+          pulseSupport
+          ungoogled
+          ;
+        gnChromium = buildPackages.gn.override upstream-info.deps.gn;
+      }
+      // lib.optionalAttrs (lib.versionAtLeast upstream-info.version "154") {
+        buildPackages = buildPackages // {
+          inherit (buildPackages.rustPackages_1_98)
+            rustc
+            cargo
+            rustfmt
+            ;
+
+          # Copy of typescript_7 (typescript-go) from unstable
+          # to include https://github.com/NixOS/nixpkgs/pull/559777
+          typescript = buildPackages.buildGoModule (finalAttrs: {
+            pname = "typescript";
+            version = "7.0.2";
+
+            src = buildPackages.fetchFromGitHub {
+              owner = "microsoft";
+              repo = "typescript";
+              tag = "v${finalAttrs.version}";
+              hash = "sha256-j1AY4sf/Jb6uwOah35lrYooc7BnSeaZ2NO6Fx1zMj60=";
+            };
+
+            modRoot = "tsc";
+
+            vendorHash = "sha256-q6dMb2ab4uZ3GTrcA7v2JzfmOM+ZzBcJN6gKOpLfM/k=";
+
+            tags = [ "noembed" ];
+
+            ldflags = [ "-s" ];
+
+            subPackages = [ "cmd/tsgo" ];
+
+            postInstall = ''
+              lib_dir="$out/lib/${finalAttrs.pname}"
+              mkdir -p "$lib_dir"
+              cp -r internal/bundled/libs/. "$lib_dir"
+
+              mv "$out/bin/tsgo" "$lib_dir/tsc"
+
+              ln -s "$lib_dir/tsc" "$out/bin/tsc"
+            '';
+          });
+        };
+        pkgsBuildBuild = pkgsBuildBuild // {
+          inherit (pkgsBuildBuild.rustPackages_1_98) rustc;
+        };
+        inherit (rustPackages_1_98) cargo rustPlatform;
+      }
+    );
 
     browser = callPackage ./browser.nix {
       inherit chromiumVersionAtLeast enableWideVine ungoogled;

@@ -35,12 +35,23 @@ stdenv.mkDerivation (finalAttrs: {
     patches = [
       # bundix and bundlerEnv fail with system-specific gems
       ./0001-build-ffi-gem.diff
+      # Fix for CVE-2026-66066
+      # https://github.com/rails/rails/security/advisories/GHSA-xr9x-r78c-5hrm
+      # Bumps rails to 8.0.5.1
+      ./0002-rails-CVE-2026-66066.diff
     ];
     postPatch = ''
       substituteInPlace ./Gemfile \
         --replace-fail "ruby File.read('.ruby-version').strip" "ruby '>= 3.4.0'"
     '';
   };
+
+  patches = [
+    # Fix for GHSA-x483-3xv3-vp52
+    # https://github.com/Freika/dawarich/security/advisories/GHSA-x483-3xv3-vp52
+    # Original diff: https://github.com/Freika/dawarich/commit/46be6bab0393522183f9f18b48d9639ebc2820f4
+    ./0003-GHSA-x483-3xv3-vp52.diff
+  ];
 
   postPatch = ''
     # move import directory to a more convenient place, otherwise its behind systemd private tmp

@@ -23,6 +23,7 @@
   enableBloat ? true,
   enjarify,
   fetchurl,
+  fetchpatch,
   file,
   findutils,
   fontforge-fonttools,
@@ -125,6 +126,11 @@ python.pkgs.buildPythonApplication rec {
     ./ignore_links.patch
     # https://salsa.debian.org/reproducible-builds/diffoscope/-/merge_requests/166
     ./fix-tests-with-zipdetails-4.006.patch
+    ./radare2.patch
+    (fetchpatch {
+      url = "https://salsa.debian.org/reproducible-builds/diffoscope/-/commit/1e32d8957aebc67addb6dd03ab03feeabbd4e188.patch";
+      hash = "sha256-09ELEsxz3ls2pCIBaPfk3OltWPDh/DaOmtf8g8Un61g=";
+    })
   ];
 
   postPatch = ''
@@ -156,11 +162,7 @@ python.pkgs.buildPythonApplication rec {
   # docx2txt <- makes tests broken:
   # > FAILED tests/comparators/test_docx.py::test_diff - IndexError: list index out of range
   # > FAILED tests/comparators/test_docx.py::test_compare_non_existing - AssertionError
-  # radare2
-  # > FAILED tests/comparators/test_elf_decompiler.py::test_ghidra_diff - IndexError: list index out of range
-  # > FAILED tests/comparators/test_elf_decompiler.py::test_radare2_diff - AssertionError
-  # > FAILED tests/comparators/test_macho_decompiler.py::test_ghidra_diff - assert 0 == 1
-  # > FAILED tests/comparators/test_macho_decompiler.py::test_radare2_diff - AssertionError
+  # radare2 (the exact output of the r2 version debian ships is expected, and our more recent version has a slightly different one)
   #
   # We filter automatically all packages for the host platform (some dependencies are not supported on Darwin, aarch64, etc.).
   # Packages which are marked broken for a platform are not automatically filtered to avoid accidentally removing them without noticing it.

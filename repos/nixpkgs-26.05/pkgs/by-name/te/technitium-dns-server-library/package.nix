@@ -5,16 +5,17 @@
   dotnetCorePackages,
   nix-update-script,
 }:
-buildDotnetModule rec {
+buildDotnetModule (finalAttrs: {
   pname = "technitium-dns-server-library";
-  version = "15.3.0";
+  version = "15.6.2";
+
+  __structuredAttrs = true;
 
   src = fetchFromGitHub {
     owner = "TechnitiumSoftware";
     repo = "TechnitiumLibrary";
-    tag = "dns-server-v${version}";
-    hash = "sha256-BQWDzMEiChY8uX1wUUZNWFDomGqUyDrZ6+UEncC5G5U=";
-    name = "${pname}-${version}";
+    tag = "dns-server-${finalAttrs.version}";
+    hash = "sha256-fb5o4AlKFU/oPypD7T3sNoUdY7nHS4skGovDSLNzpI0=";
   };
 
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
@@ -41,4 +42,4 @@ buildDotnetModule rec {
     ];
     platforms = lib.platforms.linux;
   };
-}
+})

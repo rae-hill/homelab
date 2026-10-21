@@ -87,9 +87,9 @@ stdenv.mkDerivation rec {
       floating-point arithmetic (53-bit mantissa).
     '';
 
-    license = lib.licenses.lgpl2Plus;
+    license = lib.licenses.lgpl3Plus;
 
-    maintainers = [ ];
+    maintainers = with lib.maintainers; [ coolcuber ];
     platforms = lib.platforms.all;
   };
 }

@@ -6,8 +6,8 @@
   pkg-config,
   cmake,
   ninja,
-  clang,
   python3,
+  qtshadertools,
   tdlib,
   tg_owt ? callPackage ./tg_owt.nix { inherit stdenv; },
   qtbase,
@@ -16,10 +16,10 @@
   kcoreaddons,
   lz4,
   xxhash,
-  ffmpeg_6,
+  ffmpeg,
   protobuf,
   openal-soft,
-  minizip-ng,
+  minizip,
   range-v3,
   tl-expected,
   hunspell,
@@ -28,6 +28,10 @@
   microsoft-gsl,
   boost,
   ada,
+  pango,
+  tlottie,
+  cmark-gfm,
+  libfido2,
   libavif,
   libheif,
   libjxl,
@@ -43,16 +47,24 @@
 # - https://git.alpinelinux.org/aports/tree/testing/telegram-desktop/APKBUILD
 # - https://github.com/void-linux/void-packages/blob/master/srcpkgs/telegram-desktop/template
 
+let
+  needsPangoTlottie = [
+    "64gram-unwrapped"
+    "ayugram-desktop-unwrapped"
+    "kotatogram-desktop-unwrapped"
+    "telegram-desktop-unwrapped"
+  ];
+in
 stdenv.mkDerivation (finalAttrs: {
   pname = "telegram-desktop-unwrapped";
-  version = "6.8.1";
+  version = "7.2.9";
 
   src = fetchFromGitHub {
     owner = "telegramdesktop";
     repo = "tdesktop";
     rev = "v${finalAttrs.version}";
     fetchSubmodules = true;
-    hash = "sha256-CcibFBPbviakOsf+BpAF8U0CRWIt3zO/KiHycwRw2V0=";
+    hash = "sha256-AeeO3Ys+2MhNNPnMmu1AP8vs4ROK3X+Wh79x+Cizc6c=";
   };
 
   nativeBuildInputs = [
@@ -60,10 +72,9 @@ stdenv.mkDerivation (finalAttrs: {
     cmake
     ninja
     python3
+    qtshadertools
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
-    # to build bundled libdispatch
-    clang
     gobject-introspection
   ];
 
@@ -72,9 +83,9 @@ stdenv.mkDerivation (finalAttrs: {
     qtsvg
     lz4
     xxhash
-    ffmpeg_6
+    ffmpeg
     openal-soft
-    minizip-ng
+    minizip
     range-v3
     tl-expected
     rnnoise
@@ -82,6 +93,8 @@ stdenv.mkDerivation (finalAttrs: {
     microsoft-gsl
     boost
     ada
+    cmark-gfm
+    libfido2
     (tdlib.override { tde2eOnly = true; })
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
@@ -89,6 +102,12 @@ stdenv.mkDerivation (finalAttrs: {
     qtwayland
     kcoreaddons
     hunspell
+  ]
+  ++ lib.optionals (lib.elem finalAttrs.pname needsPangoTlottie && stdenv.hostPlatform.isLinux) [
+    pango
+  ]
+  ++ lib.optionals (lib.elem finalAttrs.pname needsPangoTlottie) [
+    tlottie
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     apple-sdk_15

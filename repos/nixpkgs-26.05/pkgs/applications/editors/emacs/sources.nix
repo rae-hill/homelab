@@ -131,6 +131,34 @@ in
         url = "https://gitweb.gentoo.org/proj/emacs-patches.git/plain/emacs/30.2/02_all_ts-query-pred.patch?id=86190bf195b3e17108372d8ad89eb57037180dd2";
         hash = "sha256-0GPyfKLSaB09a8hamrSf6lx4Qk8Big4AKMOivkN1wEM=";
       })
+      (fetchpatch {
+        name = "nullify-read-symbol-shorthands-around-risky-intern-calls-80574.patch";
+        url = "https://cgit.git.savannah.gnu.org/cgit/emacs.git/patch/?id=8466eb44991707d128110bdc549fad14c8e1d61e";
+        hash = "sha256-SyRCay2MahCJovtzBHA9M1H9hXhtD5IG3ZFSEUwaWlg=";
+      })
+      (fetchpatch {
+        name = "CVE-2026-79992.patch";
+        url = "https://gitweb.gentoo.org/proj/emacs-patches.git/plain/emacs/30.2/05_all_tramp.patch?id=2a6292f81affedcc468c594c60808e652ae87118";
+        hash = "sha256-WMjTscIuOXakuTO2H+w/Hd61V61V6ZrLh9WPMd58l+M=";
+      })
+      (fetchpatch {
+        name = "CVE-2026-108976.patch";
+        url = "https://cgit.git.savannah.gnu.org/cgit/emacs.git/patch/?id=044b0203267db3b7912325d076d79a79000afe75";
+        hash = "sha256-kHS75QQhYun5tgZQ7FEQHp95URW0E4iY6MDk1wQBxVk=";
+        includes = [
+          "lisp/net/tramp-archive.el"
+          "lisp/net/tramp.el"
+        ];
+      })
+      (fetchpatch {
+        name = "CVE-2024-53920.patch";
+        url = "https://cgit.git.savannah.gnu.org/cgit/emacs.git/patch/?id=abc802ee2eb0b1663349ddf22a461f8e54a383fb";
+        hash = "sha256-ViRD4E27WDs7lLO6YPNroMo3Zq5/ASqMlmNtVI1V/Lo=";
+      })
+      (builtins.path {
+        name = "backport-tramp-get-connection-local-criteria-30.patch";
+        path = ./backport-tramp-get-connection-local-criteria-30.patch;
+      })
     ];
   });
 
@@ -155,6 +183,34 @@ in
         # tree-sitter 0.26 compatibility fix, see https://bugs.gentoo.org/971731
         url = "https://gitweb.gentoo.org/proj/emacs-patches.git/plain/emacs/30.2/02_all_ts-query-pred.patch?id=86190bf195b3e17108372d8ad89eb57037180dd2";
         hash = "sha256-0GPyfKLSaB09a8hamrSf6lx4Qk8Big4AKMOivkN1wEM=";
+      })
+      (fetchpatch {
+        name = "nullify-read-symbol-shorthands-around-risky-intern-calls-80574.patch";
+        url = "https://cgit.git.savannah.gnu.org/cgit/emacs.git/patch/?id=8466eb44991707d128110bdc549fad14c8e1d61e";
+        hash = "sha256-SyRCay2MahCJovtzBHA9M1H9hXhtD5IG3ZFSEUwaWlg=";
+      })
+      (fetchpatch {
+        name = "CVE-2026-79992.patch";
+        url = "https://gitweb.gentoo.org/proj/emacs-patches.git/plain/emacs/30.2/05_all_tramp.patch?id=2a6292f81affedcc468c594c60808e652ae87118";
+        hash = "sha256-WMjTscIuOXakuTO2H+w/Hd61V61V6ZrLh9WPMd58l+M=";
+      })
+      (fetchpatch {
+        name = "CVE-2024-53920.patch";
+        url = "https://cgit.git.savannah.gnu.org/cgit/emacs.git/patch/?id=abc802ee2eb0b1663349ddf22a461f8e54a383fb";
+        hash = "sha256-ViRD4E27WDs7lLO6YPNroMo3Zq5/ASqMlmNtVI1V/Lo=";
+      })
+      (fetchpatch {
+        name = "CVE-2026-108976.patch";
+        url = "https://cgit.git.savannah.gnu.org/cgit/emacs.git/patch/?id=044b0203267db3b7912325d076d79a79000afe75";
+        hash = "sha256-kHS75QQhYun5tgZQ7FEQHp95URW0E4iY6MDk1wQBxVk=";
+        includes = [
+          "lisp/net/tramp-archive.el"
+          "lisp/net/tramp.el"
+        ];
+      })
+      (builtins.path {
+        name = "backport-tramp-get-connection-local-criteria-30.patch";
+        path = ./backport-tramp-get-connection-local-criteria-30.patch;
       })
     ];
   });

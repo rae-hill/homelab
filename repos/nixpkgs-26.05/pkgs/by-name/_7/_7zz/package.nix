@@ -1,7 +1,9 @@
 {
   stdenv,
   lib,
-  fetchzip,
+  fetchFromGitHub,
+  _experimental-update-script-combinators,
+  nix-update-script,
 
   # Free MASM-compatible assembler
   asmc-linux,
@@ -43,17 +45,17 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "7zz";
-  version = "26.01";
+  version = "26.04";
 
-  src = fetchzip {
-    url = "https://7-zip.org/a/7z${lib.replaceStrings [ "." ] [ "" ] finalAttrs.version}-src.tar.xz";
+  src = fetchFromGitHub {
+    owner = "ip7z";
+    repo = "7zip";
+    tag = finalAttrs.version;
     hash =
-      {
-        free = "sha256-52+Gg66MOFmwYUVB0OO4PAtZJtQOkoVpxV7F9xBGy58=";
-        unfree = "sha256-w0fk8EDusUYiOfrmIiUq+xevlwfQxMhjdPzfkHkOkR8=";
-      }
-      .${if enableUnfree then "unfree" else "free"};
-    stripRoot = false;
+      if enableUnfree then
+        "sha256-JLLbkrptKzC4UuEaA0X9rXBFPH5v4n6a2jSF2E3yEv8="
+      else
+        "sha256-DDe8nMgzzciZ+SroHYqaEtOXg/MoT3RYnXvN1YC1Znc=";
     # remove the unRAR related code from the src drv
     # > the license requires that you agree to these use restrictions,
     # > or you must remove the software (source and binary) from your hard disks
@@ -138,7 +140,16 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   passthru = {
-    updateScript = ./update.sh;
+    updateScript = _experimental-update-script-combinators.sequence [
+      (nix-update-script {
+        attrPath = "_7zz";
+        extraArgs = [ "--use-github-releases" ];
+      })
+      (nix-update-script {
+        attrPath = "_7zz-rar";
+        extraArgs = [ "--version=skip" ];
+      })
+    ];
     tests.version = testers.testVersion {
       package = finalAttrs.finalPackage;
       command = "7zz --help";
@@ -148,6 +159,7 @@ stdenv.mkDerivation (finalAttrs: {
   meta = {
     description = "Command line version of the 7-Zip archiver utility";
     homepage = "https://7-zip.org";
+    changelog = "https://7-zip.org/history.txt";
     license =
       with lib.licenses;
       # 7zip code is largely lgpl2Plus
@@ -167,5 +179,11 @@ stdenv.mkDerivation (finalAttrs: {
     ];
     platforms = with lib.platforms; unix ++ windows;
     mainProgram = "7zz";
+    identifiers.cpeParts = {
+      vendor = "7-zip";
+      product = "7-zip";
+      inherit (finalAttrs) version;
+      update = "*";
+    };
   };
 })

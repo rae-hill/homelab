@@ -15,6 +15,8 @@
   tests,
 
   withNode ? true,
+  enableUpdateScript ? true,
+  packageAttrName ? "pnpm_${lib.versions.major version}",
   version,
   hash,
   knownVulnerabilities ? [ ],
@@ -65,6 +67,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       cp -R . $out/libexec/pnpm
       ln -s $out/libexec/pnpm/bin/pnpm.${ext} $out/bin/pnpm
       ln -s $out/libexec/pnpm/bin/pnpx.${ext} $out/bin/pnpx
+      ln -s pnpm $out/bin/pn
+      ln -s pnpx $out/bin/pnx
 
       runHook postInstall
     '';
@@ -93,7 +97,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   passthru =
     let
-      pnpm' = buildPackages."pnpm_${lib.versions.major version}";
+      pnpm' = buildPackages.${packageAttrName};
     in
     {
       fetchDeps =
@@ -127,13 +131,15 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         inherit (tests) pnpm;
         version = lib.optionalAttrs withNode (testers.testVersion { package = finalAttrs.finalPackage; });
       };
+    }
+    // lib.optionalAttrs enableUpdateScript {
       updateScript = writeScript "pnpm-update-script" ''
         #!/usr/bin/env nix-shell
         #!nix-shell -i bash -p curl jq common-updater-scripts
         set -eou pipefail
 
         curl_github() {
-            curl -L ''${GITHUB_TOKEN:+" -u \":$GITHUB_TOKEN\""} "$@"
+          curl -L ''${GITHUB_TOKEN:+-u ":$GITHUB_TOKEN"} "$@"
         }
 
         latestTag=$(
@@ -150,7 +156,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
         latestVersion="''${latestTag#v}"
 
-        update-source-version pnpm_${majorVersion} "$latestVersion" --file=./pkgs/development/tools/pnpm/default.nix
+        update-source-version ${packageAttrName} "$latestVersion" --file=./pkgs/development/tools/pnpm/default.nix
       '';
     };
 

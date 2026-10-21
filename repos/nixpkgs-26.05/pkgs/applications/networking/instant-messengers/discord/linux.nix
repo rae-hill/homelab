@@ -6,6 +6,7 @@
   desktopName,
   self,
   autoPatchelfHook,
+  addDriverRunpath,
   fetchurl,
   makeDesktopItem,
   lib,
@@ -151,7 +152,8 @@ let
   # where Discord's JS moduleUpdater expects them.
   stageModules = writeShellScript "discord-stage-modules" ''
     store_modules="$1"
-    modules_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/${lib.toLower binaryName}/${version}/modules"
+    user_data_dir="''${DISCORD_USER_DATA_DIR-''${XDG_CONFIG_HOME:-$HOME/.config}}"
+    modules_dir="$user_data_dir''${user_data_dir:+/}${lib.toLower binaryName}/${version}/modules"
     rm -rf "$modules_dir"
     mkdir -p "$modules_dir"
     for m in ${lib.concatStringsSep " " (lib.attrNames moduleSrcs)}; do
@@ -258,7 +260,8 @@ stdenv.mkDerivation (finalAttrs: {
         ''} \
         ${lib.strings.optionalString enableAutoscroll "--add-flags \"--enable-blink-features=MiddleClickAutoscroll\""} \
         --prefix XDG_DATA_DIRS : "${gtk3}/share/gsettings-schemas/${gtk3.name}/" \
-        --prefix LD_LIBRARY_PATH : ${finalAttrs.libPath}:$out/opt/${binaryName} \
+        --prefix LD_LIBRARY_PATH : ${finalAttrs.libPath}:$out/opt/${binaryName}:${addDriverRunpath.driverLink}/lib \
+        --suffix VK_ADD_DRIVER_FILES : "${addDriverRunpath.driverLink}/share/vulkan/icd.d" \
         ${lib.strings.optionalString disableUpdates "--run ${lib.getExe disableBreakingUpdates}"} \
         --run "${finalAttrs.stageModules} $out/opt/${binaryName}/modules" \
         --add-flags ${lib.escapeShellArg commandLineArgs}
@@ -302,7 +305,8 @@ stdenv.mkDerivation (finalAttrs: {
     exec = binaryName;
     icon = pname;
     inherit desktopName;
-    genericName = meta.description;
+    comment = meta.description;
+    genericName = "Instant Messenger";
     categories = [
       "Network"
       "InstantMessaging"
