@@ -46,11 +46,11 @@ in
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "tor";
-  version = "0.4.9.11";
+  version = "0.4.9.14";
 
   src = fetchurl {
     url = "https://dist.torproject.org/tor-${finalAttrs.version}.tar.gz";
-    hash = "sha256-LmwXIBGMgSrPAHn9R8+Rtr+rpddmwyHE09KijWoRqO0=";
+    hash = "sha256-GCRJrByP9DJ42ie2mwIEDhHQPQMn222RJuQZDsYjXko=";
   };
 
   outputs = [
@@ -102,6 +102,9 @@ stdenv.mkDerivation (finalAttrs: {
   # disable tests on linux aarch32
   # https://gitlab.torproject.org/tpo/core/tor/-/issues/40912
   doCheck = !(stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isAarch32);
+
+  # some tests (e.g. util/socketpair_ersatz) fail in the darwin sandbox otherwise.
+  __darwinAllowLocalNetworking = true;
 
   postInstall = ''
     mkdir -p $geoip/share/tor

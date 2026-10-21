@@ -44,7 +44,7 @@ in
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "gdm";
-  version = "50.1";
+  version = "50.3";
 
   outputs = [
     "out"
@@ -53,7 +53,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   src = fetchurl {
     url = "mirror://gnome/sources/gdm/${lib.versions.major finalAttrs.version}/gdm-${finalAttrs.version}.tar.xz";
-    hash = "sha256-dwFZNzUSGSQQ9BK10MRnjsFXPxrks5yB/nWGH+iJAXQ=";
+    hash = "sha256-rawHELi3lxCOpA6kVzvRpebZsk4KeZCplCFujf/i0V4=";
   };
 
   mesonFlags = [

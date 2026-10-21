@@ -42,7 +42,7 @@
 
 buildPythonPackage (finalAttrs: {
   pname = "django";
-  version = "6.0.7";
+  version = "6.0.9";
   pyproject = true;
 
   disabled = pythonOlder "3.12";
@@ -51,7 +51,7 @@ buildPythonPackage (finalAttrs: {
     owner = "django";
     repo = "django";
     tag = finalAttrs.version;
-    hash = "sha256-B28twwEGLcXV0TlQxgRhNBiKhwJd+5f7sL35SkHAkRY=";
+    hash = "sha256-rDa+er1XjE6RuHPtGC4lHKjAhm+brL/S7WmU9yJYXjY=";
   };
 
   patches = [
@@ -65,6 +65,7 @@ buildPythonPackage (finalAttrs: {
     # https://code.djangoproject.com/ticket/36997
     # https://github.com/django/django/pull/21019
     ./6.x/invalidate-importlib-cache.patch
+    ./6.x/fix-flaky-tests.patch
   ]
   ++ lib.optionals withGdal [
     (replaceVars ./6.x/gdal.patch {
@@ -75,6 +76,9 @@ buildPythonPackage (finalAttrs: {
   ];
 
   postPatch = ''
+    substituteInPlace pyproject.toml \
+      --replace-fail "setuptools>=83" "setuptools"
+
     substituteInPlace tests/utils_tests/test_autoreload.py \
       --replace-fail "/usr/bin/python" "${python.interpreter}"
   '';

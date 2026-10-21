@@ -7,14 +7,14 @@
 }:
 python3Packages.buildPythonApplication {
   pname = "tabbyapi";
-  version = "0-unstable-2026-06-27";
+  version = "0-unstable-2026-09-14";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "theroyallab";
     repo = "tabbyAPI";
-    rev = "3cf468c28362c28be1c8fc731ce1ccaf7b2206d0";
-    hash = "sha256-s97YFyij2/oYlClmV2laDrCkkoK4uVZgRsn5WwftLag=";
+    rev = "53da7919d4e45c63f4acbcbbc00cbe0f60a1ce65";
+    hash = "sha256-oKVxMoyMWZCuwLbsimTXO05Hdsw/2u2SVeYSFm1XsFg=";
   };
 
   build-system = with python3Packages; [
@@ -44,8 +44,7 @@ python3Packages.buildPythonApplication {
       sse-starlette
       packaging
       tokenizers
-      formatron
-      kbnf
+      numpy
       aiofiles
       aiohttp
       async-lru
@@ -57,7 +56,6 @@ python3Packages.buildPythonApplication {
       numpy
       setuptools
 
-      exllamav2
       exllamav3
     ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [
@@ -92,6 +90,10 @@ python3Packages.buildPythonApplication {
   postInstall = ''
     cp *.py $out/${python3Packages.python.sitePackages}/
     cp -r {common,endpoints,backends,templates} $out/${python3Packages.python.sitePackages}/
+
+    # They are wanted during runtime
+    mkdir -p $out/share/tabbyapi
+    cp -r sampler_overrides $out/share/tabbyapi/
   '';
 
   postFixup = ''

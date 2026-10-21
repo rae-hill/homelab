@@ -6,12 +6,14 @@
   lndir,
   config,
   buildPackages,
+  gsettings-desktop-schemas,
   jq,
   xdg-utils,
   writeText,
 
   ## various stuff that can be plugged in
   ffmpeg_7,
+  ffmpeg_8,
   libxxf86vm,
   libxxf86dga,
   libxt,
@@ -70,6 +72,7 @@ let
       pkcs11Modules ? [ ],
       useGlvnd ? (!isDarwin),
       cfg ? config.${applicationName} or { },
+      appDataDir ? null,
 
       ## Following options are needed for extra prefs & policies
       # For more information about anti tracking (german website)
@@ -88,6 +91,11 @@ let
 
     let
       ffmpegSupport = browser.ffmpegSupport or false;
+      # Firefox dlopens libavcodec by hardcoded soname, so each ffmpeg major needs
+      # explicit browser support; keep versioned pins here (never the ffmpeg alias)
+      # and add a tier when a release gains the next ABI. 146 added libavcodec 62
+      # (https://bugzilla.mozilla.org/show_bug.cgi?id=1962139), not uplifted to ESR 140.
+      ffmpegPackage = if lib.versionAtLeast browser.version "146" then ffmpeg_8 else ffmpeg_7;
       gssSupport = browser.gssSupport or false;
       alsaSupport = browser.alsaSupport or false;
       pipewireSupport = browser.pipewireSupport or false;
@@ -113,7 +121,7 @@ let
           ++ lib.optional (cfg.speechSynthesisSupport or true) speechd-minimal
         )
         ++ lib.optional pipewireSupport pipewire
-        ++ lib.optional ffmpegSupport ffmpeg_7
+        ++ lib.optional ffmpegSupport ffmpegPackage
         ++ lib.optional gssSupport libkrb5
         ++ lib.optional useGlvnd libglvnd
         ++ lib.optionals (cfg.enableQuakeLive or false) [
@@ -134,6 +142,12 @@ let
         ++ pkcs11Modules
         ++ lib.optionals (!isDarwin) gtk_modules;
       gtk_modules = lib.optionals (!isDarwin) [ libcanberra-gtk3 ];
+      # strictDeps prevents buildInputs from populating GSETTINGS_SCHEMAS_PATH.
+      # Revert when https://github.com/NixOS/nixpkgs/pull/546281 hits stable.
+      gsettingsSchemaPaths = lib.optionals (!isDarwin) [
+        "${gsettings-desktop-schemas}/share/gsettings-schemas/${gsettings-desktop-schemas.name}"
+        "${browser.gtk3}/share/gsettings-schemas/${browser.gtk3.name}"
+      ];
 
       # Darwin does not rename bundled binaries
       launcherName = "${applicationName}${lib.optionalString (!isDarwin) nameSuffix}";
@@ -215,6 +229,7 @@ let
     in
     stdenv.mkDerivation (finalAttrs: {
       __structuredAttrs = true;
+      strictDeps = true;
       inherit pname version;
 
       desktopItem = makeDesktopItem (
@@ -327,6 +342,11 @@ let
         "MOZ_ALLOW_DOWNGRADE"
         "1"
       ]
+      ++ lib.optionals (appDataDir != null) [
+        "--set"
+        "MOZ_APP_DATA"
+        appDataDir
+      ]
       ++ lib.optionals (!isDarwin) [
         "--suffix"
         "GTK_PATH"
@@ -337,6 +357,11 @@ let
         "XDG_DATA_DIRS"
         ":"
         "${adwaita-icon-theme}/share"
+
+        "--prefix"
+        "XDG_DATA_DIRS"
+        ":"
+        (lib.concatStringsSep ":" gsettingsSchemaPaths)
 
         "--set-default"
         "MOZ_ENABLE_WAYLAND"
@@ -434,7 +459,7 @@ let
                 ;;
               *)
                 # Copy if the symlink resolves to a Mach-O dylib
-                otool -l "$file" 2>/dev/null | grep -q 'LC_ID_DYLIB' || continue
+                otool -l "$file" 2>/dev/null | grep -F 'LC_ID_DYLIB' >/dev/null || continue
                 ;;
             esac
 
@@ -484,9 +509,6 @@ let
             oldExe="$executablePrefix/.${applicationName}"-old
             mv "$executablePath" "$oldExe"
           fi
-        ''
-        + lib.optionalString (!isDarwin) ''
-          appendToVar makeWrapperArgs --prefix XDG_DATA_DIRS : "$GSETTINGS_SCHEMAS_PATH"
         ''
         + ''
           concatTo makeWrapperArgs oldWrapperArgs

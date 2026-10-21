@@ -2,6 +2,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
+  replaceVars,
   python3Packages,
   libunistring,
   harfbuzz,
@@ -45,26 +46,42 @@
   makeBinaryWrapper,
   darwin,
   cairo,
+  shader-slang,
 }:
 
+let
+  shader-slang' = shader-slang.overrideAttrs (
+    finalAttrs: previousAttrs: {
+      version = "2026.18";
+      src = fetchFromGitHub {
+        owner = "shader-slang";
+        repo = "slang";
+        tag = "v${finalAttrs.version}";
+        hash = "sha256-GlXTDfC6BLENmrzBceJGZIP4FU5ItqtyoxmbnFZ5fdQ=";
+        fetchSubmodules = true;
+      };
+      cmakeFlags = previousAttrs.cmakeFlags ++ [ (lib.cmakeBool "SLANG_ENABLE_DXIL" false) ];
+    }
+  );
+in
 with python3Packages;
 buildPythonApplication rec {
   pname = "kitty";
-  version = "0.47.0";
+  version = "0.49.1";
   pyproject = false;
 
   src = fetchFromGitHub {
     owner = "kovidgoyal";
     repo = "kitty";
     tag = "v${version}";
-    hash = "sha256-QI+h7LSpJ5VYae3XdwDhKmpLqEGpmSulXP/mTop3gio=";
+    hash = "sha256-YVjTfJnsNEBjcHWQCq2nJBFPvLg7RqQcyWjgR4ijUqc=";
   };
 
   goModules =
     (buildGo126Module {
       pname = "kitty-go-modules";
       inherit src version;
-      vendorHash = "sha256-ZEiIGHj30h3l7mfJkOrPDTMI/GBtf/QDiG/lrqceggg=";
+      vendorHash = "sha256-urQMf5lGYPgS65VjGw0pi/ZM6CETtGWfi/kvVDAkIoc=";
     }).goModules;
 
   buildInputs = [
@@ -107,11 +124,13 @@ buildPythonApplication rec {
     sphinx
     furo
     sphinx-copybutton
+    sphinx-design
     sphinxext-opengraph
     sphinx-inline-tabs
     go_1_26
     fontconfig
     makeBinaryWrapper
+    shader-slang'
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     imagemagick
@@ -142,6 +161,9 @@ buildPythonApplication rec {
     # OSError: master_fd is in error condition
     ./disable-test_ssh_bootstrap_with_different_launchers.patch
 
+    (replaceVars ./libxkbcommon-runtime-path.patch {
+      libxkbcommon = "${lib.getLib libxkbcommon}/lib/libxkbcommon.so.0";
+    })
   ];
 
   hardeningDisable = [
@@ -152,6 +174,7 @@ buildPythonApplication rec {
   env = {
     CGO_ENABLED = 0;
     GOFLAGS = "-trimpath";
+    GOTOOLCHAIN = "local";
   };
 
   configurePhase = ''
@@ -243,6 +266,9 @@ buildPythonApplication rec {
     + ''
       # These depend on files that are not available in the sandbox
       rm tools/utils/machine_id/api_test.go
+
+      # These depend on cgroups and other resources that don't work as the tests expect in the sandbox
+      rm kitty_tests/child.py
     '';
 
   checkPhase = ''
@@ -286,6 +312,7 @@ buildPythonApplication rec {
       lib.makeBinPath [
         imagemagick
         ncurses.dev
+        shader-slang'
       ]
     }"
 

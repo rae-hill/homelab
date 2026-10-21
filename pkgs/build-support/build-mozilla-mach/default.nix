@@ -16,6 +16,7 @@
   extraPostPatch ? "",
   extraNativeBuildInputs ? [ ],
   extraConfigureFlags ? [ ],
+  extraPreConfigure ? "",
   extraBuildInputs ? [ ],
   extraMakeFlags ? [ ],
   extraPassthru ? { },
@@ -348,6 +349,19 @@ buildStdenv.mkDerivation {
       # https://bugzilla.mozilla.org/show_bug.cgi?id=2046162
       ./153-cbindgen-0.29.4-compat.patch
     ]
+    ++
+      lib.optionals (lib.versionAtLeast version "153" && lib.versionOlder apple-sdk_26.version "26.5")
+        [
+          (fetchpatch {
+            url = "https://github.com/mozilla-firefox/firefox/commit/aeec1ac9fb000105dac8eb7b20de817c5fc231b9.patch";
+            hash = "sha256-gF4zten+A1kgt2EMXQx77Q6vO+s26ZijgkNAJEZ+aUw=";
+            revert = true;
+            includes = [
+              "build/moz.configure/toolchain.configure"
+              "python/mozbuild/mozbuild/test/configure/macos_fake_sdk/SDKSettings.plist"
+            ];
+          })
+        ]
     ++ extraPatches;
 
   postPatch = ''
@@ -463,7 +477,8 @@ buildStdenv.mkDerivation {
     # linking firefox hits the vm.max_map_count kernel limit with the default musl allocator
     # TODO: Default vm.max_map_count has been increased, retest without this
     export LD_PRELOAD=${mimalloc}/lib/libmimalloc.so
-  '';
+  ''
+  + extraPreConfigure;
 
   # firefox has a different definition of configurePlatforms from nixpkgs, see configureFlags
   configurePlatforms = [ ];
@@ -513,9 +528,11 @@ buildStdenv.mkDerivation {
   ++ lib.optionals (!buildStdenv.hostPlatform.isDarwin && lib.versionAtLeast version "141") [
     "--with-onnx-runtime=${lib.getLib onnxruntime}/lib"
   ]
+  ++ lib.optionals (lib.versionOlder version "157") [
+    (enableFeature ffmpegSupport "ffmpeg")
+  ]
   ++ [
     (enableFeature crashreporterSupport "crashreporter")
-    (enableFeature ffmpegSupport "ffmpeg")
     (enableFeature geolocationSupport "necko-wifi")
     (enableFeature gssSupport "negotiateauth")
     (enableFeature jemallocSupport "jemalloc")

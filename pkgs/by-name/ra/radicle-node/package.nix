@@ -15,9 +15,9 @@
   xdg-utils,
   versionCheckHook,
 
-  version ? "1.9.1",
-  srcHash ? "sha256-8wLVNHF9qkKBK2s6RdH0/2To2zamx8RON5iBjkQoQY4=",
-  cargoHash ? "sha256-holYrCL0FApbnFRj0+bVnjkiNL14jclaM8xIqRHfEkc=",
+  version ? "1.10.3",
+  srcHash ? "sha256-xbVu+s4TQMc6fA8iUNq01y5lDxfC76Pwe6Z2rqA6C5Q=",
+  cargoHash ? "sha256-zQ6XnDJt3pek0WzC0J8PY111LGuzZeSCZ1QxwYAhPWw=",
   updateScript ? ./update.sh,
 }:
 
@@ -173,5 +173,9 @@ rustPlatform.buildRustPackage (finalAttrs: {
     platforms = lib.platforms.unix;
     teams = [ lib.teams.radicle ];
     mainProgram = "rad";
+    knownVulnerabilities = [
+      # https://radicle.dev/2026/09/23/disclosure-of-vulnerability-in-network-protocol
+      "Private repositories are insecure: traffic between nodes is not encrypted and not authenticated."
+    ];
   };
 })

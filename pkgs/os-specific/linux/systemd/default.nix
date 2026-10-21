@@ -201,13 +201,13 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   inherit pname;
-  version = "260.2";
+  version = "260.5";
 
   src = fetchFromGitHub {
     owner = "systemd";
     repo = "systemd";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-NXmmSV7/9WIW6C8wjdOwaerCy4v7Zcrd8+XDzcS8rEk=";
+    hash = "sha256-QLQad4pKkaf99k+ABOaooKi5TSX0iHH9XtMn/fy1rfE=";
   };
 
   # PATCH POLICY

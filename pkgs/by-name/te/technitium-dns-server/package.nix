@@ -8,16 +8,17 @@
   nixosTests,
   nix-update-script,
 }:
-buildDotnetModule rec {
+buildDotnetModule (finalAttrs: {
   pname = "technitium-dns-server";
-  version = "15.3.0";
+  version = "15.6.2";
+
+  __structuredAttrs = true;
 
   src = fetchFromGitHub {
     owner = "TechnitiumSoftware";
     repo = "DnsServer";
-    tag = "v${version}";
-    hash = "sha256-nopmnQpozvN0p/SyUCH3Yej/oAhDvNdfJssUA1JyGsk=";
-    name = "${pname}-${version}";
+    tag = "v${finalAttrs.version}";
+    hash = "sha256-+GMGwqPWVmMIhpa4ukM8Yh5aYtMOaEiNwRL+2leiJKo=";
   };
 
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
@@ -59,4 +60,4 @@ buildDotnetModule rec {
     ];
     platforms = lib.platforms.linux;
   };
-}
+})

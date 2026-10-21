@@ -22,7 +22,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "palemoon-bin";
-  version = "34.3.1";
+  version = "34.3.2.1";
 
   src = finalAttrs.passthru.sources."gtk${if withGTK3 then "3" else "2"}";
 
@@ -171,11 +171,11 @@ stdenv.mkDerivation (finalAttrs: {
       {
         gtk3 = fetchzip {
           urls = urlRegionVariants "gtk3";
-          hash = "sha256-PFsdDuer6mbxFrcT0rSADcOxunoJIo3Y6O4NG4R8ygY=";
+          hash = "sha256-IjD3En6qNMeUWe4sX5eb2Y76pMlWDv/NOuQr3uKluiE=";
         };
         gtk2 = fetchzip {
           urls = urlRegionVariants "gtk2";
-          hash = "sha256-C48vM0LI6rPSS0wFVnPRlppT4I5EFnWzBFg/Rxw++Bw=";
+          hash = "sha256-o0vsOw1yxWURckqoq2rb9Acl6IyYenunEuy7Trb8VmM=";
         };
       };
 
@@ -225,10 +225,25 @@ stdenv.mkDerivation (finalAttrs: {
         # TODO free, redistributable? Has strict limitations on what modifications may be done & shipped by packagers
       }
     ];
-    maintainers = with lib.maintainers; [ OPNA2608 ];
+    maintainers = [ ];
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     mainProgram = "palemoon";
     platforms = [ "x86_64-linux" ];
     hydraPlatforms = [ ];
+    knownVulnerabilities = [
+      "CVE-2026-74943"
+      "CVE-2026-74945"
+      "CVE-2026-74964"
+      "CVE-2026-74969"
+      "CVE-2026-74971"
+      "CVE-2026-74977"
+      "CVE-2026-74982"
+      "CVE-2026-92012"
+      "CVE-2026-92016"
+      "CVE-2026-92030"
+      "CVE-2026-92044"
+      "CVE-2026-92049"
+      "\"several others [security issues] that did not have a CVE designation at the time of evaluation\""
+    ];
   };
 })

@@ -20,6 +20,7 @@ in
   branding = "browser/branding/librewolf";
   inherit (librewolf-src)
     extraConfigureFlags
+    extraPreConfigure
     extraPatches
     extraPostPatch
     extraPassthru
@@ -30,7 +31,6 @@ in
     homepage = "https://librewolf.net/";
     maintainers = with lib.maintainers; [
       azahi
-      dwrege
       fpletz
       hythera
       mBornand

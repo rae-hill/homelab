@@ -12,21 +12,23 @@ let
 in
 python.pkgs.buildPythonPackage (finalAttrs: {
   pname = "pdfding";
-  version = "1.10.0";
+  version = "1.13.0";
   src = fetchFromGitHub {
     owner = "mrmn2";
     repo = "PdfDing";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-C1osj8V9+z3ahl4+zUtyI22GMtSgNLzfdGttL7gPDvY=";
+    hash = "sha256-HMoCmPlT40o6oitUw/X582dXie/5iglpnXQs4VEbp1g=";
   };
   pyproject = true;
 
   strictDeps = true;
   __structuredAttrs = true;
 
-  # remove supervisor from dependencies
+  # remove supervisor from dependencies, we use systemd
+  # and fix version, TODO move to pyprojectVersionPatchHook when it is available in stable 26.05
   postPatch = ''
     sed -i 's/supervisor.*$//' pyproject.toml
+    sed -i 's/^version = .*$/version = "${finalAttrs.version}"/' pyproject.toml
   '';
 
   dependencies =
@@ -131,12 +133,16 @@ python.pkgs.buildPythonPackage (finalAttrs: {
       "''${makeWrapperArgs[@]}"
   '';
 
+  # NOTE: don't undo relaxing of any of these, they are bound to break again
   pythonRelaxDeps = [
+    "django"
     "django-allauth"
     "gunicorn"
     "huey"
+    "markdown"
     "nh3"
     "psycopg2-binary"
+    "pypdf"
     "pypdfium2"
   ];
 
