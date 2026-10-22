@@ -181,6 +181,7 @@ in
                 "grafana.access"
                 "grafana.admins"
 
+                "technitium.access"
                 "technitium.admins"
 
                 # POSIX (unix) login — workstation greeter + sudo via map_group.
