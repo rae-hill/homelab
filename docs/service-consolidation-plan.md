@@ -207,18 +207,20 @@ duplication entirely.
 
 The declaration is consumed by small, independent generator modules. Each reads the catalog and
 contributes to exactly one subsystem. A host imports only the generators relevant to its role and
-platform. Because two of the four concerns (Caddy, ACME) must also work on the **nix-darwin** host
-(`mini`, which fronts Jellyfin with Caddy), those two are published for **both** classes —
-`flake.modules.nixos.*` and `flake.modules.darwin.*` — from one shared implementation; DNS and OIDC
-are NixOS-only (they target the Linux hosts aedilis/augustus):
+platform. The **Caddy** concern must also work on the **nix-darwin** host (`mini`, which fronts
+Jellyfin with Caddy), but — as verified below (§2.2a) — nix-darwin has **no `services.caddy` and no
+`security.acme` module**, so the Caddy concern has two rendering backends (NixOS → `services.caddy`;
+darwin → Caddyfile text) while **ACME is NixOS-only** (on darwin, Caddy does ACME natively). DNS,
+OIDC, and firewall are NixOS-only (they target the Linux hosts):
 
-| Generator module           | Class(es)        | Imported by   | Emits                                                                   |
-| -------------------------- | ---------------- | ------------- | ----------------------------------------------------------------------- |
-| `homelab-service-caddy`    | `nixos`+`darwin` | each app host | `services.caddy.virtualHosts` for services where `host == this host`    |
-| `homelab-service-acme`     | `nixos`+`darwin` | each app host | `security.acme.certs.*` + HTTP-01 challenge vhost for local services    |
-| `homelab-service-firewall` | `nixos`          | each app host | `networking.firewall.*` openings for local services (§2.7)              |
-| `homelab-service-dns`      | `nixos`          | aedilis       | `…provision.ensureDnsRecords.zones` entries for all `dns.enable` svcs   |
-| `homelab-service-oidc`     | `nixos`          | augustus      | `services.kanidm.provision.systems.oauth2.*` for all `oidc.enable` svcs |
+| Generator module           | Class(es) | Imported by   | Emits                                                                   |
+| -------------------------- | --------- | ------------- | ----------------------------------------------------------------------- |
+| `homelab-service-caddy`    | `nixos`   | each app host | `services.caddy.virtualHosts` for services where `host == this host`    |
+| `homelab-service-caddy`    | `darwin`  | `mini`        | Caddyfile site-blocks fragment for services where `host == mini`        |
+| `homelab-service-acme`     | `nixos`   | each app host | `security.acme.certs.*` + HTTP-01 challenge vhost for local services    |
+| `homelab-service-firewall` | `nixos`   | each app host | `networking.firewall.*` openings for local services (§2.7)              |
+| `homelab-service-dns`      | `nixos`   | aedilis       | `…provision.ensureDnsRecords.zones` entries for all `dns.enable` svcs   |
+| `homelab-service-oidc`     | `nixos`   | augustus      | `services.kanidm.provision.systems.oauth2.*` for all `oidc.enable` svcs |
 
 Critically, the **Caddy/ACME** generators filter on `host == config.networking.hostName` so a service
 declared once only materializes its vhost/cert on the host that runs it. The **DNS** generator runs
@@ -229,24 +231,53 @@ from the Linux DNS host. The **OIDC** generator runs only on augustus (the Kanid
 This keeps the "write once" property while respecting that DNS and OIDC are centralized on specific
 hosts — the declaration lives with the catalog, not the host, and each host picks up its slice.
 
-### 2.2a Cross-platform Caddy/ACME generators (nixos + darwin)
+### 2.2a Cross-platform Caddy/ACME: two rendering backends, one catalog
 
-The catalog option schema and the Caddy/ACME rendering helpers are **platform-agnostic** — they emit
-plain `services.caddy.virtualHosts` / `security.acme.certs` config that both NixOS and nix-darwin
-expose (both have a `security.acme` module and the Caddy service). The plan is to write the generator
-body once as a bare module function and register it under both `flake.modules.nixos.<name>` and
-`flake.modules.darwin.<name>` so `mini` imports the darwin variant. Platform differences to account
-for:
+**Verified against the vendored `repos/nix-darwin` (pinned to `nix-darwin-26.05`, matching
+`flake.lock`):** nix-darwin has **no `security.acme` module and no `services.caddy` module**. Its
+`security.*` surface is only `pki` (trust store — `security.pki.certificateFiles`), `pam`, `sandbox`,
+and `sudo`. So the original "one shared module emits identical `services.caddy.virtualHosts` /
+`security.acme.certs` on both platforms" idea does **not** hold. How `mini` works today:
 
-- **`networking.hostName`** exists on both NixOS and darwin, so the `host ==` filter is portable.
-- **Reload services / unit names** differ (`caddy.service` on systemd vs the launchd label on
-  darwin). The ACME generator should compute `reloadServices` per platform, or expose it as an
-  override the darwin host can set. On darwin, `security.acme` reload wiring is thinner — verify the
-  nix-darwin `security.acme` surface before relying on `reloadServices`.
-- **Internal step-ca ACME** must be reachable from `mini` (it already is for the existing Jellyfin
-  cert); no new trust wiring is expected, but confirm `mini` already trusts the step-ca root.
-- Keep the darwin surface **strictly Caddy + ACME** — no DNS, no OIDC, no restic, no failure-notifs
-  (those are Linux/augustus/aedilis concerns), per the requirement.
+- Caddy runs as a **`launchd.daemons.caddy`** invoking `pkgs.caddy` against a hand-written
+  **Caddyfile** in `environment.etc."caddy_nix/Caddyfile"`.
+- **ACME is Caddy-native**: the Caddyfile global block sets `acme_ca =
+  https://ca.plato-splunk.media/acme/http/directory` + `acme_ca_root`, so Caddy fetches/renews certs
+  itself. There is **no** `security.acme`, no HTTP-01 challenge vhost, and no loopback `acmePort` on
+  darwin.
+- Trust is via `security.pki.certificateFiles` (the step-ca root) — present on darwin, so `mini`
+  already trusts step-ca.
+
+The correct design is therefore **one catalog with two rendering backends** that share the vhost-body
+semantics but target different config surfaces:
+
+| Concern     | NixOS backend                                   | darwin backend                                            |
+| ----------- | ----------------------------------------------- | --------------------------------------------------------- |
+| vhost       | `services.caddy.virtualHosts.<url>.extraConfig` | a Caddyfile **site block** appended to the mini Caddyfile |
+| TLS / ACME  | `security.acme.certs.*` + `:80` challenge vhost | Caddy-native (global `acme_ca`); **no** `security.acme`   |
+| cert reload | `reloadServices = [ "caddy.service" ]`          | launchd daemon (Caddy reloads itself; n/a)                |
+| trust root  | `security.pki.certificateFiles`                 | `security.pki.certificateFiles` (same)                    |
+
+Concretely:
+
+- The **vhost-body renderer** (the `reverse_proxy` / `file_server` / mTLS block from §2.3) is a pure
+  string function reused by both backends — that's the genuinely shared code.
+- The **NixOS backend** (`homelab-service-caddy` / `-acme`, class `nixos`) wraps the body in
+  `services.caddy.virtualHosts` and emits the matching `security.acme.certs` + challenge vhost
+  (§2.4).
+- The **darwin backend** (`homelab-service-caddy`, class `darwin`) folds each local service's body
+  into the mini Caddyfile text (the catalog supersedes today's hand-written
+  `environment.etc."caddy_nix/Caddyfile"`), and contributes **nothing** for ACME — Caddy's global
+  `acme_ca` already handles issuance. There is **no** darwin ACME generator.
+- **`networking.hostName`** exists on both platforms, so the `host ==` filter is portable.
+- Keep the darwin surface **strictly Caddy (Caddyfile) + trust** — no `security.acme`, no DNS, no
+  OIDC, no restic, no failure-notifs (those are Linux/augustus/aedilis concerns), per the
+  requirement. Because darwin ACME is Caddy-native, `tls.acmePort` / `tls.challenge` are simply
+  **ignored** by the darwin backend.
+
+> Open design choice (not a blocker): either (a) generate the whole mini Caddyfile from the catalog,
+> or (b) generate only a site-blocks fragment that the existing Caddyfile `import`s. (b) is less
+> invasive for the global options (`acme_ca`, metrics, logging) that are mini-specific; recommend (b).
 
 ### 2.3 Caddy vhost generation
 
@@ -274,7 +305,7 @@ security.acme.certs."<domain>" = {
   domain = <domain>;
   listenHTTP = "127.0.0.1:${toString tls.acmePort}";
   server = constants.ca.acmeDirectoryHttp;
-  group = <certGroup>;              # default: a shared "service-certs" group Caddy joins
+  group = <certGroup>;              # per-service cert group (see below)
   reloadServices = [ "caddy.service" ] ++ extraReloads;
 };
 ```
@@ -282,10 +313,16 @@ security.acme.certs."<domain>" = {
 plus the matching `http://<domain>` challenge vhost
 (`handle /.well-known/acme-challenge/* { reverse_proxy 127.0.0.1:<acmePort> }`). For
 `tls.ca == "letsencrypt"`, swap `server` to the LE directory and allow per-cert `email`/`group`
-overrides (the aedilis public DNS cert is the one real example). Services that don't terminate their
-own TLS (today's `localhost` reverse-proxy services share Caddy's cert) can set `tls.ca = null` to
-skip cert creation and rely on an on-demand/managed cert — preserving current behavior where most
-vhosts don't name an explicit cert.
+overrides (the aedilis public DNS cert is the one real example).
+
+**Most vhosts need no explicit cert at all.** Today's `localhost` reverse-proxy services share
+Caddy's managed cert and never name one — so the common case is `tls.ca = null` (or simply omitting
+`acmePort`), which skips `security.acme.certs` creation entirely. The ACME generator only fires for
+services that genuinely terminate their **own** manual TLS cert — in practice **Kanidm** (which binds
+its own `:8443` and needs the step-ca cert directly), **postgres**, **radius**, and the aedilis
+Technitium vhosts. Per **decision §5.1 #6**, those keep a **per-service cert group** (the current
+convention), not a shared group — the blast radius of a leaked/readable cert stays scoped to the one
+service that owns it.
 
 ### 2.5 DNS record generation (aedilis)
 
@@ -410,10 +447,12 @@ access = {
 
 - `scope` drives the **interface** of the inbound opening (`public` → public interface; `tailnet`/
   `host-list` → `tailscale0`), which the firewall generator _can_ enforce today.
-- `fromHosts` is the **declared intent** for the tailnet ACL. Until this repo owns the Tailscale
-  policy file, `fromHosts` is advisory — rendered into a generated doc/table (and optionally a
-  policy-file fragment) for the admin console, not auto-applied. If/when the policy file is adopted
-  here (§5.2), the same `fromHosts` data generates the real grants with no re-declaration.
+- `fromHosts` is the **declared intent** for the tailnet ACL. This repo does **not** manage any
+  tailnet ACL today and will **not** adopt the Tailscale SaaS policy file; the long-term home is a
+  self-hosted **headscale** DERP server with declarative HuJSON ACLs (§5.2 #4). Until then `fromHosts`
+  is captured as intent only — optionally rendered into a reviewed reference table — and is not
+  auto-applied. When headscale lands, the same `fromHosts` data generates the real grants with no
+  re-declaration.
 - **praeconinus falls out naturally.** It serves only via **Tailscale Funnel** and should not reach —
   or be reached by — other tailnet devices. Its catalog entries set `access.scope = "public"` (Funnel
   ingress) with **no `fromHosts`**, and it imports the firewall generator but **no DNS/OIDC**
@@ -423,8 +462,8 @@ access = {
   from §2.3.
 
 This keeps the enforceable part (inbound openings) fully declarative and catalog-driven now, while
-modeling the egress matrix as first-class intent that becomes enforceable the moment the Tailscale
-policy file is brought in-repo — without changing any service declaration.
+modeling the egress matrix as first-class intent that becomes enforceable when the self-hosted
+headscale DERP server (with declarative ACLs) lands — without changing any service declaration.
 
 The refactor must land without a flag-day rewrite of every service. Proposed order:
 
@@ -446,15 +485,15 @@ The refactor must land without a flag-day rewrite of every service. Proposed ord
    `22481`/`22483` tailnet ACME ports). Diff `networking.firewall` per host before/after; the
    service-derived ports should match what's hand-listed today, leaving only baseline host ports
    (SSH, metrics, radius, Technitium 53/80/443/853) in `_private/<host>/security.nix`. Render the
-   `access.fromHosts` intent table for the admin console (no auto-apply).
+   `access.fromHosts` intent as a reference table only (no auto-apply; reserved for future headscale).
 6. **Flip DNS**: generate `ensureDnsRecords.zones` from the catalog on aedilis, diff against the
    current `constants.dnsRecords.private`, and only then delete `ts` + `tailnetRewrites`.
 7. **Retire `constants.services.*`** once every feature declares its own catalog entry, or keep it as
    a thin derived view for any remaining consumer during the transition.
 
 Each step is independently buildable and testable with `nix eval`/`nix build` per host, so the tree
-never enters a broken state. The `mini` darwin feature (Jellyfin → Caddy/ACME only) can be migrated
-alongside step 2–4 to exercise the darwin generator path early.
+never enters a broken state. The `mini` darwin feature (Jellyfin → Caddyfile only, no ACME generator)
+can be migrated alongside step 2–4 to exercise the darwin Caddyfile backend early.
 
 ---
 
@@ -468,13 +507,14 @@ Per `.kiro/steering/validation.md`:
   .#nixosConfigurations.<host>.config.services.caddy.virtualHosts --json` (and the analogous
   `security.acme.certs`, `services.kanidm.provision.systems.oauth2`, and
   `services.technitium-server-complete.provision.ensureDnsRecords.zones`) **before and after** each
-  service migration; the diff should be empty or an intentional, reviewed change. For `mini`, use the
-  darwin attr path (`.#darwinConfigurations.mini.config.services.caddy.virtualHosts` /
-  `.security.acme.certs`).
+  service migration; the diff should be empty or an intentional, reviewed change. For `mini` (darwin),
+  there is no `services.caddy`/`security.acme` to eval — instead diff the generated Caddyfile text
+  (`nix eval .#darwinConfigurations.mini.config.environment.etc."caddy_nix/Caddyfile".text --raw`)
+  against the current hand-written one.
 - `nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')` and `nix flake check` after each step.
 - Any new shell (unlikely here) must go through `constants.shell.mkScript` and the shellcheck gate.
 - Full per-host build: `nixos-rebuild build --flake .#augustus` / `.#aedilis` / `.#praeconinus`, and
-  `darwin-rebuild build --flake .#mini` for the darwin Caddy/ACME path, before deploying.
+  `darwin-rebuild build --flake .#mini` for the darwin Caddyfile path, before deploying.
 
 ---
 
@@ -499,54 +539,61 @@ Per `.kiro/steering/validation.md`:
    "plato-splunk.media"`). `fqdn`/`url` derive from `<subdomain>.<zone>`, and the DNS generator groups
    records by zone and creates each Primary zone on demand (§2.5). Adding a second base domain later
    requires no structural change — services just set `zone`.
-4. **Darwin support for Caddy + ACME only.** The Caddy and ACME generators are published under both
-   `flake.modules.nixos.*` and `flake.modules.darwin.*` from one shared implementation, so `mini`
-   (nix-darwin, fronts Jellyfin with Caddy) realizes its vhost + cert from the same catalog. The
-   darwin surface is **strictly** Caddy + ACME — DNS, OIDC, restic, and failure-notifs remain
-   NixOS-only (§2.2 / §2.2a). A mini-hosted service still gets its DNS record from aedilis because the
-   DNS generator folds the whole catalog regardless of host platform. A darwin service feature simply
-   omits the NixOS-only sub-modules (no `oidc.nix`, no systemd `failure-notifs`).
+4. **Darwin: Caddy only, via a separate Caddyfile backend (no `security.acme`).** Verified against the
+   vendored `repos/nix-darwin` (`nix-darwin-26.05`): nix-darwin has **no `services.caddy` and no
+   `security.acme` module** (only `security.pki` for trust). `mini` runs Caddy as a `launchd.daemons`
+   unit against a hand-written Caddyfile, and ACME is **Caddy-native** (global `acme_ca` → step-ca).
+   So the Caddy concern has **two rendering backends** sharing one vhost-body renderer: NixOS emits
+   `services.caddy.virtualHosts`; darwin emits a Caddyfile site-blocks fragment (§2.2a). **ACME is
+   NixOS-only** — the darwin backend emits no cert config and ignores `tls.acmePort`/`tls.challenge`.
+   The darwin surface stays strictly Caddy + trust (via `security.pki.certificateFiles`, already
+   present) — no DNS/OIDC/restic/failure-notifs. A mini-hosted service still gets its DNS record from
+   aedilis because the DNS generator folds the whole catalog regardless of platform.
 5. **Firewall: generate inbound openings, model egress as intent.** The catalog drives
    `networking.firewall` inbound openings per host (443 + `challenge.via == "direct"` ACME ports, on
    the interface the entry's `access.scope`/`tls.challenge.iface` selects) — eliminating the
    hand-copied `acmePort` firewall drift (§2.7). The host-firewall is inbound-only, so the
-   "which hosts may I reach" matrix is modeled as declarative **intent** (`access.fromHosts`) that
-   today generates documentation/advice for the Tailscale admin console, and the inbound half it
-   implies. praeconinus declares no peer reachability (Funnel-only) and imports no DNS/OIDC
-   generators, so it lists _nothing_ in the matrix — exactly as desired.
+   "which hosts may I reach" matrix is modeled as declarative **intent** (`access.fromHosts`) captured
+   for a future self-hosted headscale DERP server's declarative ACLs (not auto-applied now).
+   praeconinus declares no peer reachability (Funnel-only) and imports no DNS/OIDC generators, so it
+   lists _nothing_ in the matrix — exactly as desired.
+6. **Per-service cert groups (not a shared group).** Only services that terminate their **own** manual
+   TLS cert (Kanidm's `:8443`, postgres, radius, aedilis Technitium) get a `security.acme.certs` entry
+   at all; each keeps its **own** cert group (the current convention) so a readable/leaked cert's blast
+   radius stays scoped to that one service. The common reverse-proxy service names **no** cert and
+   shares Caddy's managed cert (`tls.ca = null`). There is no shared `service-certs` group (§2.4).
+7. **Baseline (non-service) firewall ports stay explicit.** SSH `22`, TS metrics/webclient `5252`,
+   radius `1812/1813`, and Technitium's `53/80/443/853` are host-level infrastructure, not
+   service-attributable. They remain hand-listed in `_private/<host>/security.nix`; the firewall
+   generator owns only the service-derived openings, keeping its scope auditable.
 
 ### 5.2 Open
 
-1. **Shared cert group.** Standardize a single `service-certs` group that Caddy joins once (replacing
-   the per-feature `certGroup` members wiring), or keep per-service groups for blast-radius isolation?
-   Recommend one shared read-only cert group for Caddy-fronted internal certs, with opt-out for
-   secret-sensitive certs (e.g. the technitium PKCS#12 cert owned by the service group). On darwin the
-   group/ownership model differs — the ACME generator must compute group/reload wiring per platform.
-2. **praeconinus (restricted deployment).** It runs a _subset_ (`homelab-api-service` only) and
-   overrides vhosts in `_private/praeconinus/programs.nix`. The catalog needs a per-host "realize only
-   these services" filter (or per-host overrides) so the restricted host doesn't inadvertently pull in
-   the full augustus vhost set. The `host`-filtering in §2.2 largely handles this, but
-   praeconinus-specific vhost bodies (base-path rewrites) need an override hook.
-3. **nix-darwin `security.acme` surface.** Confirm the darwin `security.acme` module supports the
-   fields the ACME generator emits (`listenHTTP`, `server`, `group`, `reloadServices`) and that
-   launchd reload wiring works the way the generator assumes. If `reloadServices` is unavailable or
-   named differently on darwin, expose it as a per-platform override rather than hard-coding
-   `caddy.service`. Also confirm `mini` already trusts the step-ca root for internal certs (it should,
-   given the existing Jellyfin cert).
-4. **Own the Tailscale policy file in-repo?** The firewall generator enforces only the **inbound**
-   half of the reachability matrix; the **egress/peer-grant** half (`access.fromHosts`) lives in the
-   Tailscale ACL, which is currently managed out-of-band in the admin console. Should this repo adopt
-   the Tailscale policy file (e.g. via a `tailscale-gitops-pusher`-style flow or a checked-in
-   `acl.json` templated from the catalog) so `fromHosts` becomes the single source for _both_ halves?
-   That is a larger, security-sensitive change (a mistake could cut off tailnet access to a host) and
-   is deliberately deferred — the catalog is designed so `access.fromHosts` data is ready to feed it
-   when adopted, with no per-service re-declaration. Until then, treat `fromHosts` as generating a
-   reviewed table/fragment the admin applies manually.
-5. **Baseline (non-service) firewall ports.** SSH `22`, TS metrics `5252`, radius `1812/1813`, and
-   Technitium's `53/80/443/853` are host-level, not service-attributable. Keep them as explicit host
-   config (recommended), or model "infrastructure ports" in a separate per-host list? Recommend
-   leaving them in `_private/<host>/security.nix` so the generator's scope stays strictly
-   service-derived and auditable.
+1. **praeconinus (restricted deployment) — the `:8443` vhost explained.** Investigated: praeconinus
+   serves the homelab UI+API over **Tailscale Funnel** at `praeconinus.neko-bicolor.ts.net`, but Caddy
+   binds **`:8443`**, not `:443` (`_private/praeconinus/programs.nix`). The reason is Funnel semantics,
+   not a local port clash with another app: with `services.tailscale` + Funnel enabled (and
+   `TS_PERMIT_CERT_UID = "caddy"` so Caddy can use the Tailscale cert), **tailscaled** terminates
+   public TLS and occupies the node's `:443` for Funnel ingress, forwarding to a local Caddy. `8443`
+   is chosen because it is one of **Funnel's three permitted ports (443 / 8443 / 10000)**. Note the
+   firewall does **not** open `8443` — Funnel traffic reaches Caddy via tailscaled (loopback), not
+   through an external-interface firewall rule. Implications for the catalog: a Funnel-fronted service
+   needs a `backend`/vhost **listen port** distinct from the standard 443 (model as e.g.
+   `access.scope = "funnel"` with an implied `:8443` listen), plus the `extraCaddyConfig` escape hatch
+   for its base-path rewrites (`/api`, `/ui`). The old `praeconinus-host-plan.md` still documents the
+   original `:443` design — it is stale; the live config is `:8443`.
+2. **Per-host import wiring.** Each host must import exactly the generators for its role/platform
+   (augustus: all nixos; aedilis: +dns; app hosts: caddy/acme/firewall; mini: darwin caddy only;
+   praeconinus: caddy/firewall, no dns/oidc). This is mechanical but worth a short checklist in the
+   implementation PR so a host doesn't silently miss a generator.
+
+> Resolved during planning (see §5.1): typed submodule (#1), colocated features incl. failure-notifs
+> (#2), per-service `zone` (#3), darwin Caddy-only via Caddyfile backend with no `security.acme` (#4,
+> verified against vendored nix-darwin), firewall inbound-generation + egress-as-intent (#5),
+> per-service cert groups only for manual-TLS services like Kanidm (#6), baseline infra ports stay
+> explicit (#7). The egress/peer matrix is **deferred** to a future self-hosted **headscale** DERP
+> server with declarative HuJSON ACLs — `access.fromHosts` is captured as intent now and feeds that
+> later with no re-declaration; no Tailscale SaaS policy file is brought in-repo.
 
 ---
 
