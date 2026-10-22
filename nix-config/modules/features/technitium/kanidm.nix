@@ -18,8 +18,8 @@ in
       services.kanidm.provision.systems.oauth2."${tech.clientId}" = {
         # NOTE: confirm the exact redirect/callback path Technitium expects for its
         # OIDC sign-in flow against the running version (docs/aedilis-host-plan.md §7).
-        originUrl = "${tech.adminUrl}/sso/callback";
-        originLanding = "${tech.adminUrl}/";
+        originUrl = "${tech.adminUrl}:${builtins.toString tech.adminPort}/sso/callback";
+        originLanding = "${tech.adminUrl}:${builtins.toString tech.adminPort}/";
         displayName = "Technitium DNS";
 
         basicSecretFile = config.sops.secrets.technitium_client_secret.path;
