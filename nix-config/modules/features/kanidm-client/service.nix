@@ -4,15 +4,20 @@ let
   unix = c.unix;
 in
 {
-  # Kanidm unix CLIENT: NSS + PAM integration via kanidm-unixd, plus the
-  # offline SSH key path. Enabling `services.kanidm.unix.enable` in nixpkgs
-  # 26.05 AUTO-WIRES the pam_kanidm rules (auth/account/session, sufficient,
-  # ignore_unknown_user) — do NOT hand-write security.pam.services.*.rules.
+  # Kanidm unix CLIENT: NSS + PAM integration via kanidm-unixd. Enabling
+  # `services.kanidm.unix.enable` in nixpkgs 26.05 AUTO-WIRES the pam_kanidm
+  # rules (auth/account/session, sufficient, ignore_unknown_user) — do NOT
+  # hand-write security.pam.services.*.rules.
   #
-  # This is additive to step-ca: `sshIntegration` installs an
-  # AuthorizedKeysCommand, which coexists with the existing
-  # services.openssh.settings.TrustedUserCAKeys (step-ca user CA). Audit after
-  # deploy with: sshd -T | grep -iE 'authorizedkeys|trustedusercakeys'
+  # SSH: `unix.sshIntegration` is deliberately DISABLED. It would install an
+  # AuthorizedKeysCommand that serves long-lived STATIC Kanidm-managed public
+  # keys. We intentionally rely solely on step-ca instead, which issues
+  # SHORT-LIVED SSH CERTIFICATES (via the `kanidm` OIDC provisioner) validated
+  # by services.openssh.settings.TrustedUserCAKeys — a stronger, expiring
+  # credential. Keeping both would add a weaker parallel auth path and a second
+  # AuthorizedKeysCommand for no benefit. Audit after deploy with:
+  #   sshd -T | grep -iE 'authorizedkeys|trustedusercakeys'
+  # (expect: NO kanidm AuthorizedKeysCommand, TrustedUserCAKeys intact.)
   flake.modules.nixos.kanidm-client =
     {
       config,
@@ -29,7 +34,11 @@ in
         client.settings.uri = c.idm.url;
 
         unix.enable = true; # NSS + PAM (auto-wired) + unixd-tasks (home creation)
-        unix.sshIntegration = true; # AuthorizedKeysCommand -> kanidm_ssh_authorizedkeys
+        # Disabled on purpose — step-ca short-lived SSH certs are the sole SSH
+        # auth path (see header comment). Leaving this false removes the
+        # AuthorizedKeysCommand, the kanidm_ssh_authorizedkeys wrapper, and the
+        # kanidm-authorized-keys user.
+        unix.sshIntegration = false;
 
         unix.settings = {
           # Human-friendly home path: /home/<name> (e.g. /home/rae) rather than

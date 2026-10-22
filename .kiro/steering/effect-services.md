@@ -13,6 +13,7 @@ Upstream monorepos are vendored at `./repos/` as read-only reference material vi
 | `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05) |
 | `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)     |
 | `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source          |
+| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool    |
 | `repos/crypto/`               | https://github.com/smallstep/crypto.git             | step-ca / smallstep crypto library      |
 | `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source            |
 

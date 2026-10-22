@@ -30,8 +30,9 @@ Confirmed unchanged / usable as-is:
 
 - `services.kanidm.unix.enable` installs `kanidm-unixd` + tasks daemon and
   inserts `libnss_kanidm` into `nssDatabases`.
-- `services.kanidm.unix.sshIntegration` wires the `AuthorizedKeysCommand`
-  path (offline/static Kanidm SSH keys).
+- `services.kanidm.unix.sshIntegration` would wire the `AuthorizedKeysCommand`
+  path (static Kanidm SSH keys) — we deliberately leave it **disabled** (§4);
+  step-ca certs are the sole SSH path.
 - step-ca's existing `OIDC` provisioner named `kanidm` already stamps the
   Kanidm username into the SSH cert principal (`defaultUserSSHCertDuration =
   "2h"`). **This is the working path we must not break.**
@@ -95,9 +96,9 @@ profile) from `/home/jacob` to the `rae` home, and only then remove local
 
 This replaces the earlier three-option dilemma. The sequence is:
 
-- **Phase 1 — add `rae` as a Kanidm POSIX login on `nixos`** (NSS + PAM +
-  `sshIntegration`), local `jacob` still present and functional. Prove
-  greeter login as `rae`, confirm step-ca untouched.
+- **Phase 1 — add `rae` as a Kanidm POSIX login on `nixos`** (NSS + PAM;
+  `sshIntegration` left disabled), local `jacob` still present and functional.
+  Prove greeter login as `rae`, confirm step-ca untouched.
 - **Phase 2 — migrate state and retire local `jacob`** on `nixos`: move the
   sops age key + ssh keys into `rae`'s home, re-key the HM profile to
   `rae@nixos`, remove `users.users.jacob`.
@@ -181,11 +182,12 @@ Design notes:
   (add in `kanidm.nix` alongside the existing `kanidm` entry, since that list
   is augustus-scoped).
 
-### 2.3 (Deferred) static SSH keys in Kanidm
+### 2.3 (Not used) static SSH keys in Kanidm
 
-Optional offline path: `kanidm person ssh-pubkey add <user> ...`. Not required
-while step-ca is the primary SSH path. Add later if we want login when step-ca
-is unreachable. Covered by client `sshIntegration` (§4).
+Kanidm's static SSH key path (`kanidm person ssh-pubkey add`, served via
+`unix.sshIntegration`) is intentionally **not** used — step-ca short-lived
+certs are the sole SSH auth path (§4). Documented here only to note it was
+considered and rejected in favor of the stronger cert-based path.
 
 ---
 
@@ -203,8 +205,8 @@ flake.modules.nixos.kanidm-client = { config, lib, pkgs, ... }: {
   services.kanidm.client.enable = true;
   services.kanidm.client.settings.uri = config.constants.idm.url;  # https://idm.plato-splunk.media
 
-  services.kanidm.unix.enable = true;          # NSS + PAM (auto-wired) + unixd-tasks
-  services.kanidm.unix.sshIntegration = true;  # AuthorizedKeysCommand (offline SSH keys)
+  services.kanidm.unix.enable = true;           # NSS + PAM (auto-wired) + unixd-tasks
+  services.kanidm.unix.sshIntegration = false;  # step-ca certs are the sole SSH path (§4)
   services.kanidm.unix.settings = {
     kanidm.pam_allowed_login_groups = [ "unix.workstations" ];
     # map Kanidm POSIX groups onto local system groups (Kanidm >= 1.4):
@@ -260,28 +262,65 @@ central rather than per-host mapfiles.
 
 ---
 
-## 4. SSH — preserving step-ca and extending to servers
+## 4. SSH — step-ca is the sole SSH auth path
 
-This is the constraint that matters most. Two **independent** pubkey sources
-coexist on sshd; a session succeeds if either passes:
+step-ca is the **only** SSH authentication mechanism. Kanidm's static-key
+integration (`unix.sshIntegration`) is deliberately **disabled** — step-ca's
+short-lived SSH certificates are a stronger, expiring credential, and running
+both would add a weaker parallel path plus a second `AuthorizedKeysCommand`.
 
-| Path               | sshd mechanism                                           | Where configured today         | Status             |
-| ------------------ | -------------------------------------------------------- | ------------------------------ | ------------------ |
-| step-ca user cert  | `TrustedUserCAKeys` (`c.ca.sshUserCaCert`)               | `services/openssh.nix`         | **Keep untouched** |
-| Kanidm static keys | `AuthorizedKeysCommand` → `kanidm_ssh_authorizedkeys %u` | added by `unix.sshIntegration` | new, additive      |
+| Path               | sshd mechanism                             | Status                                |
+| ------------------ | ------------------------------------------ | ------------------------------------- |
+| step-ca user cert  | `TrustedUserCAKeys` (`c.ca.sshUserCaCert`) | **Sole path — keep**                  |
+| Kanidm static keys | `AuthorizedKeysCommand`                    | **Disabled** (sshIntegration = false) |
 
-### 4.1 Do not break step-ca (verification-first)
+### 4.1 Decision: `unix.sshIntegration = false`
+
+The `kanidm-client` module sets `services.kanidm.unix.sshIntegration = false`.
+In nixpkgs 26.05 this flag is the sole gate on `addKaniSshKeys`
+(`cfg.unix.enable && cfg.unix.sshIntegration`), so disabling it removes:
+
+- the `AuthorizedKeysCommand` / `AuthorizedKeysCommandUser` sshd settings,
+- the `kanidm_ssh_authorizedkeys` setuid wrapper, and
+- the `kanidm-authorized-keys` system user/group.
+
+NSS + PAM (`unix.enable = true`) are independent and unaffected. Verified by
+building the rendered `nixos` sshd_config: it contains `TrustedUserCAKeys`
+(step-ca) and **no** Kanidm `AuthorizedKeysCommand`; the
+`kanidm-authorized-keys` user and `kanidm_ssh_authorizedkeys` wrapper are not
+created.
+
+> Trade-off accepted: there is no Kanidm offline/static SSH key fallback. If
+> step-ca is unreachable, SSH cert issuance is unavailable — acceptable because
+> the CA is part of the same homelab and this matches the existing posture.
+
+### 4.2 Do not break step-ca (verification-first)
 
 - `services/openssh.nix` sets `TrustedUserCAKeys = c.ca.sshUserCaCert`. Leave
-  it. `unix.sshIntegration` adds an `AuthorizedKeysCommand`; it does **not**
-  touch `TrustedUserCAKeys`.
-- **Only the first `AuthorizedKeysCommand` wins.** Audit after deploy:
-  `sshd -T | grep -iE 'authorizedkeyscommand|trustedusercakeys'` on each host
-  to confirm exactly one command and the CA path intact.
+  it untouched. With `sshIntegration = false`, nothing adds a competing
+  `AuthorizedKeysCommand`.
+- Audit after deploy: `sshd -T | grep -iE 'authorizedkeyscommand|trustedusercakeys'`
+  — expect the CA path present and **no** kanidm AuthorizedKeysCommand.
 - The `ssh-cert-renewer` host-cert flow and step-ca OIDC user-cert flow are
   orthogonal to NSS/unixd — no change.
 
-### 4.2 Principal ↔ unix identity on destination servers (Phase 3)
+### 4.3 Principal ↔ unix identity on destination servers (Phase 3)
+
+For `step ssh` into augustus/cicero to land on the `rae` identity, the cert
+**principal** (the Kanidm username `rae`, stamped by the step-ca `kanidm` OIDC
+provisioner) must map to a login account on the destination:
+
+- **If the destination also enables `kanidm-client` (unix.enable)**, the `rae`
+  principal resolves via NSS to the Kanidm POSIX account directly — provided
+  `rae` is in `pam_allowed_login_groups` there too. This is the clean path:
+  add `nixos.kanidm-client` to the server hosts (augustus/cicero) in Phase 3,
+  with an appropriate `pam_allowed_login_groups` (e.g. a `unix.servers` group
+  distinct from `unix.workstations`).
+- **During migration**, the servers still have local `jacob` with
+  `openssh.authorizedPrincipals`. The step-ca cert authorizes by principal, so
+  as the cert principal moves from `jacob` to `rae` the server-side
+  authorization must move with it — either by adding `rae` to the Kanidm NSS
+  path (preferred) or, transitionally, adding `rae` to the local account's
 
 For `step ssh` into augustus/cicero to land on the `rae` identity, the cert
 **principal** (the Kanidm username `rae`, stamped by the step-ca `kanidm` OIDC
@@ -371,14 +410,15 @@ Declarative Nix (done, evaluates + ShellCheck passes):
       (augustus) for the groups + the `rae` person (gidnumber/shell). Logs in as
       `idm_admin` non-interactively via `KANIDM_PASSWORD`; ShellCheck-gated.
       Imported into the augustus host.
-- [x] `features/kanidm-client/service.nix` — `unix.enable` + `sshIntegration` +
+- [x] `features/kanidm-client/service.nix` — `unix.enable` +
+      `sshIntegration = false` (step-ca is the sole SSH path) +
       `map_group` (wheel←sysadmins, networkmanager/video←workstations) +
       `pam_allowed_login_groups` + `home_alias = "name"` (→ `/home/rae`) + local
       groups. Imported into the `nixos` host.
-- [x] Verified by eval: step-ca `TrustedUserCAKeys` and the Kanidm
-      `AuthorizedKeysCommand` **coexist** in the rendered `nixos` sshd_config
-      (one AuthorizedKeysCommand, CA path intact); `pam_kanidm` auth rule is
-      auto-wired on the `login` stack.
+- [x] Verified by eval: the rendered `nixos` sshd_config has step-ca
+      `TrustedUserCAKeys` and **no** Kanidm `AuthorizedKeysCommand` (the
+      `kanidm-authorized-keys` user and `kanidm_ssh_authorizedkeys` wrapper are
+      not created); `pam_kanidm` auth rule is auto-wired on the `login` stack.
 
 Deploy + one-time operator steps (NOT yet done — require the live systems):
 
@@ -394,8 +434,8 @@ Deploy + one-time operator steps (NOT yet done — require the live systems):
 - [ ] Verify (server reachable):
       - `getent passwd rae` resolves via Kanidm (uid/gid 66001).
       - `getent group unix.workstations` lists `rae`.
-      - `sshd -T | grep -iE 'authorizedkeys|trustedusercakeys'` — one
-      AuthorizedKeysCommand (kanidm), CA path intact.
+      - `sshd -T | grep -iE 'authorizedkeys|trustedusercakeys'` — CA path
+      intact, and **no** kanidm AuthorizedKeysCommand (sshIntegration disabled).
       - `step ssh` to augustus still works (step-ca untouched).
       - GDM login **as `rae`** — test from a **second TTY / live session first**
       (PAM lockout guard). Local `jacob` login must still work as recovery.
@@ -462,17 +502,17 @@ completes, and test `rae` login from a second TTY / live session.
 
 ## 8. Risks & mitigations
 
-| Risk                                                  | Mitigation                                                                                                                                                                                          |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PAM misconfig locks out the workstation               | Rely on auto-wired `pam_kanidm` (no hand-written rules); test from 2nd TTY; keep rollback generation and local `jacob` as recovery until Phase 2. step-ca SSH remains an independent recovery path. |
-| sops age key lives in `/home/jacob`                   | §1.1/§5: migrate the age key into `/home/rae` and re-point `sops.age.keyFile` **before** removing local `jacob`; verify sops decryption post-migration.                                             |
-| Losing step-ca/ssh keys during home migration         | Copy (don't move) `~/.ssh/yk_ssh_keys`, `~/.step`, age key into `/home/rae`; verify `step ssh` + sops before deleting `/home/jacob`.                                                                |
-| Second `AuthorizedKeysCommand` clobbers step-ca audit | `sshd -T` audit gate in checklist; only `unix.sshIntegration` sets it.                                                                                                                              |
-| POSIX attrs drift (manual CLI)                        | Single idempotent oneshot; gidnumbers pinned in `service-registry.nix`.                                                                                                                             |
-| First HM/NSS resolve needs server online              | Documented; first `rae` login/HM build needs connectivity; cache covers later offline use.                                                                                                          |
-| Client/server kanidm major mismatch                   | Both reference the same `kanidmWithSecretProvisioning_1_11` constant.                                                                                                                               |
-| step-ca TLS/SSH regression                            | No step-ca files touched; explicit post-deploy verification of issuance + renewer.                                                                                                                  |
-| Server login breaks as principal moves `jacob`→`rae`  | Phase 3 moves authorization before removing local `jacob`; keep `authorizedPrincipals` transitional overlap.                                                                                        |
+| Risk                                                 | Mitigation                                                                                                                                                                                          |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PAM misconfig locks out the workstation              | Rely on auto-wired `pam_kanidm` (no hand-written rules); test from 2nd TTY; keep rollback generation and local `jacob` as recovery until Phase 2. step-ca SSH remains an independent recovery path. |
+| sops age key lives in `/home/jacob`                  | §1.1/§5: migrate the age key into `/home/rae` and re-point `sops.age.keyFile` **before** removing local `jacob`; verify sops decryption post-migration.                                             |
+| Losing step-ca/ssh keys during home migration        | Copy (don't move) `~/.ssh/yk_ssh_keys`, `~/.step`, age key into `/home/rae`; verify `step ssh` + sops before deleting `/home/jacob`.                                                                |
+| Second `AuthorizedKeysCommand` clobbers step-ca      | Not applicable — `unix.sshIntegration = false`, so Kanidm adds no AuthorizedKeysCommand. `sshd -T` audit still in checklist to confirm.                                                             |
+| POSIX attrs drift (manual CLI)                       | Single idempotent oneshot; gidnumbers pinned in `service-registry.nix`.                                                                                                                             |
+| First HM/NSS resolve needs server online             | Documented; first `rae` login/HM build needs connectivity; cache covers later offline use.                                                                                                          |
+| Client/server kanidm major mismatch                  | Both reference the same `kanidmWithSecretProvisioning_1_11` constant.                                                                                                                               |
+| step-ca TLS/SSH regression                           | No step-ca files touched; explicit post-deploy verification of issuance + renewer.                                                                                                                  |
+| Server login breaks as principal moves `jacob`→`rae` | Phase 3 moves authorization before removing local `jacob`; keep `authorizedPrincipals` transitional overlap.                                                                                        |
 
 ---
 
