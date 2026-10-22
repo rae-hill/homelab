@@ -25,6 +25,7 @@ in
       nixos.cifs
       nixos.restic
       nixos.uxplay
+      nixos.kanidm-client
 
       ./../_private/nixos/hardware.nix
       ./../_private/nixos/filesystems.nix

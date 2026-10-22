@@ -47,6 +47,37 @@ in
       inherit mkOidcEndpoint;
     };
 
+    # Kanidm POSIX (unix) identity provisioning. Kanidm uses a single
+    # `gidnumber` per account/group that doubles as the UID for persons. We
+    # allocate EXPLICIT numbers (rather than Kanidm's dynamic range) so UID/GID
+    # are stable and documented. Range chosen in the recommended 65536–524287
+    # band (leaves 1000–65535 for OS/local use). These are consumed by the
+    # augustus-side POSIX-enablement oneshot (features/kanidm-posix) and must
+    # stay consistent with any client-side `map_group` wiring.
+    unix = {
+      # POSIX login groups (gate + local-group extension targets).
+      groups = {
+        # Daily-use workstation login gate (pam_allowed_login_groups).
+        workstations = {
+          name = "unix.workstations";
+          gidnumber = 65601;
+        };
+        # Maps onto local `wheel` (sudo) on clients.
+        sysadmins = {
+          name = "unix.sysadmins";
+          gidnumber = 65602;
+        };
+      };
+      # Per-person POSIX attributes. `gidnumber` doubles as the UID.
+      persons = {
+        rae = {
+          name = "rae";
+          gidnumber = 66001;
+          shell = "/run/current-system/sw/bin/zsh";
+        };
+      };
+    };
+
     # Shared source of truth for declaratively-provisioned authoritative DNS records
     # (consumed by hosts running the technitium-provisioning feature with
     # services.technitium-server-complete.provision.ensureDnsRecords.enable = true).

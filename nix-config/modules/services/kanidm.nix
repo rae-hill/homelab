@@ -2,6 +2,7 @@
 let
   c = config.constants;
   svc = c.services.kanidm;
+  unix = c.unix;
 in
 {
   flake.modules.nixos.kanidm =
@@ -84,6 +85,13 @@ in
 
             "technitium.access" = { };
             "technitium.admins" = { };
+
+            # POSIX (unix) login groups. POSIX *enablement* (gidnumber) is set
+            # imperatively by the kanidm-posix oneshot — kanidm-provision cannot
+            # manage POSIX attributes. These entries just ensure the groups exist
+            # and carry membership.
+            "${unix.groups.workstations.name}" = { };
+            "${unix.groups.sysadmins.name}" = { };
           };
 
           persons = {
@@ -174,6 +182,10 @@ in
                 "grafana.admins"
 
                 "technitium.admins"
+
+                # POSIX (unix) login — workstation greeter + sudo via map_group.
+                "${unix.groups.workstations.name}"
+                "${unix.groups.sysadmins.name}"
               ];
             };
             "g1447dk9fp" = {
@@ -276,6 +288,7 @@ in
       services.failure-notifs.attachServices = [
         "kanidm"
         "restic-backups-kanidm"
+        "kanidm-posix-provision"
       ];
     };
 }

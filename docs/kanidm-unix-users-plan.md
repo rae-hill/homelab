@@ -347,46 +347,82 @@ the Kanidm POSIX username" recommendation — it just needs to be re-keyed to
 
 ## 6. Phased execution checklist
 
-**Phase 1 — add `rae` as a Kanidm POSIX login on `nixos` (local `jacob`
-untouched, no step-ca regression). Ship first.**
+Per the agreed split, this is a **two-phase** effort:
 
-- [ ] `service-registry.nix`: add `constants.unix` block (gidnumbers for
-      `unix.workstations`, `unix.sysadmins`, and `rae`).
-- [ ] `kanidm.nix`: add `unix.workstations` / `unix.sysadmins` groups; add
-      `rae` to both; add `kanidm-posix-provision` to
-      `failure-notifs.attachServices`.
-- [ ] New `features/kanidm-posix/service.nix` — imperative POSIX enablement
-      oneshot (augustus) for the groups and the `rae` person. Register in
-      augustus host.
-- [ ] New `features/kanidm-client/service.nix` — `unix.enable` +
-      `sshIntegration` + `map_group` + local groups.
-- [ ] `hosts/nixos.nix`: import `nixos.kanidm-client`.
-- [ ] Deploy augustus first (POSIX enablement), then `nixos`.
-- [ ] Verify: `getent passwd rae`, `sshd -T | grep -iE 'authorizedkeys|trusted'`
-      (one command, CA intact), `step ssh` to augustus still works, GDM login
-      **as `rae`** (test from a **second tty/live session** first — PAM lockout
-      guard). Local `jacob` login must still work as the recovery path.
+- **Phase 1 (this change): plumbing + a functional `rae` POSIX login**, with
+  local `jacob` left completely untouched. Goal: get everything _ready_ to
+  delete `jacob` without actually deleting it.
+- **Phase 2 (later, explicitly gated): retire `jacob`.**
 
-**Phase 2 — retire local `jacob` on `nixos`, cut over fully to `rae`.**
+A possible **Phase 3** (extend `rae` login to the servers) is noted at the end
+but is not part of this effort.
+
+### Phase 1 — IMPLEMENTED (pending deploy + manual password step)
+
+Declarative Nix (done, evaluates + ShellCheck passes):
+
+- [x] `service-registry.nix`: `constants.unix` block — gidnumbers for
+      `unix.workstations` (65601), `unix.sysadmins` (65602), and `rae` (66001),
+      plus `rae`'s login shell (`zsh`).
+- [x] `kanidm.nix`: `unix.workstations` / `unix.sysadmins` groups added to
+      `provision.groups`; `rae` added to both; `kanidm-posix-provision`
+      registered in `failure-notifs.attachServices`.
+- [x] `features/kanidm-posix/service.nix` — idempotent POSIX-enablement oneshot
+      (augustus) for the groups + the `rae` person (gidnumber/shell). Logs in as
+      `idm_admin` non-interactively via `KANIDM_PASSWORD`; ShellCheck-gated.
+      Imported into the augustus host.
+- [x] `features/kanidm-client/service.nix` — `unix.enable` + `sshIntegration` +
+      `map_group` (wheel←sysadmins, networkmanager/video←workstations) +
+      `pam_allowed_login_groups` + `home_alias = "name"` (→ `/home/rae`) + local
+      groups. Imported into the `nixos` host.
+- [x] Verified by eval: step-ca `TrustedUserCAKeys` and the Kanidm
+      `AuthorizedKeysCommand` **coexist** in the rendered `nixos` sshd_config
+      (one AuthorizedKeysCommand, CA path intact); `pam_kanidm` auth rule is
+      auto-wired on the `login` stack.
+
+Deploy + one-time operator steps (NOT yet done — require the live systems):
+
+- [ ] Deploy **augustus** first so `kanidm-posix-provision` POSIX-enables the
+      groups and the `rae` person.
+- [ ] **One-time manual:** set `rae`'s UNIX (sudo/login) password — this is
+      interactive and cannot be declarative:
+      `sh
+      kanidm login --name idm_admin
+      kanidm person posix set-password --name idm_admin rae`
+      Without this there is no credential for PAM/greeter login.
+- [ ] Deploy **nixos** (the workstation client).
+- [ ] Verify (server reachable):
+      - `getent passwd rae` resolves via Kanidm (uid/gid 66001).
+      - `getent group unix.workstations` lists `rae`.
+      - `sshd -T | grep -iE 'authorizedkeys|trustedusercakeys'` — one
+      AuthorizedKeysCommand (kanidm), CA path intact.
+      - `step ssh` to augustus still works (step-ca untouched).
+      - GDM login **as `rae`** — test from a **second TTY / live session first**
+      (PAM lockout guard). Local `jacob` login must still work as recovery.
+
+> At the end of Phase 1 the system is _ready_ for `jacob` removal but nothing is
+> removed. `jacob` remains the primary/recovery account until Phase 2.
+
+### Phase 2 — retire local `jacob` on `nixos` (deferred, do not start yet)
 
 - [ ] New `modules/home/rae-nixos.nix` (`flake.homeConfigurations."rae@nixos"`)
       ported from `jacob-nixos.nix`, keyed to `rae` / `/home/rae`, uid/agent
-      paths updated.
+      paths updated (uid 66001, `/run/user/66001`).
 - [ ] Migrate per-user state into `/home/rae`: sops age key, `~/.ssh/yk_ssh_keys`,
       `~/.step`. Re-point `sops.age.keyFile` in `_private/nixos/sops.nix`.
 - [ ] First `rae` HM build with the Kanidm server reachable.
-- [ ] Update `AllowUsers` in `services/openssh.nix` to include `rae`.
+- [ ] Update `AllowUsers` (currently `[ "jacob" ]` in `services/openssh.nix`,
+      overridable per-host) to include/replace with `rae`.
 - [ ] Remove `users.users.jacob` from `_private/nixos/users.nix`; drop
       `jacob@nixos` HM config. Never add `users.users.rae`.
 - [ ] Re-verify greeter login as `rae` + keyring + step-ca + sops decryption.
 
-**Phase 3 — extend `rae` to servers; retire local `jacob` there.**
+### Phase 3 — extend `rae` to servers (out of scope for now)
 
-- [ ] Add `unix.servers` group (declarative + POSIX hook) and add `rae`.
-- [ ] Enable `kanidm-client` on augustus (then cicero/praeconinus) with
+- [ ] Add a `unix.servers` group (declarative + POSIX hook) and add `rae`.
+- [ ] Import `kanidm-client` on augustus (then cicero/praeconinus) with
       `pam_allowed_login_groups = [ "unix.servers" ]`.
-- [ ] Move the SSH cert principal authorization from `jacob` to `rae`
-      (NSS-resolved `rae`, or transitional `authorizedPrincipals`).
+- [ ] Move the SSH cert principal authorization from `jacob` to `rae`.
 - [ ] Audit `sshd -T`; confirm `rae` principal resolves to the Kanidm NSS
       account; then remove local `jacob` accounts per-host.
 

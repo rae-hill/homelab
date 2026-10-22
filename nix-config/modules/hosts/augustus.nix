@@ -26,6 +26,7 @@ in
       nixos.postgres
       nixos.restic
       nixos.kanidm
+      nixos.kanidm-posix
       nixos.home-assistant
       nixos.minecraft
       nixos.podman-quadlet
