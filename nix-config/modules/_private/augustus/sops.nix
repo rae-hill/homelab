@@ -153,23 +153,12 @@
     };
   };
 
-  sops.secrets.apprise_secret_key = {
-    owner = "apprise";
-    group = "apprise";
-  };
-
-  sops.secrets.apprise_restic_backup_passphrase = {
-    owner = "restic";
-  };
-
   sops.secrets.pushover_user_key = {
-    owner = "apprise";
-    group = "apprise";
+    owner = "root";
   };
 
   sops.secrets.pushover_token = {
-    owner = "apprise";
-    group = "apprise";
+    owner = "root";
   };
 
   sops.secrets.habitsync_db_pass = {

@@ -87,9 +87,11 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  # Failure notification service
+  # Failure notification service (direct to Pushover)
   services.failure-notifs = {
     enable = true;
+    userKeyFile = config.sops.secrets.pushover_user_key.path;
+    tokenFile = config.sops.secrets.pushover_token.path;
     # Services not owned by a specific module, or shared across hosts
     attachServices = [
       "caddy"

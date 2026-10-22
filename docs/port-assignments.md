@@ -41,7 +41,6 @@ Last updated: 2026-10-13
 | 35427 | Homelab API            | TCP      | 127.0.0.1                | Node.js API server (behind Caddy)       |
 | 41872 | PostgreSQL ACME        | TCP      | 127.0.0.1                | ACME http-01 for postgres cert          |
 | 47309 | IT Tools               | TCP      | 127.0.0.1                | Developer tools (behind Caddy)          |
-| 51571 | Apprise                | TCP      | 127.0.0.1                | Notification gateway (behind Caddy)     |
 | 64073 | Kanidm ACME            | TCP      | 127.0.0.1                | ACME http-01 for kanidm cert            |
 
 ---
@@ -147,7 +146,7 @@ by Caddy.
 - **ACME challenge ports:** High ports on 127.0.0.1, used by `security.acme.certs.*.listenHTTP`
 - **Application ports:** Defined in `service-registry.nix` under `config.constants.services`
 - **Metrics ports:** Typically 9xxx range (Prometheus convention)
-- **Container internal ports:** Mapped from container port to host port (e.g. apprise 8000→51571, it-tools 8080→47309)
+- **Container internal ports:** Mapped from container port to host port (e.g. it-tools 8080→47309)
 
 ## Adding a New Port
 

@@ -30,7 +30,7 @@ Update `docs/port-assignments.md` when:
 - ACME challenge ports use `acmePort` in the same service constant block
 - Internal-only services bind to `127.0.0.1`
 - Services exposed over Tailscale are firewalled to the `tailscale0` interface
-- Container ports map internal container ports to host ports (e.g. apprise maps 8000→51571)
+- Container ports map internal container ports to host ports (e.g. it-tools maps 8080→47309)
 - Metrics ports follow the Prometheus convention (9xxx range) where possible
 
 ## Host ↔ Service Mapping

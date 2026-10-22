@@ -34,7 +34,6 @@ in
       nixos.openwebui
       nixos.planka
       nixos.it-tools
-      nixos.apprise
       nixos.habitsync
       nixos.failure-notifs
       nixos.prometheus

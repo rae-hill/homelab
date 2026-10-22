@@ -143,14 +143,6 @@ in
         hmacFileName = "hmac.secret";
       };
 
-      apprise = {
-        subdomain = "apprise";
-        domain = mkDomain "apprise";
-        url = mkUrl "apprise";
-        port = 51571;
-        stateDir = "/var/lib/apprise";
-      };
-
       habitsync = {
         subdomain = "habitsync";
         domain = mkDomain "habitsync";
