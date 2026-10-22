@@ -22,21 +22,45 @@
     hosts = {
       augustus = {
         system = "x86_64-linux";
+        tailscale = {
+          v4 = "100.95.250.77";
+          v6 = "fd7a:115c:a1e0::6301:fa4d";
+        };
       };
       cicero = {
         system = "x86_64-linux";
+        tailscale = {
+          v4 = "100.72.52.108";
+          v6 = "fd7a:115c:a1e0::2801:3495";
+        };
       };
       praeconinus = {
         system = "aarch64-linux";
+        tailscale = {
+          v4 = "100.111.235.57";
+          v6 = "fd7a:115c:a1e0::b33a:eb39";
+        };
       };
       nixos = {
         system = "x86_64-linux";
+        tailscale = {
+          v4 = "100.99.178.23";
+          v6 = "fd7a:115c:a1e0::b01:b217";
+        };
       };
       mini = {
         system = "aarch64-darwin";
+        tailscale = {
+          v4 = "100.111.29.21";
+          v6 = "fd7a:115c:a1e0::db01:1d31";
+        };
       };
       aedilis = {
         system = "x86_64-linux";
+        tailscale = {
+          v4 = "100.108.78.46";
+          v6 = "fd7a:115c:a1e0::b43a:4e2f";
+        };
       };
     };
 

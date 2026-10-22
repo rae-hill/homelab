@@ -55,6 +55,18 @@
                 reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
               }
 
+              # The scrape token is minted by augustus's technitium-metrics-token
+              # oneshot via POST /api/user/login over this same mTLS vhost (the
+              # token then authorizes the /api/dashboard/metrics/text scrape). The
+              # login path must be allowlisted or Caddy returns 404 and the token
+              # mint fails ("login request failed"), leaving the DNS scrape target
+              # DOWN. Keep the allowlist tight — only the login endpoint, not all
+              # of /api/* — since mTLS is the only gate in front of it.
+              @login path /api/user/login
+              handle @login {
+                reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
+              }
+
               handle {
                 respond 404
               }

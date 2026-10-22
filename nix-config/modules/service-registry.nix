@@ -13,6 +13,120 @@ let
   idmDomain = mkDomain "idm";
   mkOidcEndpoint =
     clientId: "https://${idmDomain}/oauth2/openid/${clientId}/.well-known/openid-configuration";
+
+  # --- Tailnet split-horizon DNS records (dnsRecords.private) -----------------
+  # Per-host Tailscale addresses. Defined locally (not via config.constants.hosts)
+  # to avoid a self-reference while config.constants is being constructed. These
+  # MUST stay in sync with constants.hosts.<name>.tailscale.
+  ts = {
+    augustus.v4 = "100.95.250.77";
+    augustus.v6 = "fd7a:115c:a1e0::6301:fa4d";
+    cicero.v4 = "100.72.52.108";
+    cicero.v6 = "fd7a:115c:a1e0::2801:3495";
+    praeconinus.v4 = "100.111.235.57";
+    praeconinus.v6 = "fd7a:115c:a1e0::b33a:eb39";
+    nixos.v4 = "100.99.178.23";
+    nixos.v6 = "fd7a:115c:a1e0::b01:b217";
+    mini.v4 = "100.111.29.21";
+    mini.v6 = "fd7a:115c:a1e0::db01:1d31";
+    aedilis.v4 = "100.108.78.46";
+    aedilis.v6 = "fd7a:115c:a1e0::b43a:4e2f";
+  };
+
+  # subdomain (under plato-splunk.media) -> host key in `ts`. Each entry becomes an
+  # apex A + AAAA record (e.g. `idm.plato-splunk.media`). Reproduces the NextDNS
+  # "rewrite" model for the exact service hostnames consumers use. No wildcards:
+  # only the apex names are queried.
+  tailnetRewrites = {
+    idm = "augustus";
+    ldap = "augustus";
+    openwebui = "augustus";
+    radius = "augustus";
+    home-assistant = "augustus";
+    dev-tools = "augustus";
+    planka = "augustus";
+    postgres-augustus = "augustus";
+    augustus = "augustus";
+    homelab-api = "augustus";
+    homelab = "augustus";
+    apprise = "augustus";
+    habitsync = "augustus";
+    prometheus = "augustus";
+    grafana = "augustus";
+    loki-push = "augustus";
+    prometheus-client = "augustus";
+
+    ca = "cicero";
+    cicero = "cicero";
+    cicero-metrics = "cicero";
+    ca-monitoring = "cicero";
+
+    nixos = "nixos";
+
+    ollama = "mini";
+    mini-caddy-metrics = "mini";
+    mini-jellyfin-metrics = "mini";
+
+    praeconinus = "praeconinus";
+
+    dns-admin = "aedilis";
+    dns-metrics = "aedilis";
+  };
+
+  # Build the apex A + AAAA records for one subdomain/host pair.
+  mkTailnetRecords =
+    subdomain: hostKey:
+    let
+      host = ts.${hostKey};
+      apex = mkDomain subdomain;
+    in
+    [
+      {
+        A.name = apex;
+        A.address = host.v4;
+      }
+      {
+        AAAA.name = apex;
+        AAAA.address = host.v6;
+      }
+    ];
+
+  tailnetRecords = lib.concatLists (lib.mapAttrsToList mkTailnetRecords tailnetRewrites);
+
+  # Non-Tailscale LAN outlier: nas is reachable on a private LAN v4 only (no tailnet
+  # address, no AAAA). Kept separate from the ts-driven generation above.
+  nasRecords = [
+    {
+      A.name = mkDomain "nas";
+      A.address = "10.76.100.190";
+    }
+  ];
+
+  # Public-facing names that must remain resolvable from this (now authoritative)
+  # internal zone. Because `plato-splunk.media` is a Primary zone here, any name NOT
+  # in the zone returns NXDOMAIN rather than falling through to public DNS — so the
+  # server's own public endpoint identities (`dns`, `aedilis`) must be present,
+  # pointing at the public OVH addresses (NOT the tailnet addresses). These are the
+  # public DoH/DoT/DoQ endpoint and the host name.
+  aedilisPublicV4 = "15.204.95.40";
+  aedilisPublicV6 = "2604:2dc0:222::64d";
+  publicEndpointRecords = lib.concatLists (
+    map
+      (subdomain: [
+        {
+          A.name = mkDomain subdomain;
+          A.address = aedilisPublicV4;
+        }
+        {
+          AAAA.name = mkDomain subdomain;
+          AAAA.address = aedilisPublicV6;
+        }
+      ])
+      [
+        "dns"
+        "aedilis"
+      ]
+  );
 in
 {
   config.constants = {
@@ -95,7 +209,12 @@ in
     #   records = [ { name; type; ttl?; <value fields> } ]; }; }
     dnsRecords = {
       public = { };
-      private = { };
+      private = {
+        "${baseDomain}" = {
+          type = "Primary";
+          records = tailnetRecords ++ nasRecords ++ publicEndpointRecords;
+        };
+      };
     };
 
     postgres = {

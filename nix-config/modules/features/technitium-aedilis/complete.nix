@@ -100,14 +100,31 @@ let
           enable = true;
           # Dedicated least-privilege API user (created manually — see runbook). The
           # token broker logs in as this user; it holds Settings:Modify + Zones:Modify
-          # only (NOT admin). aedilis is a recursive resolver so ensureDnsRecords stays
-          # off; the provisioner is used for the settings + encrypted-DNS steps.
+          # only (NOT admin). The provisioner handles the settings + encrypted-DNS
+          # steps, and now also the authoritative internal zone below.
           apiUser = "provisioner";
           apiPasswordFile = config.sops.secrets.technitium_provisioner_password.path;
           provisionDoTDoQCert = true;
           # Order the provisioner after the public DNS cert exists (needed for the
           # PKCS#12 conversion), without the generic module touching security.acme.
           certReadyUnits = [ "acme-${tech.domain}.service" ];
+
+          # Host the internal plato-splunk.media zone authoritatively on this
+          # recursive resolver. This replaces the former NextDNS "rewrites": the
+          # server (and its DoH/DoT/DoQ clients) resolve these names from the local
+          # Primary zone instead of recursing to public DNS. Critically, this is what
+          # lets Technitium's own OIDC/SSO client reach `idm.plato-splunk.media` (a
+          # tailnet-only name that would otherwise NXDOMAIN under public recursion).
+          #
+          # NOTE: a Primary zone is fully authoritative — any plato-splunk.media name
+          # NOT in constants.dnsRecords.private returns NXDOMAIN (no public
+          # fallthrough). This is intentional: we own the internal zone. The set
+          # therefore includes the public endpoint names (dns, aedilis) so the
+          # server's own public identity stays resolvable.
+          ensureDnsRecords = {
+            enable = true;
+            zones = c.dnsRecords.private;
+          };
         };
 
         caddy = {
