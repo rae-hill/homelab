@@ -381,6 +381,17 @@ let
               };
               description = "Upstream the vhost serves.";
             };
+            tracing = mkOption {
+              type = types.submodule {
+                options.enable = mkEnableOption ''
+                  emit a `tracing { span <name> }` block in the vhost (gated additionally on the
+                  host's services.tempo.enable). Only the services that explicitly added a span
+                  today (kanidm, loki-push, homelab-api, homelab-ui) set this
+                '';
+              };
+              default = { };
+              description = "Caddy tracing span for this vhost (opt-in; matches current per-service spans).";
+            };
             tls = mkOption {
               type = tlsType;
               default = { };

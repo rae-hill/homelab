@@ -22,6 +22,7 @@ in
 
       nixos.system-base
       nixos.caddy
+      nixos.homelab-service-oidc-host
       nixos.acme
       nixos.postgres
       nixos.restic

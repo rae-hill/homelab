@@ -106,7 +106,7 @@
         in
         lib.concatStrings [
           tls
-          (tracingBlock hostCfg name)
+          (lib.optionalString e.tracing.enable (tracingBlock hostCfg name))
           backend
           e.extraCaddyConfig
         ];
