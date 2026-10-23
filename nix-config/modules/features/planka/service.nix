@@ -26,37 +26,17 @@ let
   plankaStartScript = inputs.self + "/nix-config/modules/_private/augustus/planka-start.sh";
 in
 {
-  flake.modules.nixos.planka =
-    { config, lib, pkgs, ... }:
+  flake.modules.nixos.planka-service =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       caCert = config.environment.etc."ssl/certs/ca-certificates.crt".source;
     in
     {
-      services.kanidm.provision.systems.oauth2."${svc.clientId}" = {
-        originUrl = "${svc.url}/oidc-callback";
-        originLanding = "${svc.url}/";
-        displayName = "Planka";
-
-        allowInsecureClientDisablePkce = true;
-
-        basicSecretFile = config.sops.secrets.planka_client_secret.path;
-
-        scopeMaps."planka.access" = [
-          "openid"
-          "email"
-          "profile"
-        ];
-
-        claimMaps.roles = {
-          joinType = "array";
-          valuesByGroup = {
-            "planka.admins" = [ plankaAdminRole ];
-            "planka.project_owner" = [ plankaPORole ];
-            "planka.access" = [ plankaUserRole ];
-          };
-        };
-      };
-
       services.postgresql.ensureDatabases = [
         plankaDbName
       ];
@@ -142,11 +122,7 @@ in
         };
       };
 
-      services.caddy.virtualHosts."${svc.url}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString svc.port}
-        '';
-      };
+      # Caddy reverse proxy now generated from the catalog (features/planka/catalog.nix).
 
       services.restic.backups.planka = {
         user = "restic";

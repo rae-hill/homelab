@@ -4,7 +4,7 @@ let
   svc = c.services.home-assistant;
 in
 {
-  flake.modules.nixos.home-assistant =
+  flake.modules.nixos.home-assistant-service =
     {
       config,
       lib,
@@ -13,21 +13,6 @@ in
       ...
     }:
     {
-      services.kanidm.provision.systems.oauth2."${svc.clientId}" = {
-        originUrl = "${svc.url}/auth/oidc/callback";
-        originLanding = "${svc.url}/auth/oidc/welcome";
-        displayName = "Home Assistant";
-
-        basicSecretFile = config.sops.secrets.home_assistant_client_secret.path;
-
-        scopeMaps."home-assistant.access" = [
-          "openid"
-          "email"
-          "groups"
-          "profile"
-        ];
-      };
-
       sops.templates."home-assistant-secrets.yaml" = {
         owner = "hass";
         content = ''
@@ -100,11 +85,7 @@ in
         };
       };
 
-      services.caddy.virtualHosts."${svc.url}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString svc.port}
-        '';
-      };
+      # Caddy reverse proxy now generated from the catalog (features/home-assistant/catalog.nix).
 
       services.failure-notifs.attachServices = [
         "home-assistant"
