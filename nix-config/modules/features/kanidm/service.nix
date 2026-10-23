@@ -5,7 +5,7 @@ let
   unix = c.unix;
 in
 {
-  flake.modules.nixos.kanidm =
+  flake.modules.nixos.kanidm-service =
     {
       config,
       lib,
@@ -224,48 +224,15 @@ in
         };
       };
 
-      services.caddy.virtualHosts."https://${svc.domain}" = {
-        extraConfig = ''
-          tls "${directory}/fullchain.pem" "${directory}/key.pem"
-          tracing {
-            span kanidm
-          }
-          reverse_proxy ${config.services.kanidm.provision.instanceUrl} {
-            header_up HOST {host}
-            transport http {
-              tls_server_name ${svc.domain}
-            }
-          }
-        '';
-      };
-
-      services.caddy.virtualHosts."http://${svc.domain}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString svc.acmePort}
-        '';
-      };
-
-      services.caddy.virtualHosts."http://${svc.ldapDomain}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString svc.acmePort}
-        '';
-      };
+      # Caddy https vhost + the idm ACME challenge vhost + the cert are now generated from the
+      # catalog (features/kanidm/catalog.nix). The ldap route and its DNS record are REMOVED
+      # (approved: homelab is OIDC-exclusive, LDAP unused). The server's own LDAP bindaddress
+      # setting is kept for config parity, but nothing routes to it.
 
       users.groups.idm.members = [
         "caddy"
         "kanidm"
       ];
-
-      security.acme.certs."${svc.domain}" = {
-        domain = svc.domain;
-        listenHTTP = "127.0.0.1:${builtins.toString svc.acmePort}";
-        server = c.ca.acmeDirectoryHttp;
-        group = "idm";
-        reloadServices = [
-          "caddy.service"
-          "kanidm.service"
-        ];
-      };
 
       services.restic.backups.kanidm = {
         user = "restic";
