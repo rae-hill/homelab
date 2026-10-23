@@ -5,7 +5,7 @@ let
   containerName = "radiusd";
 in
 {
-  flake.modules.nixos.radius =
+  flake.modules.nixos.radius-service =
     {
       config,
       lib,
@@ -47,19 +47,10 @@ in
         ];
       };
 
-      security.acme.certs."${svc.domain}" = {
-        domain = svc.domain;
-        group = "radiusd";
-        server = c.ca.acmeDirectoryHttp;
-        listenHTTP = "127.0.0.1:${builtins.toString svc.acmePort}";
-        reloadServices = [ "podman-${containerName}.service" ];
-      };
-
-      services.caddy.virtualHosts."http://${svc.domain}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString svc.acmePort}
-        '';
-      };
+      # ACME cert + http://radius challenge vhost now generated from the catalog
+      # (features/radius/catalog.nix). The container still reads the cert dir via the
+      # `inherit (config.security.acme.certs."${svc.domain}") directory;` binding above —
+      # the generator creates the same cert name, so the directory path is unchanged.
 
       sops.templates."radius_config" = {
         owner = "radiusd";
