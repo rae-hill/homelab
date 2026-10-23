@@ -16,27 +16,14 @@ let
   containerTrustStore = "/etc/ssl/certs/truststore.p12";
 in
 {
-  flake.modules.nixos.habitsync =
-    { config, lib, pkgs, ... }:
+  flake.modules.nixos.habitsync-service =
     {
-      # Kanidm OIDC public client
-      services.kanidm.provision.systems.oauth2."${svc.clientId}" = {
-        public = true;
-
-        originUrl = [
-          "${svc.url}/auth-callback"
-          "habitsync://auth-callback"
-        ];
-        originLanding = "${svc.url}";
-        displayName = "HabitSync";
-
-        scopeMaps."habitsync.access" = [
-          "openid"
-          "profile"
-          "email"
-        ];
-      };
-
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    {
       # PostgreSQL database and user
       services.postgresql.ensureDatabases = [
         habitsyncDbName
@@ -116,12 +103,7 @@ in
         };
       };
 
-      # Caddy reverse proxy
-      services.caddy.virtualHosts."${svc.url}" = {
-        extraConfig = ''
-          reverse_proxy 127.0.0.1:${builtins.toString svc.port}
-        '';
-      };
+      # Caddy reverse proxy now generated from the catalog (features/habitsync/catalog.nix).
 
       # Restic backup
       services.restic.backups.habitsync = {
