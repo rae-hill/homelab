@@ -4,7 +4,7 @@ let
   svc = c.services.postgres;
 in
 {
-  flake.modules.nixos.postgres =
+  flake.modules.nixos.postgres-service =
     {
       config,
       lib,
@@ -249,22 +249,13 @@ in
           location = cfg.backupLocation;
         };
 
-        services.caddy.virtualHosts."http://${domain}" = lib.mkIf cfg.enable {
-          extraConfig = ''
-            reverse_proxy localhost:${builtins.toString acmePort}
-          '';
-        };
+        # Caddy http://postgres-augustus challenge vhost + the ACME cert are now generated from
+        # the catalog (features/postgres/catalog.nix). The server still reads the cert dir via the
+        # `inherit (config.security.acme.certs."${domain}") directory;` binding — the generator
+        # creates the same cert name, so the directory path is unchanged.
 
         users.groups.postgres-certs = lib.mkIf cfg.enable {
           members = [ "postgres" ];
-        };
-
-        security.acme.certs."${domain}" = lib.mkIf cfg.enable {
-          inherit domain;
-          listenHTTP = "127.0.0.1:${builtins.toString acmePort}";
-          server = c.ca.acmeDirectoryHttp;
-          group = "postgres-certs";
-          postRun = "${pkgs.systemd}/bin/systemctl start postgresql-update-certs.service";
         };
 
         services.failure-notifs.attachServices = [
