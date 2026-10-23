@@ -4,31 +4,14 @@ let
   svc = c.services.openwebui;
 in
 {
-  flake.modules.nixos.openwebui =
-    { config, lib, pkgs, ... }:
+  flake.modules.nixos.openwebui-service =
     {
-      services.kanidm.provision.systems.oauth2."${svc.clientId}" = {
-        originUrl = "${svc.url}/oauth/oidc/callback";
-        originLanding = "${svc.url}/";
-        displayName = "Open WebUI";
-
-        basicSecretFile = config.sops.secrets.openwebui_client_secret.path;
-
-        scopeMaps."openwebui.access" = [
-          "openid"
-          "email"
-          "profile"
-        ];
-
-        claimMaps.roles = {
-          joinType = "array";
-          valuesByGroup = {
-            "openwebui.admins" = [ "admin" ];
-            "openwebui.access" = [ "user" ];
-          };
-        };
-      };
-
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    {
       sops.templates."openwebui-env" = {
         owner = "openwebui";
         group = "openwebui";
@@ -69,11 +52,7 @@ in
         environmentFile = config.sops.templates."openwebui-env".path;
       };
 
-      services.caddy.virtualHosts."${svc.url}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString svc.port}
-        '';
-      };
+      # Caddy reverse proxy now generated from the catalog (features/openwebui/catalog.nix).
 
       systemd.services.open-webui.serviceConfig = {
         User = "openwebui";

@@ -7,7 +7,7 @@ let
   tempoSvc = c.services.tempo;
 in
 {
-  flake.modules.nixos.grafana =
+  flake.modules.nixos.grafana-service =
     {
       config,
       lib,
@@ -15,29 +15,6 @@ in
       ...
     }:
     {
-      # Kanidm OIDC client registration
-      services.kanidm.provision.systems.oauth2."${svc.clientId}" = {
-        originUrl = "${svc.url}/login/generic_oauth";
-        originLanding = "${svc.url}/";
-        displayName = "Grafana";
-
-        basicSecretFile = config.sops.secrets.grafana_client_secret.path;
-
-        scopeMaps."grafana.access" = [
-          "openid"
-          "email"
-          "profile"
-        ];
-
-        claimMaps.roles = {
-          joinType = "array";
-          valuesByGroup = {
-            "grafana.admins" = [ "admin" ];
-            "grafana.access" = [ "editor" ];
-          };
-        };
-      };
-
       services.grafana = {
         enable = true;
 
@@ -428,12 +405,8 @@ in
         ];
       };
 
-      # Caddy reverse proxy (OIDC handles auth)
-      services.caddy.virtualHosts."${svc.url}" = {
-        extraConfig = ''
-          reverse_proxy 127.0.0.1:${builtins.toString svc.port}
-        '';
-      };
+      # Caddy reverse proxy (OIDC handles auth) — now generated from the catalog
+      # (features/grafana/catalog.nix). Vhost removed here.
 
       services.failure-notifs.attachServices = [
         "grafana"
