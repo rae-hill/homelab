@@ -2,7 +2,7 @@
 {
   flake.modules.nixos.homelab-ui = {
     imports = with inputs.self.modules.nixos; [
-      homelab-ui-caddy
+      homelab-ui-catalog
     ];
   };
 }

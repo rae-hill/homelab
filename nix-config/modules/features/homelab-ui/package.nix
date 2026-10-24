@@ -44,8 +44,7 @@ let
         hash = "sha256-2YUmWQEC7Ooer5l+8gwXaE23P91XAckDq50UBGrJk+A=";
       };
 
-      optionalExport = name: value:
-        if value != null then "export ${name}=\"${value}\"" else "";
+      optionalExport = name: value: if value != null then "export ${name}=\"${value}\"" else "";
     in
     pkgs.stdenv.mkDerivation {
       pname = "homelab-ui";

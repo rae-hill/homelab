@@ -1,16 +1,17 @@
+# loki — runtime (services.loki) + system user + failure-notifs.
+#
+# Verbatim carry-over of the loki runtime from the old services/loki.nix. The loki runtime is
+# loopback-only plumbing behind the loki-push catalog vhost; failure-notifs is tied to the unit
+# so it stays colocated here. No behavioral change.
+#
+# See docs/service-consolidation/loki.md §2.2.
 { config, ... }:
 let
-  c = config.constants;
-  svc = c.services.loki;
+  svc = config.constants.services.loki;
 in
 {
-  flake.modules.nixos.loki =
-    {
-      config,
-      lib,
-      pkgs,
-      ...
-    }:
+  flake.modules.nixos.loki-service =
+    { lib, ... }:
     {
       services.loki = {
         enable = true;
@@ -95,24 +96,6 @@ in
       };
 
       users.groups.loki = { };
-
-      # External push ingestion endpoint (mTLS-guarded, for remote Alloy instances)
-      services.caddy.virtualHosts."${c.services.loki-push.url}" = {
-        extraConfig = ''
-          tls {
-            client_auth {
-              mode require_and_verify
-              trust_pool file {
-                pem_file ${c.ca.rootCert}
-              }
-            }
-          }
-          tracing {
-            span loki-push
-          }
-          reverse_proxy 127.0.0.1:${builtins.toString svc.port}
-        '';
-      };
 
       services.failure-notifs.attachServices = [ "loki" ];
     };
