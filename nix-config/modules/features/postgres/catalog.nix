@@ -36,7 +36,10 @@ in
         access.scope.tailnet = { };
         dns.tailnet = { };
 
-        managedBy.acme = true;
+        managedBy = {
+          acme = true;
+          dns = true;
+        };
       };
     };
 }

@@ -32,7 +32,10 @@ in
 
         # Only the acme generator acts (cert + bare challenge vhost). No caddy https vhost,
         # no oidc, no firewall (1812/1813 stay baseline).
-        managedBy.acme = true;
+        managedBy = {
+          acme = true;
+          dns = true;
+        };
       };
     };
 }

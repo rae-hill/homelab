@@ -77,11 +77,12 @@ in
           };
           # gate.none (default): renderer emits `tls <cert> <key>\nreverse_proxy 127.0.0.1:5380`.
           access.scope.tailnet = { };
-          dns = null;
+          dns.tailnet = { }; # dns-admin A/AAAA (-> aedilis tailnet addr)
           managedBy = {
             caddy = true;
             acme = true;
             firewall = true;
+            dns = true;
           };
         };
 
@@ -105,7 +106,7 @@ in
             };
           };
           access.scope.tailnet = { };
-          dns = null;
+          dns.tailnet = { }; # dns-metrics A/AAAA (-> aedilis tailnet addr)
 
           # Verbatim reproduction of technitium/caddy.nix's metrics vhost body: explicit cert +
           # mTLS client_auth + the tight path allowlist (@node /metrics, @dns metrics, @login) +
@@ -151,6 +152,7 @@ in
             caddy = true;
             acme = true;
             firewall = true;
+            dns = true;
           };
         };
       };

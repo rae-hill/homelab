@@ -29,8 +29,11 @@ in
           extraCaddyConfig = ''
             metrics
           '';
-          dns = null; # mini-caddy-metrics A/AAAA stays in tailnetRewrites until the DNS cutover
-          managedBy.caddy = true;
+          dns.tailnet = { }; # mini-caddy-metrics A/AAAA (-> mini tailnet addr), emitted on aedilis
+          managedBy = {
+            caddy = true;
+            dns = true;
+          };
         };
 
         # (2) Jellyfin metrics scrape, mTLS + rewrite.
@@ -45,8 +48,11 @@ in
           extraCaddyConfig = ''
             rewrite / /metrics
           '';
-          dns = null;
-          managedBy.caddy = true;
+          dns.tailnet = { }; # mini-jellyfin-metrics A/AAAA (-> mini tailnet addr), emitted on aedilis
+          managedBy = {
+            caddy = true;
+            dns = true;
+          };
         };
 
         # (3) Public Jellyfin, plain reverse-proxy + /metrics redirect.

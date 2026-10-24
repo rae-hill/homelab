@@ -22,6 +22,7 @@ in
         managedBy = {
           caddy = true;
           firewall = true;
+          dns = true;
         };
       };
     };

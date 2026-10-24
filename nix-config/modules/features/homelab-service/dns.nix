@@ -1,44 +1,54 @@
 # DNS record generator (nixos, aedilis only via the import matrix).
 #
-# Reads the WHOLE catalog (every host — central DNS); filters to managedBy.dns AND dns.enable.
-# NO host == filter. Groups by zone, folds each group into
-# services.technitium-server-complete.provision.ensureDnsRecords.zones, deriving A/AAAA from
-# constants.hosts.<host>.tailscale. Merges non-service static extras (nas + public endpoints,
-# host apexes) from constants.dnsExtraRecords. The record attrTag shape matches
-# technitium-provisioning/options.nix. Upsert-only semantics unchanged.
+# DNS is CENTRAL: aedilis must emit records for services on EVERY host. But catalog entries
+# (`homelab.catalog.<name>`) are contributed via per-host NixOS module imports, so aedilis's
+# `config.homelab.catalog` only contains aedilis-local entries — it cannot see augustus/cicero/
+# mini services. The caddy/acme/firewall/oidc generators are fine with that (they only act on
+# local entries), but DNS is the one GLOBAL concern.
+#
+# So the DNS fold reads a FLAKE-LEVEL aggregate, `constants.catalogDns` — a global attrset each
+# service's catalog.nix contributes to at the flake-parts level (alongside its per-host
+# `homelab.catalog.<name>` entry). `constants` is a flake-parts option merged across all modules
+# regardless of host, so this aggregate sees every service on every host. Each value is
+# `{ subdomain; zone; host; record = <attrTag: tailnet|cname|public>; }`.
+#
+# Groups by zone, derives A/AAAA from constants.hosts.<host>.tailscale, and merges the
+# non-service static extras (nas + public endpoints + host apexes) from constants.dnsExtraRecords.
+# The record attrTag shape matches technitium-provisioning/options.nix. Upsert-only semantics.
 #
 # See docs/service-consolidation/catalog-and-generators.md §3.6 and dns-records.md.
 { config, ... }@topLevel:
 let
   c = topLevel.config.constants;
-  catLib = c.catalogLib;
+  catalogDns = topLevel.config.flake.catalogDns or { };
 in
 {
   flake.modules.nixos.homelab-service-dns =
     { config, lib, ... }:
     let
       inherit (lib)
-        filterAttrs
         attrValues
         groupBy
         concatMap
         mapAttrs
         ;
 
-      wanted = attrValues (filterAttrs (_: e: e.managedBy.dns && e.dns != null) config.homelab.catalog);
+      tagOf = v: lib.head (lib.attrNames v);
+
+      wanted = attrValues catalogDns;
 
       mkRecordsFor =
         e:
         let
-          apex = catLib.fqdn e;
-          kind = catLib.tagOf e.dns;
+          apex = "${e.subdomain}.${e.zone}";
+          kind = tagOf e.record;
         in
         if kind == "cname" then
           [
             {
               CNAME = {
                 name = apex;
-                cname = e.dns.cname.target;
+                cname = e.record.cname.target;
               };
             }
           ]
@@ -47,13 +57,13 @@ in
             {
               A = {
                 name = apex;
-                address = e.dns.public.v4;
+                address = e.record.public.v4;
               };
             }
             {
               AAAA = {
                 name = apex;
-                address = e.dns.public.v6;
+                address = e.record.public.v6;
               };
             }
           ]

@@ -18,6 +18,20 @@
     description = "Named NixOS/homeManager/darwin module functions, keyed by class then aspect name";
   };
 
+  # Global, cross-host aggregate of each catalog service's DNS fact. Unlike the per-host
+  # `homelab.catalog` NixOS option (which only exists on the host that imports the service
+  # module), this is a FLAKE-LEVEL option merged across ALL modules regardless of host — so the
+  # aedilis `homelab-service-dns` generator can emit records for services running on every host.
+  # Each service's features/<svc>/catalog.nix contributes one entry at the flake-parts level,
+  # alongside its per-host `homelab.catalog.<name>` entry. Value shape:
+  #   { subdomain; zone; host; record = { tailnet = {}; } | { cname = { target; }; }
+  #                                    | { public = { v4; v6; }; }; }
+  options.flake.catalogDns = lib.mkOption {
+    type = lib.types.attrsOf lib.types.raw;
+    default = { };
+    description = "Cross-host aggregate of catalog service DNS facts, consumed by homelab-service-dns.";
+  };
+
   config.constants = {
     hosts = {
       augustus = {

@@ -115,16 +115,15 @@ let
           # Primary zone instead of recursing to public DNS. Critically, this is what
           # lets Technitium's own OIDC/SSO client reach `idm.plato-splunk.media` (a
           # tailnet-only name that would otherwise NXDOMAIN under public recursion).
-          #
           # NOTE: a Primary zone is fully authoritative — any plato-splunk.media name
-          # NOT in constants.dnsRecords.private returns NXDOMAIN (no public
-          # fallthrough). This is intentional: we own the internal zone. The set
-          # therefore includes the public endpoint names (dns, aedilis) so the
-          # server's own public identity stays resolvable.
-          ensureDnsRecords = {
-            enable = true;
-            zones = c.dnsRecords.private;
-          };
+          # NOT in the record set returns NXDOMAIN (no public fallthrough). This is
+          # intentional: we own the internal zone. The record set is now produced by the
+          # `homelab-service-dns` generator (folds catalog entries with dns != null +
+          # managedBy.dns, plus constants.dnsExtraRecords for non-service names). The
+          # public endpoint names (dns, aedilis) are in dnsExtraRecords so the server's
+          # own public identity stays resolvable.
+          ensureDnsRecords.enable = true;
+          # zones are set by the homelab-service-dns generator (NOT hand-listed here).
         };
 
         caddy = {

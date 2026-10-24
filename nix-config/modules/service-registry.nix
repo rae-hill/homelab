@@ -37,61 +37,11 @@ let
   # apex A + AAAA record (e.g. `idm.plato-splunk.media`). Reproduces the NextDNS
   # "rewrite" model for the exact service hostnames consumers use. No wildcards:
   # only the apex names are queried.
-  tailnetRewrites = {
-    idm = "augustus";
-    ldap = "augustus";
-    openwebui = "augustus";
-    radius = "augustus";
-    home-assistant = "augustus";
-    dev-tools = "augustus";
-    planka = "augustus";
-    postgres-augustus = "augustus";
-    augustus = "augustus";
-    homelab-api = "augustus";
-    homelab = "augustus";
-    apprise = "augustus";
-    habitsync = "augustus";
-    prometheus = "augustus";
-    grafana = "augustus";
-    loki-push = "augustus";
-    prometheus-client = "augustus";
-
-    ca = "cicero";
-    cicero = "cicero";
-    cicero-metrics = "cicero";
-    ca-monitoring = "cicero";
-
-    nixos = "nixos";
-
-    ollama = "mini";
-    mini-caddy-metrics = "mini";
-    mini-jellyfin-metrics = "mini";
-
-    praeconinus = "praeconinus";
-
-    dns-admin = "aedilis";
-    dns-metrics = "aedilis";
-  };
-
-  # Build the apex A + AAAA records for one subdomain/host pair.
-  mkTailnetRecords =
-    subdomain: hostKey:
-    let
-      host = ts.${hostKey};
-      apex = mkDomain subdomain;
-    in
-    [
-      {
-        A.name = apex;
-        A.address = host.v4;
-      }
-      {
-        AAAA.name = apex;
-        AAAA.address = host.v6;
-      }
-    ];
-
-  tailnetRecords = lib.concatLists (lib.mapAttrsToList mkTailnetRecords tailnetRewrites);
+  #
+  # NOTE: the former `tailnetRewrites` string map + `mkTailnetRecords`/`tailnetRecords` fold
+  # have been REPLACED by `catalogDns` (below) — the typed, catalog-shaped DNS aggregate the
+  # homelab-service-dns generator folds. The `ts` table remains (host-apex extras); service
+  # records now come from `catalogDns`.
 
   # Non-Tailscale LAN outlier: nas is reachable on a private LAN v4 only (no tailnet
   # address, no AAAA). Kept separate from the ts-driven generation above.
@@ -127,8 +77,94 @@ let
         "aedilis"
       ]
   );
+
+  # --- Non-service DNS extras (for the homelab-service-dns generator) ---------
+  # The DNS generator folds service-derived records from catalog entries; these are
+  # the records that have NO owning catalog service and must be supplied explicitly:
+  #   - host apexes (the machines themselves): augustus/cicero/nixos/praeconinus
+  #   - tailnet names with no catalog entry: ca (cicero step-ca), ollama (mini)
+  #   - the nas LAN A record (no tailnet address, no AAAA)
+  #   - the public OVH endpoint identities: dns, aedilis
+  # A/AAAA for tailnet names come from `ts` (identical to constants.hosts.<h>.tailscale).
+  # Keyed by zone, matching the generator's `extrasByZone` shape.
+  mkTailnetApex =
+    subdomain: hostKey:
+    let
+      host = ts.${hostKey};
+      apex = mkDomain subdomain;
+    in
+    [
+      {
+        A.name = apex;
+        A.address = host.v4;
+      }
+      {
+        AAAA.name = apex;
+        AAAA.address = host.v6;
+      }
+    ];
+  dnsExtraRecords = {
+    "${baseDomain}" =
+      # host apexes (self-names → own tailnet address)
+      (mkTailnetApex "augustus" "augustus")
+      ++ (mkTailnetApex "cicero" "cicero")
+      ++ (mkTailnetApex "nixos" "nixos")
+      ++ (mkTailnetApex "praeconinus" "praeconinus")
+      # tailnet names with no catalog entry
+      ++ (mkTailnetApex "ca" "cicero")
+      ++ (mkTailnetApex "ollama" "mini")
+      # nas LAN outlier (A only, no AAAA)
+      ++ nasRecords
+      # public OVH endpoint identities (dns, aedilis)
+      ++ publicEndpointRecords;
+  };
+
+  # --- flake.catalogDns: global cross-host DNS aggregate for homelab-service-dns ----------
+  # DNS is central (aedilis emits records for services on every host), but per-host
+  # `homelab.catalog` entries are only visible on the host that imports them. So the service
+  # DNS facts live here as ONE global, typed map the aedilis DNS generator folds (plus
+  # dnsExtraRecords for non-service names). This replaces the old `tailnetRewrites` string map
+  # with the catalog's attrTag record shape. Each service's features/<svc>/catalog.nix still
+  # carries its own `dns`/`managedBy.dns` as declared intent; this aggregate is what the
+  # generator actually reads (see features/homelab-service/dns.nix for why it cannot read the
+  # per-host catalogs cross-host). subdomain/host match each service's catalog entry; `ldap`
+  # and `apprise` are intentionally absent (operator-approved removals).
+  mkCatalogDns = name: subdomain: host: {
+    inherit subdomain host;
+    zone = baseDomain;
+    record.tailnet = { };
+  };
+  catalogDns = {
+    # augustus services
+    kanidm = mkCatalogDns "kanidm" "idm" "augustus";
+    openwebui = mkCatalogDns "openwebui" "openwebui" "augustus";
+    radius = mkCatalogDns "radius" "radius" "augustus";
+    home-assistant = mkCatalogDns "home-assistant" "home-assistant" "augustus";
+    it-tools = mkCatalogDns "it-tools" "dev-tools" "augustus";
+    planka = mkCatalogDns "planka" "planka" "augustus";
+    postgres = mkCatalogDns "postgres" "postgres-augustus" "augustus";
+    homelab-api = mkCatalogDns "homelab-api" "homelab-api" "augustus";
+    homelab-ui = mkCatalogDns "homelab-ui" "homelab" "augustus";
+    habitsync = mkCatalogDns "habitsync" "habitsync" "augustus";
+    prometheus = mkCatalogDns "prometheus" "prometheus" "augustus";
+    prometheus-client = mkCatalogDns "prometheus-client" "prometheus-client" "augustus";
+    grafana = mkCatalogDns "grafana" "grafana" "augustus";
+    loki-push = mkCatalogDns "loki-push" "loki-push" "augustus";
+    # cicero services
+    cicero-metrics = mkCatalogDns "cicero-metrics" "cicero-metrics" "cicero";
+    ca-monitoring = mkCatalogDns "ca-monitoring" "ca-monitoring" "cicero";
+    # mini services
+    mini-caddy-metrics = mkCatalogDns "mini-caddy-metrics" "mini-caddy-metrics" "mini";
+    mini-jellyfin-metrics = mkCatalogDns "mini-jellyfin-metrics" "mini-jellyfin-metrics" "mini";
+    # aedilis services
+    dns-admin = mkCatalogDns "dns-admin" "dns-admin" "aedilis";
+    dns-metrics = mkCatalogDns "dns-metrics" "dns-metrics" "aedilis";
+  };
 in
 {
+  # Global cross-host DNS aggregate (see homelab-service-dns generator).
+  config.flake.catalogDns = catalogDns;
+
   config.constants = {
     inherit baseDomain;
 
@@ -192,30 +228,10 @@ in
       };
     };
 
-    # Shared source of truth for declaratively-provisioned authoritative DNS records
-    # (consumed by hosts running the technitium-provisioning feature with
-    # services.technitium-server-complete.provision.ensureDnsRecords.enable = true).
-    #
-    #   dnsRecords.public  — records for PUBLIC authoritative servers (public IPs).
-    #   dnsRecords.private — records for PRIVATE (Tailscale) authoritative servers.
-    #                        These point at tailnet 100.x / ULA addresses and are
-    #                        NEVER published to Route53 — they only ever live here and
-    #                        are served by tailnet-only hosts.
-    #
-    # Each host references the slice it serves, e.g.:
-    #   provision.ensureDnsRecords.zones = config.constants.dnsRecords.private;
-    # The attrset shape matches services.technitium-server-complete.provision
-    #   .ensureDnsRecords.zones: { "<zone>" = { type?; useSoaSerialDateScheme?;
-    #   records = [ { name; type; ttl?; <value fields> } ]; }; }
-    dnsRecords = {
-      public = { };
-      private = {
-        "${baseDomain}" = {
-          type = "Primary";
-          records = tailnetRecords ++ nasRecords ++ publicEndpointRecords;
-        };
-      };
-    };
+    # Non-service DNS records merged into the generated zone by homelab-service-dns.
+    # (The former hand-maintained `dnsRecords.private` zone has been replaced by the
+    # homelab-service-dns generator folding `flake.catalogDns` + these extras.)
+    inherit dnsExtraRecords;
 
     postgres = {
       domain = mkDomain "postgres-augustus";

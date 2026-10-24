@@ -39,6 +39,7 @@ in
           caddy = true;
           oidc = true;
           firewall = true;
+          dns = true;
         };
       };
     };

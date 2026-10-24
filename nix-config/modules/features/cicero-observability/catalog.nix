@@ -50,11 +50,12 @@ in
           };
 
           access.scope.tailnet = { };
-          dns = null; # cicero-metrics A/AAAA stays in tailnetRewrites until the DNS cutover
+          dns.tailnet = { }; # cicero-metrics A/AAAA (-> cicero tailnet addr)
           managedBy = {
             caddy = true;
             acme = true;
             firewall = true;
+            dns = true;
           };
         };
 
@@ -75,10 +76,11 @@ in
           };
 
           access.scope.tailnet = { };
-          dns = null; # ca-monitoring A/AAAA stays in tailnetRewrites until the DNS cutover
+          dns.tailnet = { }; # ca-monitoring A/AAAA (-> cicero tailnet addr)
           managedBy = {
             caddy = true;
             firewall = true;
+            dns = true;
           };
         };
       };

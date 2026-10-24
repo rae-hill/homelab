@@ -58,6 +58,7 @@ in
           caddy = true;
           acme = true;
           firewall = true;
+          dns = true;
         };
       };
     };
