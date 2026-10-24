@@ -246,18 +246,47 @@ let
         mtls = mkOption {
           description = "`tls … { client_auth require_and_verify; trust_pool … }`.";
           type = types.submodule {
-            options.trustPoolFile = mkOption {
-              type = types.path;
-              description = "PEM trust pool for client_auth.";
+            options = {
+              trustPoolFile = mkOption {
+                type = types.path;
+                description = "PEM trust pool for client_auth.";
+              };
+              serverCert = mkOption {
+                type = types.enum [
+                  "managed"
+                  "ownCert"
+                ];
+                default = "managed";
+                description = ''
+                  Which server cert the mTLS vhost presents:
+                    "managed" -> Caddy-managed/on-demand cert; emit the cert-less
+                                 `tls { client_auth … }` form (loki, prometheus, cicero). This
+                                 is INDEPENDENT of tls.cert — an entry may own an ACME cert for
+                                 a different purpose (e.g. a client cert consumed outbound) while
+                                 its mTLS vhost uses a Caddy-managed server cert.
+                    "ownCert" -> name the entry's own ACME cert (tls.cert.own) as the server
+                                 cert: `tls <fullchain> <key> { client_auth … }`.
+                '';
+              };
             };
           };
         };
         mtlsAllowlist = mkOption {
           description = "mTLS plus a path allowlist supplied via extraCaddyConfig (backend suppressed).";
           type = types.submodule {
-            options.trustPoolFile = mkOption {
-              type = types.path;
-              description = "PEM trust pool for client_auth.";
+            options = {
+              trustPoolFile = mkOption {
+                type = types.path;
+                description = "PEM trust pool for client_auth.";
+              };
+              serverCert = mkOption {
+                type = types.enum [
+                  "managed"
+                  "ownCert"
+                ];
+                default = "managed";
+                description = "Server cert for the mTLS vhost: managed (cert-less) or ownCert (names tls.cert.own).";
+              };
             };
           };
         };

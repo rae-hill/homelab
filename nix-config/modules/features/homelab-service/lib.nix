@@ -102,12 +102,18 @@
         let
           gateTag = tagOf e.tls.gate;
           isMtls = gateTag == "mtls" || gateTag == "mtlsAllowlist";
+          gatePayload = payloadOf e.tls.gate;
+          # The mTLS vhost names the entry's own cert ONLY when serverCert == "ownCert".
+          # Otherwise (the default "managed") the server cert is Caddy-managed and the vhost
+          # emits the cert-less `tls { client_auth … }` form — even if the entry owns an ACME
+          # cert for a different purpose (e.g. a client cert consumed outbound, cicero).
+          mtlsNamesCert = isMtls && gatePayload.serverCert == "ownCert" && certDir != null;
           tls =
             if isMtls then
               mtlsTlsLine {
-                certPem = if certDir != null then "${certDir}/fullchain.pem" else null;
-                certKey = if certDir != null then "${certDir}/key.pem" else null;
-                trustPool = (payloadOf e.tls.gate).trustPoolFile;
+                certPem = if mtlsNamesCert then "${certDir}/fullchain.pem" else null;
+                certKey = if mtlsNamesCert then "${certDir}/key.pem" else null;
+                trustPool = gatePayload.trustPoolFile;
               }
             else if certDir != null then
               plainTlsLine {

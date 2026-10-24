@@ -19,6 +19,7 @@ in
 
       nixos.system-base
       nixos.step-ca
+      nixos.homelab-service-apphost
       nixos.cicero-observability
 
       ./../_private/cicero/hardware.nix
