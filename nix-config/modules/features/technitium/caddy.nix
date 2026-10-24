@@ -20,58 +20,10 @@
           useInternalCA = true;
         };
 
-        # Admin UI (Tailscale-only via firewall, OIDC-gated by Technitium). No mTLS —
-        # Tailscale + OIDC already gate access. Caddy terminates TLS with the step-ca
-        # cert and reverse-proxies to the loopback web console.
-        services.caddy.virtualHosts."https://${cfg.caddy.adminDomain}:${toString cfg.caddy.adminPort}" = {
-          extraConfig = ''
-            tls ${cfg.caddy.adminCertPemFile} ${cfg.caddy.adminCertKeyFile}
-            reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
-          '';
-        };
-
-        # Metrics endpoint (Tailscale-only, mTLS). Prometheus has no OIDC, so client
-        # certs gate it. Serves node_exporter at /metrics and Technitium DNS metrics
-        # at /api/dashboard/metrics/text; everything else is denied.
-        services.caddy.virtualHosts."https://${cfg.caddy.metricsDomain}:${toString cfg.caddy.metricsPort}" =
-          {
-            extraConfig = ''
-              tls ${cfg.caddy.metricsCertPemFile} ${cfg.caddy.metricsCertKeyFile} {
-                client_auth {
-                  mode require_and_verify
-                  trust_pool file {
-                    pem_file ${cfg.caddy.metricsMtlsTrustPoolFile}
-                  }
-                }
-              }
-
-              @node path /metrics
-              handle @node {
-                reverse_proxy 127.0.0.1:${toString cfg.caddy.nodeExporterPort}
-              }
-
-              @dns path /api/dashboard/metrics/text
-              handle @dns {
-                reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
-              }
-
-              # The scrape token is minted by augustus's technitium-metrics-token
-              # oneshot via POST /api/user/login over this same mTLS vhost (the
-              # token then authorizes the /api/dashboard/metrics/text scrape). The
-              # login path must be allowlisted or Caddy returns 404 and the token
-              # mint fails ("login request failed"), leaving the DNS scrape target
-              # DOWN. Keep the allowlist tight — only the login endpoint, not all
-              # of /api/* — since mTLS is the only gate in front of it.
-              @login path /api/user/login
-              handle @login {
-                reverse_proxy 127.0.0.1:${toString cfg.webHttpPort}
-              }
-
-              handle {
-                respond 404
-              }
-            '';
-          };
+        # The admin UI + mTLS metrics HTTPS vhost BODIES now come from the service catalog
+        # (features/technitium-aedilis/catalog.nix, rendered by the caddy generator). This
+        # generic module keeps only the host-level Caddy settings + the cert-group->caddy
+        # membership below.
 
         # Caddy needs read access to the admin + metrics ACME certs (owned by the
         # dedicated cert group) — NOT the service group or any secrets.

@@ -161,6 +161,7 @@ in
       inputs.self.modules.nixos.technitium
       inputs.self.modules.nixos.technitium-provisioning
       inputs.self.modules.nixos.technitium-aedilis-acme
+      inputs.self.modules.nixos.technitium-aedilis-catalog
       inputs.self.modules.nixos.technitium-aedilis-observability
       aedilisConfig
     ];

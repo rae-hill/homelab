@@ -18,6 +18,7 @@ in
       inputs.sops-nix.nixosModules.sops
 
       nixos.system-base
+      nixos.homelab-service-dns-host
       nixos.technitium-aedilis
 
       ./../_private/aedilis/hardware.nix
