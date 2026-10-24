@@ -14,6 +14,8 @@ in
       darwin.darwin-base
       darwin.nixvim-complete
       darwin.homebrew
+      darwin.homelab-service-apphost
+      darwin.mini-jellyfin
 
       ./../_private/mini/sops.nix
       ./../_private/mini/programs.nix

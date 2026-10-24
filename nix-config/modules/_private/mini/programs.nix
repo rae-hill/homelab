@@ -5,9 +5,6 @@
   pkgs,
   ...
 }:
-let
-  rootCert = ../../../../certs/alford-root.crt;
-in
 {
   programs.zsh = {
     enable = true;
@@ -19,64 +16,9 @@ in
     pkgs.step-cli
   ];
 
-  environment.etc."caddy_nix/Caddyfile".text = ''
-    {
-      email web@jacob-alford.dev
-      acme_ca https://ca.plato-splunk.media/acme/http/directory
-      acme_ca_root /etc/step/certs/root_ca.crt
-
-      storage file_system /etc/caddy
-      
-      admin off
-      metrics
-      debug
-    }
-
-    https://mini-caddy-metrics.plato-splunk.media {
-      tls {
-        client_auth {
-          mode require_and_verify
-          trust_pool file {
-            pem_file ${rootCert}
-          }
-        }
-      }
-
-      metrics
-    }
-
-    https://mini-jellyfin-metrics.plato-splunk.media {
-      tls {
-        client_auth {
-          mode require_and_verify
-          trust_pool file {
-            pem_file ${rootCert}
-          }
-        }
-      }
-      
-      rewrite / /metrics
-      reverse_proxy 127.0.0.1:8096
-    }
-
-    https://jellyfin.plato-splunk.media {
-      handle_path /metrics {
-        redir https://mini-jellyfin-metrics.plato-splunk.media
-      }
-
-      reverse_proxy localhost:8096
-    }
-  '';
-
-  launchd.daemons.caddy = {
-    command = "${pkgs.caddy}/bin/caddy run --config /etc/caddy_nix/Caddyfile --adapter caddyfile";
-    serviceConfig = {
-      KeepAlive = true;
-      RunAtLoad = true;
-      StandardOutPath = "/etc/caddy/logs/caddy.info.log";
-      StandardErrorPath = "/etc/caddy/logs/caddy.err.log";
-    };
-  };
+  # The Caddyfile global block + launchd daemon + the Jellyfin/metrics site blocks now live in
+  # features/mini-jellyfin/ (catalog entries rendered by the darwin caddy generator). mini imports
+  # darwin.homelab-service-apphost + darwin.mini-jellyfin from hosts/mini.nix.
 
   system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
 
