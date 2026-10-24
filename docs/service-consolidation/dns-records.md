@@ -6,7 +6,7 @@ Status: **PROPOSED** · Highest-leverage migration, executed **LAST** · Index:
 
 This plan replaces the hand-maintained `tailnetRewrites` map + `ts` IP table in
 `nix-config/modules/service-registry.nix` with the `homelab-service-dns` generator (defined in
-[catalog-and-generators.md](./catalog-and-generators.md) §3.6), which folds `dns.enable` catalog
+[catalog-and-generators.md](./catalog-and-generators.md) §3.6), which folds non-null `dns` catalog
 entries into `services.technitium-server-complete.provision.ensureDnsRecords.zones` on aedilis.
 
 This is the **riskiest** migration in the consolidation: a Primary zone is fully authoritative, so any
@@ -135,10 +135,10 @@ They point at the **public** OVH addresses, **not** the tailnet addresses.
 Each current name falls into exactly one of four buckets. This drives **how** the generator produces
 it (service-derived) vs. **whether** it must be retained as an explicit non-service extra.
 
-### 2.1 Service-derived — generated from a catalog entry (`dns.enable` + `host`)
+### 2.1 Service-derived — generated from a catalog entry (`dns.tailnet` + `host`)
 
 These correspond to a real catalog service. Each is emitted by the DNS generator from that service's
-`dns.enable = true` + `dns.kind = "tailnet"` + `host`, with A/AAAA from
+`dns.tailnet = { }` + `host`, with A/AAAA from
 `constants.hosts.<host>.tailscale`. The subdomain is the service's `subdomain` field.
 
 | current subdomain       | → host     | owning catalog service / plan                              |
@@ -270,9 +270,9 @@ explicit non-service extras merged in.
 ### 3.1 Service-derived records (the fold)
 
 `homelab-service-dns` (aedilis only; folds the **whole** catalog regardless of each service's host)
-emits, for every entry with `managedBy.dns && dns.enable`:
+emits, for every entry with `managedBy.dns && dns != null`:
 
-- `dns.kind == "tailnet"` → `{ A = { name = <fqdn>; address = hosts.<host>.tailscale.v4; }; }` +
+- `dns.tailnet` → `{ A = { name = <fqdn>; address = hosts.<host>.tailscale.v4; }; }` +
   the matching `AAAA` from `.v6`.
 - grouped by `zone` (default `plato-splunk.media`), one Primary zone per group.
 
@@ -425,7 +425,7 @@ service already declares its catalog entry and **all** other generators (caddy /
 oidc) have passed their own parity gates. Only then touch DNS.
 
 - [ ] **Precondition:** confirm every §2.1 service and every §2.4 metrics name has a catalog entry
-      with `subdomain`, `host`, `dns.enable = true`, `dns.kind = "tailnet"`. Cross-check the §1.2
+      with `subdomain`, `host`, `dns.tailnet = { }`. Cross-check the §1.2
       table — all 28 rewrite names (minus host apexes, minus the removed `apprise` **and `ldap`**)
       must be covered by a service or a feature-contributed `dns`-only entry (`loki-push`,
       `prometheus-client`, `cicero-metrics`, `ca-monitoring`, `mini-*-metrics`). **`ldap` is NOT

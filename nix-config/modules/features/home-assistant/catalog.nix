@@ -10,19 +10,14 @@ in
       homelab.catalog.home-assistant = {
         subdomain = svc.subdomain;
         host = "augustus";
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port; # 8123
-        };
-        tls.ca = null;
-        access.scope = "tailnet";
-        dns.enable = true;
+        backend.reverseProxy.port = svc.port; # 8123
+        tls.cert.shared = { };
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         oidc = {
-          enable = true;
           clientId = svc.clientId; # "home-assistant"
-          public = false;
-          secretRef = "home_assistant_client_secret";
+          client.basic.secretRef = "home_assistant_client_secret";
           callbackPath = "/auth/oidc/callback";
           landingPath = "/auth/oidc/welcome"; # NOT "/" — role mapping is app-side (no claimMaps)
           displayName = "Home Assistant";

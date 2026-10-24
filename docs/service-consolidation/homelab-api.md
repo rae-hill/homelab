@@ -366,21 +366,18 @@ in
         zone = "plato-splunk.media";         # default baseDomain; stated for clarity
         host = "augustus";                   # the FULL deployment runs on augustus
 
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port;                   # 35427 (renderer hardcodes 127.0.0.1 upstream)
-        };
+        backend.reverseProxy.port = svc.port;   # 35427 (renderer hardcodes 127.0.0.1 upstream)
 
         # Shares Caddy's managed cert (no manual ACME cert, no challenge vhost).
         tls = {
-          ca = null;
+          cert.shared = { };
           insecureHttp = true;               # ALSO emit http://homelab-api.plato-splunk.media (§2.1)
-          # gate defaults to "none"; app-handled OIDC is documentation-only (no Caddy auth).
+          # gate defaults to tls.gate.none; app-handled OIDC is documentation-only (no Caddy auth).
         };
 
-        access.scope = "tailnet";            # reachable over tailscale0; 443/80 are baseline openings
+        access.scope.tailnet = { };          # reachable over tailscale0; 443/80 are baseline openings
 
-        dns.enable = true;                   # emit homelab-api A/AAAA on aedilis (reproduces tailnetRewrites)
+        dns.tailnet = { };                   # emit homelab-api A/AAAA on aedilis (reproduces tailnetRewrites)
 
         # OIDC slice defined in oidc.nix (merged into this same entry); see §3.2.
       };
@@ -406,9 +403,8 @@ in
     { ... }:
     {
       homelab.catalog.homelab-api.oidc = {
-        enable = true;
         clientId = svc.clientId;             # "homelab" (NOT the entry name "homelab-api")
-        public = true;                       # PKCE, no basicSecretFile
+        client.public = { };                 # PKCE, no basicSecretFile
         displayName = "Homelab";
 
         # Callbacks/landing hang off the FRONTEND origin, not the API url -> override base.
@@ -634,8 +630,8 @@ nix eval '.#nixosConfigurations.augustus.config.networking.firewall.allowedTCPPo
 ### 5.5 DNS parity (deferred to the dns-records migration)
 
 The `homelab-api` **and** `homelab` A/AAAA records (both → augustus) stay produced by
-`tailnetRewrites` until [./dns-records.md](./dns-records.md) switches on the DNS generator. `dns.enable
-= true` here declares intent; verify at cutover:
+`tailnetRewrites` until [./dns-records.md](./dns-records.md) switches on the DNS generator. `dns.tailnet
+= { }` here declares intent; verify at cutover:
 
 ```sh
 nix eval \
@@ -677,12 +673,12 @@ nixos-rebuild build --flake .#augustus       # closure builds; diff store path i
    `/tmp/api-*.before`.
 
 3. **Create `features/homelab-api/catalog.nix`** — the `homelab.catalog.homelab-api` entry from §3.1
-   (`subdomain = "homelab-api"`, `host = "augustus"`, `backend = { reverseProxy; 35427; }`,
-   `tls = { ca = null; insecureHttp = true; }`, `access.scope = "tailnet"`, `dns.enable = true`).
+   (`subdomain = "homelab-api"`, `host = "augustus"`, `backend.reverseProxy.port = 35427`,
+   `tls = { cert.shared = { }; insecureHttp = true; }`, `access.scope.tailnet = { }`, `dns.tailnet = { }`).
    Entry name MUST be `homelab-api` (tracing span). (Upstream is `127.0.0.1` via the renderer — no
    per-entry field.)
 
-4. **Create `features/homelab-api/oidc.nix`** — the `.oidc` slice from §3.2 (`public = true`,
+4. **Create `features/homelab-api/oidc.nix`** — the `.oidc` slice from §3.2 (`client.public = { }`,
    `clientId = "homelab"`, `originBase = frontendUrl`, list `callbackPath` incl. the absolute
    `localhost:4321` literal, `landingPath = ""`, both scopeMaps, the asymmetric `roles` claimMap).
 
@@ -725,8 +721,8 @@ nixos-rebuild build --flake .#augustus       # closure builds; diff store path i
       re-verified no-op for already-migrated services
 - [ ] Baseline captured: both vhosts `--raw` (Tempo OFF **and** ON), whole-vhost JSON,
       `oauth2.homelab` JSON, unit/env/firewall → `*.before`
-- [ ] `features/homelab-api/catalog.nix` — dual vhost entry (`insecureHttp = true`, `tls.ca = null`,
-      `access.scope = "tailnet"`, `dns.enable = true`, entry named `homelab-api`)
+- [ ] `features/homelab-api/catalog.nix` — dual vhost entry (`insecureHttp = true`, `tls.cert.shared = { }`,
+      `access.scope.tailnet = { }`, `dns.tailnet = { }`, entry named `homelab-api`)
 - [ ] `features/homelab-api/oidc.nix` — public client, `clientId = "homelab"`,
       `originBase = frontendUrl`, list `callbackPath` (incl. `localhost:4321` literal),
       `landingPath = ""`, both scopeMaps, asymmetric `roles` claimMap

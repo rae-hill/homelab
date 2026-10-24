@@ -10,19 +10,14 @@ in
       homelab.catalog.openwebui = {
         subdomain = svc.subdomain;
         host = "augustus";
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port; # 19553
-        };
-        tls.ca = null;
-        access.scope = "tailnet";
-        dns.enable = true;
+        backend.reverseProxy.port = svc.port; # 19553
+        tls.cert.shared = { };
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         oidc = {
-          enable = true;
           clientId = svc.clientId; # "openwebui"
-          public = false;
-          secretRef = "openwebui_client_secret";
+          client.basic.secretRef = "openwebui_client_secret";
           callbackPath = "/oauth/oidc/callback";
           landingPath = "/";
           displayName = "Open WebUI";

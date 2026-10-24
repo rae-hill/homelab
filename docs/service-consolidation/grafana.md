@@ -11,7 +11,7 @@ Module: `nix-config/modules/services/grafana.nix`
 ## 1. Current emitted output (verbatim)
 
 Grafana is an **app-gated OIDC** reverse-proxy service: Caddy does a plain `reverse_proxy` with **no
-Caddy-level auth** (`tls.gate = "oidc"`; Grafana's `auth.generic_oauth` handles the OIDC flow).
+Caddy-level auth** (`tls.gate.oidc`; Grafana's `auth.generic_oauth` handles the OIDC flow).
 Registry facts (`constants.services.grafana`): `subdomain = "grafana"`, `port = 3000`,
 `clientId = "grafana"`, so `svc.url = "https://grafana.plato-splunk.media"`.
 
@@ -21,8 +21,8 @@ Registry facts (`constants.services.grafana`): `subdomain = "grafana"`, `port = 
 reverse_proxy 127.0.0.1:3000
 ```
 
-There is **no** `security.acme.certs` entry — the vhost shares Caddy's managed cert (`tls.ca =
-null`). No mTLS, no Caddy-level auth (comment in source: "OIDC handles auth").
+There is **no** `security.acme.certs` entry — the vhost shares Caddy's managed cert
+(`tls.cert.shared`). No mTLS, no Caddy-level auth (comment in source: "OIDC handles auth").
 
 ### 1.2 Kanidm OIDC — `services.kanidm.provision.systems.oauth2."grafana"`
 
@@ -98,24 +98,20 @@ features/grafana/
 homelab.catalog.grafana = {
   subdomain = "grafana";                # -> url = https://grafana.plato-splunk.media
   host = "augustus";
-  backend = { kind = "reverseProxy"; port = 3000; };
+  backend.reverseProxy.port = 3000;
 
-  tls = {
-    ca = null;                          # shares Caddy's managed cert (no security.acme.certs)
-    gate = "oidc";                      # app-gated; NO Caddy-level auth emitted
-  };
+  tls.cert.shared = { };                # shares Caddy's managed cert (no security.acme.certs)
+  tls.gate.oidc = { };                  # app-gated; NO Caddy-level auth emitted
 
-  access.scope = "tailnet";
-  dns.enable = true;                    # emits grafana A/AAAA -> augustus tailnet IP on aedilis
+  access.scope.tailnet = { };
+  dns.tailnet = { };                    # emits grafana A/AAAA -> augustus tailnet IP on aedilis
 
   oidc = {
-    enable = true;
     clientId = "grafana";
-    public = false;                     # basic secret client
+    client.basic.secretRef = "grafana_client_secret";  # basic secret client
     callbackPath = "/login/generic_oauth";
     landingPath = "/";
     displayName = "Grafana";
-    secretRef = "grafana_client_secret";
     # --- irreducible per-service parts, carried verbatim into the generator ---
     scopeMaps."grafana.access" = [ "openid" "email" "profile" ];
     claimMaps.roles = {
@@ -170,7 +166,7 @@ registers the catalog entry, which the (host-imported) caddy / oidc / dns genera
 
 ### 3.1 Caddy vhost
 
-The caddy generator renders `backend = { kind = "reverseProxy"; port = 3000; }` with `gate = "oidc"`
+The caddy generator renders `backend.reverseProxy.port = 3000` with `tls.gate.oidc`
 into exactly:
 
 ```caddy
@@ -178,8 +174,8 @@ reverse_proxy 127.0.0.1:3000
 ```
 
 matching §1.1 byte-for-byte (grafana's source already uses `127.0.0.1`, so if the shared renderer
-standardizes on `127.0.0.1` the gate stays empty with no deviation). `gate = "oidc"` emits **no**
-Caddy-level auth. `tls.ca = null` → no `security.acme.certs` entry, identical to today.
+standardizes on `127.0.0.1` the gate stays empty with no deviation). `tls.gate.oidc` emits **no**
+Caddy-level auth. `tls.cert.shared` → no `security.acme.certs` entry, identical to today.
 
 ### 3.2 OIDC client
 
@@ -190,7 +186,7 @@ The oidc generator (augustus only) folds the catalog `oidc` block into
   ✓ (same)
 - `originLanding = "${svc.url}${landingPath}"` = `https://grafana.plato-splunk.media/` ✓
 - `displayName = "Grafana"` ✓
-- `basicSecretFile = config.sops.secrets.grafana_client_secret.path` (from `secretRef`) ✓
+- `basicSecretFile = config.sops.secrets.grafana_client_secret.path` (from `client.basic.secretRef`) ✓
 - `scopeMaps` / `claimMaps.roles` passed through **verbatim** (incl. `grafana.access → editor`) ✓
 
 Every attribute matches §1.2 exactly. The sops secret `grafana_client_secret` still lives in

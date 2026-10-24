@@ -241,13 +241,13 @@ praeconinus needs; this section shows the mapping. Whether we should actually _u
 | ------------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------- |
 | Funnel hostname, not a subdomain           | `subdomain` + `zone`                                             | `subdomain = "praeconinus"`, `zone = "neko-bicolor.ts.net"`     |
 | Non-standard listen port `:8443`           | `listenPort = 8443`                                              | drives the vhost key suffix `:8443` in the caddy generator      |
-| Funnel ingress, no firewall opening        | `access.scope = "funnel"`                                        | firewall generator opens **nothing** for funnel scope           |
-| No OIDC client                             | `oidc.enable = false` (default)                                  | augustus-only OIDC generator never sees it (praeconinus ≠ host) |
-| No DNS record                              | `dns.enable = false` (default)                                   | Funnel name resolves via Tailscale, not Technitium              |
-| Shares Caddy/Tailscale cert, no manual TLS | `tls.ca = null` (default)                                        | no `security.acme.certs` entry; no `:80` challenge vhost        |
+| Funnel ingress, no firewall opening        | `access.scope.funnel = { }`                                      | firewall generator opens **nothing** for funnel scope           |
+| No OIDC client                             | `oidc = null` (default)                                          | augustus-only OIDC generator never sees it (praeconinus ≠ host) |
+| No DNS record                              | `dns = null` (default)                                           | Funnel name resolves via Tailscale, not Technitium              |
+| Shares Caddy/Tailscale cert, no manual TLS | `tls.cert.shared = { }` (default)                                | no `security.acme.certs` entry; no `:80` challenge vhost        |
 | Bespoke base-path routing body             | `extraCaddyConfig` (the whole `map`/`redir`/`handle_path` block) | the escape hatch from parent plan §2.3                          |
 
-Per the parent plan's `accessType`, **`scope = "funnel"`** is a first-class enum value whose documented
+Per the parent plan's `accessType`, **`access.scope.funnel`** is a first-class variant whose documented
 behavior is exactly praeconinus's: "Tailscale Funnel ingress (tailscaled owns `:443`; Caddy listens on
 `:8443`; **NO** firewall opening)." So the firewall generator, filtering `host == "praeconinus"`,
 contributes **zero** ports — the host keeps its hand-listed baseline `22 / 443 / 5252` (+ the public
@@ -257,7 +257,7 @@ contributes **zero** ports — the host keeps its hand-listed baseline `22 / 443
 
 The catch: praeconinus multiplexes **two** backends (API + static UI) under **one** vhost with
 base-path routing, whereas the catalog's `backend` field models a **single** upstream. There is no
-clean `backend = reverseProxy` **or** `static` that captures "`/api/*` → proxy _and_ `/ui/*` → static
+clean `backend.reverseProxy` **or** `backend.static` that captures "`/api/*` → proxy _and_ `/ui/*` → static
 _and_ a root redirect." The honest mapping pushes the **entire** routing body through
 `extraCaddyConfig` and leaves `backend` as a near-nominal placeholder:
 
@@ -270,12 +270,12 @@ homelab.catalog.homelab-api-praeconinus = {
   listenPort = 8443;                 # Funnel target port; vhost key becomes …ts.net:8443
 
   # The backend is nominal — the real routing is two handle_path blocks below.
-  backend = { kind = "reverseProxy"; port = 35427; };
+  backend.raw = { };
 
-  tls.ca = null;                      # Caddy/Tailscale-managed cert; no security.acme.certs
-  access.scope = "funnel";            # Funnel ingress; firewall opens nothing for this entry
-  dns.enable = false;                 # Funnel name is not a Technitium record
-  oidc.enable = false;                # restricted: no OIDC client
+  tls.cert.shared = { };              # Caddy/Tailscale-managed cert; no security.acme.certs
+  access.scope.funnel = { };          # Funnel ingress; firewall opens nothing for this entry
+  dns = null;                         # Funnel name is not a Technitium record
+  oidc = null;                        # restricted: no OIDC client
 
   # The whole bespoke body, byte-for-byte, via the escape hatch:
   extraCaddyConfig = ''
@@ -302,15 +302,16 @@ homelab.catalog.homelab-api-praeconinus = {
 
 But note the **collision** with the shared vhost-body renderer. The renderer
 (`constants.catalogLib.renderVhostBody`, parent plan §3.1) always appends `backendBlock e` **before**
-`extraCaddyConfig`. For `backend.kind = "reverseProxy"` that would prepend a stray
+`extraCaddyConfig`. For a `backend.reverseProxy` variant that would prepend a stray
 `reverse_proxy localhost:35427` line **above** the `map`/`redir`/`handle_path` block — changing the
-emitted body and breaking operational equivalence. So a faithful mapping would additionally require
-**either**:
+emitted body and breaking operational equivalence. So a faithful mapping instead uses a
+**routing-owning** backend variant:
 
-- a new `backend.kind = "none"` (renderer emits no backend directive, only `extraCaddyConfig`), **or**
+- `backend.raw = { }` (renderer emits no backend directive, only `extraCaddyConfig`) — as used in the
+  entry above, **or**
 - a `renderVhostBody` branch that suppresses `backendBlock` when `extraCaddyConfig` fully owns routing.
 
-Both are schema changes introduced _solely_ to accommodate this one host. That is the crux of the
+Both are schema surfaces introduced _solely_ to accommodate this one host. That is the crux of the
 recommendation.
 
 ### 3.3 Generators praeconinus would (not) import
@@ -320,11 +321,11 @@ Per the parent plan's per-host import matrix, praeconinus imports `homelab-servi
 
 - **caddy** — would emit the `:8443` vhost from `extraCaddyConfig` (modulo the backend-block collision
   in §3.2).
-- **acme** — no-op: `tls.ca == null`, so no `security.acme.certs` and no `:80` challenge vhost.
-- **firewall** — no-op: `access.scope == "funnel"` opens nothing; baseline `22 / 443 / 5252` stays
+- **acme** — no-op: `tls.cert.shared`, so no `security.acme.certs` and no `:80` challenge vhost.
+- **firewall** — no-op: `access.scope.funnel` opens nothing; baseline `22 / 443 / 5252` stays
   hand-listed in `_private/praeconinus/security.nix`.
-- **dns / oidc** — not imported at all, so the restricted posture is structural, not just a disabled
-  flag.
+- **dns / oidc** — not imported at all, so the restricted posture is structural, not just a `null`
+  field.
 
 ---
 
@@ -367,8 +368,8 @@ praeconinus shares **none** of that shape:
    with base-path routing and a query-preserving redirect. The honest mapping shoves the **whole** body
    through `extraCaddyConfig` with a nominal `backend`, so the "typed, self-documenting entry" benefit
    evaporates — the real logic is an opaque string either way.
-3. **It would force schema changes for one host.** Faithful rendering requires a new `backend.kind =
-   "none"` (or a renderer special-case) purely to stop the shared renderer prepending a stray
+3. **It would force schema changes for one host.** Faithful rendering requires a `backend.raw = { }`
+   variant (or a renderer special-case) purely to stop the shared renderer prepending a stray
    `reverse_proxy` line (§3.2). Adding schema surface to the keystone module to accommodate exactly one
    host is a poor trade — it taxes every future reader of the schema for a single caller.
 4. **Operational equivalence is the paramount constraint, and the bespoke override already satisfies it
@@ -377,7 +378,7 @@ praeconinus shares **none** of that shape:
    versus a normal service.
 5. **The restricted posture is already expressed structurally** by praeconinus's short host module list
    (no OIDC/DNS modules imported). That is clearer, and harder to get subtly wrong, than a catalog entry
-   with four disabled flags.
+   with four null/default-off fields.
 
 **What praeconinus _should_ adopt from this work, if anything:** only the pieces that reduce real
 duplication without the single-backend mismatch — and even those are optional:
@@ -385,7 +386,7 @@ duplication without the single-backend mismatch — and even those are optional:
 - The `homelab-ui` static build is already referenced the same way here (`inputs.self.packages.
   aarch64-linux.homelab-ui`) as in the augustus UI feature; no change needed.
 - If the firewall generator lands fleet-wide, praeconinus can import `homelab-service-firewall` **only
-  if** it declares its service with `access.scope = "funnel"` so the generator contributes nothing —
+  if** it declares its service with `access.scope.funnel = { }` so the generator contributes nothing —
   but since the generator would emit **zero** ports for this host, importing it buys nothing over the
   three hand-listed baseline ports. Prefer leaving `_private/praeconinus/security.nix` as-is.
 
@@ -404,10 +405,10 @@ referencing this doc) so the next reader does not "fix" the port, and stop there
 - [ ] Add an inline comment above the `:8443` vhost explaining the Funnel `443 → 8443` mechanism
       (tailscaled owns `:443`; Caddy on `:8443`; loopback ingress; **do not** open `8443`), referencing
       this doc and parent plan §5.2 #1, so the port is not mistakenly "corrected."
-- [ ] If, contrary to this recommendation, praeconinus is later migrated: add `backend.kind = "none"`
+- [ ] If, contrary to this recommendation, praeconinus is later migrated: add `backend.raw = { }`
       (or a `renderVhostBody` suppression branch) to the keystone schema **first** (§3.2), then set the
       entry per §3.2 with the full body in `extraCaddyConfig`, import only `homelab-service-apphost`
       (no dns/oidc), and prove the §4 parity gate is an empty diff — the `:8443` port and the empty
       firewall/acme contribution are the equivalence-critical invariants.
-- [ ] Leave `_private/praeconinus/security.nix` unchanged either way: `access.scope = "funnel"` emits
+- [ ] Leave `_private/praeconinus/security.nix` unchanged either way: `access.scope.funnel` emits
       no ports, so the hand-listed baseline `22 / 443 / 5252` remains the source of truth.

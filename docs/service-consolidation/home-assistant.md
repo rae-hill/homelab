@@ -107,20 +107,16 @@ features/home-assistant/
 homelab.catalog.home-assistant = {
   subdomain = "home-assistant";          # -> https://home-assistant.plato-splunk.media
   host = "augustus";
-  backend = { kind = "reverseProxy"; port = 8123; };
+  backend.reverseProxy.port = 8123;
 
-  tls = {
-    ca = null;                           # shares Caddy's managed cert; no security.acme.certs entry
-    gate = "oidc";                       # app-gated OIDC; no Caddy-level auth — emits no extra config
-  };
+  tls.cert.shared = { };                 # shares Caddy's managed cert; no security.acme.certs entry
+  tls.gate.oidc = { };                   # app-gated OIDC; no Caddy-level auth — emits no extra config
 
-  dns.enable = true;                     # emits home-assistant A/AAAA on aedilis -> augustus tailnet IPs
+  dns.tailnet = { };                     # emits home-assistant A/AAAA on aedilis -> augustus tailnet IPs
 
   oidc = {
-    enable = true;
     clientId = "home-assistant";
-    public = false;                      # basic client -> basicSecretFile
-    secretRef = "home_assistant_client_secret";
+    client.basic.secretRef = "home_assistant_client_secret";  # basic client -> basicSecretFile
     displayName = "Home Assistant";
     callbackPath = "/auth/oidc/callback"; # originUrl     = url + /auth/oidc/callback
     landingPath = "/auth/oidc/welcome";   # originLanding = url + /auth/oidc/welcome  (NOT "/")
@@ -137,7 +133,7 @@ must support (a default of `/` would silently change `originLanding`).
 ### 2.2 Generator output
 
 **Caddy** (`homelab-service-caddy`, nixos, filtered to `host == "augustus"`) renders the vhost body
-from `backend.kind == "reverseProxy"` + `port`:
+from the `backend.reverseProxy` `port`:
 
 ```caddy
 reverse_proxy 127.0.0.1:8123
@@ -161,7 +157,7 @@ Output must equal §1.2 exactly.
 
 - **Vhost.** The catalog + Caddy generator produce the same `reverse_proxy` body to port `8123` on
   augustus, with the approved `localhost → 127.0.0.1` upstream-token substitution (§2.2) as the only
-  textual difference. No TLS gate, mTLS, or explicit cert is introduced — `tls.ca = null` keeps the
+  textual difference. No TLS gate, mTLS, or explicit cert is introduced — `tls.cert.shared` keeps the
   managed-cert behavior.
 - **OIDC client.** The OIDC generator must reproduce the **exact** `oauth2.home-assistant` attribute
   set, including:
@@ -175,7 +171,7 @@ Output must equal §1.2 exactly.
 - **HA service, sops template, failure-notifs.** Moved verbatim into `service.nix`; byte-identical,
   so the `auth_oidc` component config (discovery_url, role group maps) and the rendered
   `secrets.yaml` are unchanged.
-- **DNS.** `dns.enable = true` reproduces the existing `home-assistant → augustus` tailnet A/AAAA
+- **DNS.** `dns.tailnet = { }` reproduces the existing `home-assistant → augustus` tailnet A/AAAA
   record that `tailnetRewrites` emits today (covered end-to-end by the DNS cutover plan; parity
   verified there).
 
@@ -221,8 +217,8 @@ nix eval --raw '.#nixosConfigurations.augustus.config.sops.templates."home-assis
 ## 5. Schema-completeness note
 
 The generic catalog `oidc` schema in the parent plan (§2.1/§2.6) lists
-`enable / clientId / public / callbackPath / landingPath / displayName / secretRef / scopeMaps /
-claimMaps`. Home Assistant exercises two schema requirements:
+`clientId / client (client.basic.secretRef | client.public) / callbackPath / landingPath /
+displayName / scopeMaps / claimMaps`. Home Assistant exercises two schema requirements:
 
 - **Non-`/` `landingPath`.** The schema already includes `landingPath`, but the parent plan's
   examples all default it to `/`. **Flag for the parent plan:** confirm `landingPath` is a

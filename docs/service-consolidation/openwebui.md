@@ -12,7 +12,7 @@ Module: `nix-config/modules/services/openwebui.nix`
 ## 1. Current emitted output (verbatim)
 
 Open WebUI is an **app-gated OIDC** reverse-proxy service: Caddy does a plain `reverse_proxy` with
-**no Caddy-level auth** (`tls.gate = "oidc"` means the app handles the OIDC flow itself). Registry
+**no Caddy-level auth** (`tls.gate.oidc` means the app handles the OIDC flow itself). Registry
 facts (`constants.services.openwebui`): `subdomain = "openwebui"`, `port = 19553`,
 `clientId = "openwebui"`, so `svc.url = "https://openwebui.plato-splunk.media"`.
 
@@ -24,8 +24,8 @@ The module sets `extraConfig` to (note the source uses `localhost`, not `127.0.0
 reverse_proxy localhost:19553
 ```
 
-There is **no** `security.acme.certs` entry — the vhost shares Caddy's managed cert (`tls.ca =
-null`). No mTLS, no Caddy-level auth.
+There is **no** `security.acme.certs` entry — the vhost shares Caddy's managed cert
+(`tls.cert.shared`). No mTLS, no Caddy-level auth.
 
 ### 1.2 Kanidm OIDC — `services.kanidm.provision.systems.oauth2."openwebui"`
 
@@ -96,24 +96,20 @@ features/openwebui/
 homelab.catalog.openwebui = {
   subdomain = "openwebui";              # -> url = https://openwebui.plato-splunk.media
   host = "augustus";
-  backend = { kind = "reverseProxy"; port = 19553; };
+  backend.reverseProxy.port = 19553;
 
-  tls = {
-    ca = null;                          # shares Caddy's managed cert (no security.acme.certs)
-    gate = "oidc";                      # app-gated; NO Caddy-level auth emitted
-  };
+  tls.cert.shared = { };                # shares Caddy's managed cert (no security.acme.certs)
+  tls.gate.oidc = { };                  # app-gated; NO Caddy-level auth emitted
 
-  access.scope = "tailnet";
-  dns.enable = true;                    # emits openwebui A/AAAA -> augustus tailnet IP on aedilis
+  access.scope.tailnet = { };
+  dns.tailnet = { };                    # emits openwebui A/AAAA -> augustus tailnet IP on aedilis
 
   oidc = {
-    enable = true;
     clientId = "openwebui";
-    public = false;                     # basic secret client
+    client.basic.secretRef = "openwebui_client_secret";  # basic secret client
     callbackPath = "/oauth/oidc/callback";
     landingPath = "/";
     displayName = "Open WebUI";
-    secretRef = "openwebui_client_secret";
     # --- irreducible per-service parts, carried verbatim into the generator ---
     scopeMaps."openwebui.access" = [ "openid" "email" "profile" ];
     claimMaps.roles = {
@@ -163,15 +159,15 @@ up.
 
 ### 3.1 Caddy vhost
 
-The caddy generator renders `backend = { kind = "reverseProxy"; port = 19553; }` with `gate =
-"oidc"` into:
+The caddy generator renders `backend.reverseProxy.port = 19553` with `tls.gate.oidc` into:
 
 ```caddy
 reverse_proxy 127.0.0.1:19553
 ```
 
-`gate = "oidc"` emits **no** Caddy-level auth (app-gated), so no extra directives appear. `tls.ca =
-null` means the generator creates **no** `security.acme.certs` entry — identical to today.
+`tls.gate.oidc` emits **no** Caddy-level auth (app-gated), so no extra directives appear.
+`tls.cert.shared` means the generator creates **no** `security.acme.certs` entry — identical to
+today.
 
 > **Vhost-body note (approved deviation).** The source today emits `reverse_proxy localhost:19553`;
 > the shared renderer standardizes on **`127.0.0.1`** (operator-approved — catalog-and-generators
@@ -188,7 +184,7 @@ The oidc generator (augustus only) folds the catalog `oidc` block into
   ✓ (same)
 - `originLanding = "${svc.url}${landingPath}"` = `https://openwebui.plato-splunk.media/` ✓
 - `displayName = "Open WebUI"` ✓
-- `basicSecretFile = config.sops.secrets.openwebui_client_secret.path` (from `secretRef`) ✓
+- `basicSecretFile = config.sops.secrets.openwebui_client_secret.path` (from `client.basic.secretRef`) ✓
 - `scopeMaps` / `claimMaps.roles` passed through **verbatim** ✓
 
 Every attribute matches §1.2 exactly. The sops secret `openwebui_client_secret` still lives in

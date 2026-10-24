@@ -19,18 +19,19 @@ in
         nameValuePair
         ;
 
-      wanted = filterAttrs (_: e: e.managedBy.oidc && e.oidc.enable) config.homelab.catalog;
+      wanted = filterAttrs (_: e: e.managedBy.oidc && e.oidc != null) config.homelab.catalog;
 
       mkClient =
-        _name: e:
+        name: e:
         let
           base = catLib.url e;
           o = e.oidc;
+          clientId = if o.clientId != null then o.clientId else name;
           callbacks = lib.toList o.callbackPath; # str or list -> list
           mkOrigin = p: if lib.hasInfix "://" p then p else "${base}${p}";
           originUrls = map mkOrigin callbacks;
         in
-        nameValuePair o.clientId (
+        nameValuePair clientId (
           {
             displayName = o.displayName;
             originUrl = if builtins.length originUrls == 1 then builtins.head originUrls else originUrls;
@@ -42,10 +43,10 @@ in
             allowInsecureClientDisablePkce = true;
           }
           // (
-            if o.public then
+            if catLib.tagOf o.client == "public" then
               { public = true; }
             else
-              { basicSecretFile = config.sops.secrets.${o.secretRef}.path; }
+              { basicSecretFile = config.sops.secrets.${o.client.basic.secretRef}.path; }
           )
         );
     in

@@ -49,7 +49,7 @@ direct-challenge-firewall_ exemplar. It stacks four things no other module does 
 4. **Direct tailnet ACME challenge ports.** The admin/metrics certs are for **tailnet-only** names,
    so step-ca (on cicero) reaches their HTTP-01 challenge listeners **directly over Tailscale** on
    `22483`/`22481` — the firewall opens those two ports on `tailscale0`. This is the one real
-   `tls.challenge = { via = "direct"; iface = "tailscale0"; }` case the keystone firewall generator
+   `tls.cert.own.challenge = { via = "direct"; iface = "tailscale0"; }` case the keystone firewall generator
    (catalog-and-generators §3.5) was designed for. The public `dns` cert's challenge, by contrast,
    arrives on the **public** `:80` fronted by Caddy (`via = "caddy80"`), needing **no** challenge-port
    opening.
@@ -299,7 +299,7 @@ The **service-attributable** openings this plan owns are exactly:
 - `tailscale0.allowedTCPPorts`: **`22481`** (dns-metrics direct ACME challenge) and **`22483`**
   (dns-admin direct ACME challenge). These equal the two `acmePort` constants, hand-copied here today.
 - `tailscale0.allowedTCPPorts`: **`8443`** (admin UI vhost `listenPort`) and **`9443`** (metrics
-  vhost `listenPort`) — the two HTTPS vhost ports, both `access.scope = "tailnet"`. (These belong to
+  vhost `listenPort`) — the two HTTPS vhost ports, both `access.scope.tailnet`. (These belong to
   the companion [./technitium-caddy.md](./technitium-caddy.md) vhosts but are **firewall-generated**
   from the same catalog entries; this plan owns the firewall half for all four.)
 
@@ -397,8 +397,8 @@ entry" does **not** apply cleanly. There are two defensible shapes; the recommen
   and _consumption_ contract.** Concretely:
   - Add a `features/technitium-aedilis/catalog.nix` that contributes **three** catalog entries
     (`technitium`, `technitium-admin`, `technitium-metrics`) carrying only the **cert + challenge +
-    firewall** facts (`tls.ca`, `tls.acmePort`, `tls.email`, `tls.certGroup`, `tls.reloadServices`,
-    `tls.challenge`, `access.scope`, `listenPort`).
+    firewall** facts (`tls.cert.own.{ca,acmePort,email,certGroup,reloadServices,challenge}`,
+    `access.scope`, `listenPort`).
   - Opt those entries into `managedBy.acme = true` and `managedBy.firewall = true` **only** (NOT
     `managedBy.caddy` for the cert production — the HTTPS vhosts are the companion plan; see §2.1).
   - Delete `technitium-aedilis-acme` once the acme generator emits the identical three certs + three
@@ -464,29 +464,31 @@ in
       homelab.catalog.technitium = {
         subdomain = "dns";
         host = "aedilis";
-        # No Caddy HTTPS vhost (Technitium-native TLS). backend modeled as "none"/raw (gap E).
-        backend.kind = "raw";            # emits no vhost body; cert-only entry (see §7 gap E)
+        # No Caddy HTTPS vhost (Technitium-native TLS). backend modeled as "raw" (gap E).
+        backend.raw = { };               # emits no vhost body; cert-only entry (see §7 gap E)
         tls = {
-          ca = "letsencrypt";            # public LE directory
-          email = "rae@plato-splunk.media";  # custom LE account email (gap A)
-          acmePort = tech.acmePort;      # 22482 loopback
-          certGroup = "technitium";      # cfg.group — service reads for PKCS#12 (override default)
-          reloadServices = [             # generator prepends caddy.service? -> NO (gap B): see §3.3
-            "caddy.service"
-            "technitium-dns-server.service"
-            "technitium-provision.service"
-          ];
-          challenge = {
-            via = "caddy80";             # public :80 fronts loopback 22482; NO firewall opening
-            # The public challenge vhost needs the HTTPS-redirect handle (gap C).
-            redirectToHttps = true;      # emits the `handle { redir https://…{uri} }` block
+          cert.own = {
+            ca = "letsencrypt";          # public LE directory
+            email = "rae@plato-splunk.media";  # custom LE account email (gap A)
+            acmePort = tech.acmePort;    # 22482 loopback
+            certGroup = "technitium";    # cfg.group — service reads for PKCS#12 (override default)
+            reloadServices = [           # generator prepends caddy.service? -> NO (gap B): see §3.3
+              "caddy.service"
+              "technitium-dns-server.service"
+              "technitium-provision.service"
+            ];
+            challenge = {
+              via = "caddy80";           # public :80 fronts loopback 22482; NO firewall opening
+              # The public challenge vhost needs the HTTPS-redirect handle (gap C).
+              body.handle.redirectToHttps = true;  # emits the `handle { redir https://…{uri} }` block
+            };
           };
-          gate = "none";
+          gate.none = { };
         };
-        access.scope = "public";         # DoH/DoT/DoQ are public — but see §3.4: the firewall
+        access.scope.public = { };       # DoH/DoT/DoQ are public — but see §3.4: the firewall
                                          #   generator must NOT open 443/853 (Technitium-native,
                                          #   baseline host infra, not a vhost listenPort).
-        dns.enable = false;              # the dns/aedilis public-identity records are emitted by
+        dns = null;                      # the dns/aedilis public-identity records are emitted by
                                          #   the dns-records migration, NOT this cert entry (§3.7).
       };
 
@@ -496,21 +498,23 @@ in
         subdomain = "dns-admin";
         host = "aedilis";
         listenPort = tech.adminPort;     # 8443
-        backend = { kind = "reverseProxy"; port = tech.webHttpPort; };  # 5380 (companion vhost)
+        backend.reverseProxy.port = tech.webHttpPort;  # 5380 (companion vhost)
         tls = {
-          ca = "internal";               # step-ca
-          acmePort = tech.adminAcmePort; # 22483 loopback listener
-          certGroup = "<cfg.certGroup>"; # dedicated cert group (override — see §3.3 note)
-          reloadServices = [ ];          # generator yields exactly [ caddy.service ]
-          challenge = {
-            via = "direct";              # step-ca connects straight to 22483 over tailscale
-            iface = "tailscale0";        # -> firewall opens 22483 on tailscale0
-            body = "bare";               # bare `reverse_proxy 127.0.0.1:22483`, no handle (gap C)
+          cert.own = {
+            ca = "internal";             # step-ca
+            acmePort = tech.adminAcmePort; # 22483 loopback listener
+            certGroup = "<cfg.certGroup>"; # dedicated cert group (override — see §3.3 note)
+            reloadServices = [ ];        # generator yields exactly [ caddy.service ]
+            challenge = {
+              via = "direct";            # step-ca connects straight to 22483 over tailscale
+              iface = "tailscale0";      # -> firewall opens 22483 on tailscale0
+              body.bare = { };           # bare `reverse_proxy 127.0.0.1:22483`, no handle (gap C)
+            };
           };
-          gate = "oidc";                 # OIDC-gated by Technitium itself (not Caddy) — doc only
+          gate.oidc = { };               # OIDC-gated by Technitium itself (not Caddy) — doc only
         };
-        access.scope = "tailnet";        # opens 8443 on tailscale0
-        dns.enable = false;              # dns-records migration owns the dns-admin record (§3.7)
+        access.scope.tailnet = { };      # opens 8443 on tailscale0
+        dns = null;                      # dns-records migration owns the dns-admin record (§3.7)
         # managedBy.caddy stays OFF here — the HTTPS vhost body is the companion plan.
       };
 
@@ -519,21 +523,23 @@ in
         subdomain = "dns-metrics";
         host = "aedilis";
         listenPort = dnsMetrics.port;    # 9443
-        backend = { kind = "reverseProxy"; port = dnsMetrics.nodeExporterPort; };  # companion vhost
+        backend.reverseProxy.port = dnsMetrics.nodeExporterPort;  # companion vhost
         tls = {
-          ca = "internal";               # step-ca
-          acmePort = dnsMetrics.acmePort; # 22481 loopback listener
-          certGroup = "<cfg.certGroup>"; # dedicated cert group (Caddy + Alloy)
-          reloadServices = [ "alloy.service" ]; # generator prepends caddy.service -> [caddy, alloy]
-          challenge = {
-            via = "direct";              # step-ca connects straight to 22481 over tailscale
-            iface = "tailscale0";        # -> firewall opens 22481 on tailscale0
-            body = "bare";               # bare `reverse_proxy 127.0.0.1:22481`, no handle (gap C)
+          cert.own = {
+            ca = "internal";             # step-ca
+            acmePort = dnsMetrics.acmePort; # 22481 loopback listener
+            certGroup = "<cfg.certGroup>"; # dedicated cert group (Caddy + Alloy)
+            reloadServices = [ "alloy.service" ]; # generator prepends caddy.service -> [caddy, alloy]
+            challenge = {
+              via = "direct";            # step-ca connects straight to 22481 over tailscale
+              iface = "tailscale0";      # -> firewall opens 22481 on tailscale0
+              body.bare = { };           # bare `reverse_proxy 127.0.0.1:22481`, no handle (gap C)
+            };
           };
-          gate = "mtls+allowlist";       # companion plan's path allowlist (technitium-caddy.md)
+          gate.mtlsAllowlist.trustPoolFile = c.ca.rootCert; # companion plan's path allowlist (technitium-caddy.md)
         };
-        access.scope = "tailnet";        # opens 9443 on tailscale0
-        dns.enable = false;              # dns-records migration owns the dns-metrics record (§3.7)
+        access.scope.tailnet = { };      # opens 9443 on tailscale0
+        dns = null;                      # dns-records migration owns the dns-metrics record (§3.7)
       };
     };
 }
@@ -543,7 +549,7 @@ in
 > (`technitium`/`technitium-admin`/`technitium-metrics`). But today the public cert uses `cfg.group`
 > (`"technitium"`, which happens to match entry #1's name — but it is semantically the **service**
 > group, so set it explicitly) and the two step-ca certs use `cfg.certGroup` (the **dedicated** cert
-> group, a different name). The catalog must set `tls.certGroup` to the exact current group names — a
+> group, a different name). The catalog must set `tls.cert.own.certGroup` to the exact current group names — a
 > literal reconciliation point since `cfg.group` / `cfg.certGroup` are option values in the Technitium
 > module (resolve their concrete string values from `services.technitium-server-complete` defaults and
 > hard-code them in the catalog, OR read them via `config.services.technitium-server-complete.{group,certGroup}`
@@ -583,7 +589,7 @@ The **HTTPS** admin (`:8443`) and metrics (`:9443`) vhost **bodies** remain prod
 `technitium/caddy.nix` until the companion [./technitium-caddy.md](./technitium-caddy.md) migration
 moves them onto `managedBy.caddy`. This plan touches **only** the certs, the `http://` challenge
 vhosts, and the firewall. The `8443`/`9443` firewall openings are generated here (from the
-`access.scope = "tailnet"` + `listenPort` of entries #2/#3), while the vhost bodies stay with the
+`access.scope.tailnet` + `listenPort` of entries #2/#3), while the vhost bodies stay with the
 companion plan — both read the same three catalog entries, so there is no duplication of facts, only
 a split of which generator consumes which field (§3.5 note).
 
@@ -593,17 +599,17 @@ a split of which generator consumes which field (§3.5 note).
 
 ### 3.1 The public Let's Encrypt cert (`dns`)
 
-The acme generator (keystone §3.4) for `host == aedilis && managedBy.acme && tls.ca != null` renders,
-with `tls.ca == "letsencrypt"` selecting the LE directory:
+The acme generator (keystone §3.4) for `host == aedilis && managedBy.acme && tls.cert ? own` renders,
+with `tls.cert.own.ca == "letsencrypt"` selecting the LE directory:
 
 ```nix
 security.acme.certs."dns.plato-splunk.media" = {
   domain = "dns.plato-splunk.media";
   listenHTTP = "127.0.0.1:22482";
   server = "https://acme-v02.api.letsencrypt.org/directory";
-  group = "technitium";                                   # tls.certGroup
+  group = "technitium";                                   # tls.cert.own.certGroup
   reloadServices = [ "caddy.service" "technitium-dns-server.service" "technitium-provision.service" ];
-  email = "rae@plato-splunk.media";                       # tls.email (schema gap A)
+  email = "rae@plato-splunk.media";                       # tls.cert.own.email (schema gap A)
 };
 ```
 
@@ -613,10 +619,10 @@ generator's `certServer e` which, for `ca == "letsencrypt"`, returns exactly
 generator (both schema gaps):
 
 - **`email`** — the keystone cert generator has no `email` field; LE certs with a custom account email
-  need it. **Gap (A):** add `tls.email` (nullable; only emitted when set). See §7.
-- **`reloadServices`** — the generic generator does `[ "caddy.service" ] ++ tls.reloadServices`. But
+  need it. **Gap (A):** add `tls.cert.own.email` (nullable; only emitted when set). See §7.
+- **`reloadServices`** — the generic generator does `[ "caddy.service" ] ++ tls.cert.own.reloadServices`. But
   the public cert's exact list is `[ caddy, technitium-dns-server, technitium-provision ]`. If the
-  generator **prepends** `caddy.service`, the catalog must supply `tls.reloadServices =
+  generator **prepends** `caddy.service`, the catalog must supply `tls.cert.own.reloadServices =
   [ technitium-dns-server.service technitium-provision.service ]` (NOT including caddy). **Gap (B):**
   the kanidm plan already relies on this prepend behavior; confirm it and set the catalog's list
   **without** `caddy.service` so the merged result is exactly the current three-element list in the
@@ -646,13 +652,13 @@ security.acme.certs."dns-metrics.plato-splunk.media" = {
 **Equivalence argument.** `domain`/`listenHTTP`/`server`/`group` all map one-to-one. `dns-admin`'s
 `reloadServices` is just `[ caddy.service ]` (generator prepends caddy, catalog adds nothing).
 `dns-metrics`'s is `[ caddy.service ] ++ [ alloy.service ] = [ caddy.service alloy.service ]`, order
-preserved. No `email` (internal certs omit it; the `tls.email` field stays null for these two).
+preserved. No `email` (internal certs omit it; the `tls.cert.own.email` field stays null for these two).
 
 ### 3.3 `reloadServices` prepend + `certGroup` resolution — the reconciliation details
 
 - **Prepend order.** The keystone generator emits `reloadServices = [ "caddy.service" ] ++
-  e.tls.reloadServices` (catalog-and-generators §3.4). All three current lists have `caddy.service`
-  **first**, so the catalog must supply `tls.reloadServices` as the list **minus** the leading
+  e.tls.cert.own.reloadServices` (catalog-and-generators §3.4). All three current lists have `caddy.service`
+  **first**, so the catalog must supply `tls.cert.own.reloadServices` as the list **minus** the leading
   `caddy.service`, in the current order:
   - `dns`: `[ "technitium-dns-server.service" "technitium-provision.service" ]`
   - `dns-admin`: `[ ]`
@@ -684,12 +690,13 @@ does not yet cover (gap C):
   ```
   This is the keystone's **default** `handle /.well-known/acme-challenge/*` form (with `127.0.0.1`,
   matching the keystone default) **plus** an HTTPS-redirect `handle` block. The redirect is the
-  delta: **gap (C) redirect half** — `tls.challenge.redirectToHttps = true` makes the generator append
-  the `handle { redir https://<fqdn>{uri} }` block. Only the public `dns` challenge sets it.
+  delta: **gap (C) redirect half** — `tls.cert.own.challenge.body.handle.redirectToHttps = true` makes
+  the generator append the `handle { redir https://<fqdn>{uri} }` block. Only the public `dns`
+  challenge sets it.
 - **`dns-admin` / `dns-metrics` (`via = "direct"`):** bodies are the **bare**
   `reverse_proxy 127.0.0.1:22483` / `reverse_proxy 127.0.0.1:22481` (no `handle` wrapper, no
-  redirect). This is the same "bare body" shape kanidm needs. **Gap (C)** — `tls.challenge.body =
-  "bare"` makes the generator emit the bare `reverse_proxy 127.0.0.1:<acmePort>` form. The upstream
+  redirect). This is the same "bare body" shape kanidm needs. **Gap (C)** — `tls.cert.own.challenge.body.bare
+  = { }` makes the generator emit the bare `reverse_proxy 127.0.0.1:<acmePort>` form. The upstream
   token is `127.0.0.1` via the renderer's global standardization (§7.8 #22) — matching the source
   exactly; no per-entry host-token field is needed (kanidm's challenge body likewise becomes
   `127.0.0.1`, the one approved substitution there). See §7 gap (C).
@@ -704,12 +711,12 @@ gap-C fields set per entry, each renders byte-for-byte including trailing newlin
 The firewall generator (keystone §3.5) for `host == aedilis && managedBy.firewall` folds:
 
 - **Listen-port openings** by `access.scope`'s interface:
-  - entry #1 `technitium` (`scope = "public"`, `backend.kind = "raw"`, **no** vhost listenPort) →
+  - entry #1 `technitium` (`scope.public`, `backend.raw`, **no** vhost listenPort) →
     see the caveat below: it must contribute **nothing** (443/853 are Technitium-native baseline, not
     a vhost `listenPort`).
-  - entry #2 `technitium-admin` (`scope = "tailnet"`, `listenPort = 8443`) → `tailscale0` opens `8443`.
-  - entry #3 `technitium-metrics` (`scope = "tailnet"`, `listenPort = 9443`) → `tailscale0` opens `9443`.
-- **Direct-challenge acmePorts** (`tls.challenge.via == "direct"`), grouped by `iface`:
+  - entry #2 `technitium-admin` (`scope.tailnet`, `listenPort = 8443`) → `tailscale0` opens `8443`.
+  - entry #3 `technitium-metrics` (`scope.tailnet`, `listenPort = 9443`) → `tailscale0` opens `9443`.
+- **Direct-challenge acmePorts** (`tls.cert.own.challenge.via == "direct"`), grouped by `iface`:
   - entry #2 → `tailscale0` opens `22483`.
   - entry #3 → `tailscale0` opens `22481`.
   - entry #1 is `via = "caddy80"` → contributes **no** challenge-port opening.
@@ -717,14 +724,14 @@ The firewall generator (keystone §3.5) for `host == aedilis && managedBy.firewa
 Resulting generated `tailscale0.allowedTCPPorts` contribution: `[ 8443 9443 22481 22483 ]` — exactly
 the four service-attributable ports hand-listed today.
 
-> **Caveat on entry #1's `access.scope = "public"`.** The public `dns` cert entry has **no Caddy
-> HTTPS vhost** (`backend.kind = "raw"`) and its "public" ports (`443` DoH, `853` DoT/DoQ) are
+> **Caveat on entry #1's `access.scope.public`.** The public `dns` cert entry has **no Caddy
+> HTTPS vhost** (`backend.raw`) and its "public" ports (`443` DoH, `853` DoT/DoQ) are
 > **Technitium-native protocol listeners**, i.e. baseline host infra — **not** a catalog `listenPort`.
-> If the firewall generator naïvely opened `listenPort` for `scope = "public"` entries, it would need
+> If the firewall generator naïvely opened `listenPort` for `scope.public` entries, it would need
 > entry #1 to have **no** `listenPort` to open (or `listenPort = null`). **Gap (E):** a cert-only /
-> `backend.kind = "raw"` entry with no servable port must contribute **no** listen-port firewall
+> `backend.raw` entry with no servable port must contribute **no** listen-port firewall
 > opening (only its challenge-port opening, which here is `via = "caddy80"` → also none). The clean
-> encoding is `listenPort = null` (or `access.scope = "none"` for the firewall, while still modeling
+> encoding is `listenPort = null` (or `access.scope.none = { }` for the firewall, while still modeling
 > the cert as public) so the generator opens nothing for entry #1. **Public `80`/`443`/`853` stay
 > hand-listed baseline** in `_private/aedilis/security.nix` (§1.4). See §7 gap (E).
 
@@ -758,7 +765,7 @@ The `dns`, `dns-admin`, `dns-metrics`, and `aedilis` A/AAAA records (and the who
 `plato-splunk.media` zone) are provisioned via `services.technitium-server-complete.provision.ensureDnsRecords.zones
 = c.dnsRecords.private` in `aedilisConfig`. That is the **DNS-records migration**
 ([./dns-records.md](./dns-records.md)), not this plan — so all three catalog entries set
-`dns.enable = false` (the records come from the existing `ensureDnsRecords` wiring, and will be
+`dns = null` (the records come from the existing `ensureDnsRecords` wiring, and will be
 migrated wholesale by the DNS generator later). This plan must **not** emit any DNS record, or it
 would duplicate the authoritative zone.
 
@@ -772,24 +779,24 @@ would duplicate the authoritative zone.
 
 ## 4. Operational-equivalence summary (per surface)
 
-| Surface                                                  | Today                                                      | After (source)                                                | Equivalent?                |
-| -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- | -------------------------- |
-| `security.acme.certs."dns…"` (public LE)                 | hand-written (LE, email, group=cfg.group, 3 reloads)       | acme generator (`ca=letsencrypt`, `tls.email`, gap A/B)       | ✓ (needs gap A + B)        |
-| `security.acme.certs."dns-admin…"` (step-ca)             | hand-written (step-ca, group=cfg.certGroup, [caddy])       | acme generator (`ca=internal`, certGroup override)            | ✓ identical                |
-| `security.acme.certs."dns-metrics…"` (step-ca)           | hand-written (step-ca, group=cfg.certGroup, [caddy,alloy]) | acme generator (`ca=internal`, reloadServices=[alloy])        | ✓ identical                |
-| `http://dns…` challenge vhost (handle + redirect)        | `handle /.well-known…` + `handle { redir … }`              | acme generator, `redirectToHttps=true` (gap C)                | ✓ (needs gap C redirect)   |
-| `http://dns-admin…` challenge vhost (bare)               | `reverse_proxy 127.0.0.1:22483\n`                          | acme generator, `tls.challenge.body="bare"` (gap C)           | ✓ (needs gap C bare body)  |
-| `http://dns-metrics…` challenge vhost (bare)             | `reverse_proxy 127.0.0.1:22481\n`                          | acme generator, `tls.challenge.body="bare"` (gap C)           | ✓ (needs gap C bare body)  |
-| `services.homelab-acme.defaultCA`                        | `"internal"`                                               | unchanged (set in the catalog feature or kept in complete)    | ✓ identical                |
-| firewall `tailscale0` `22481`/`22483` (direct challenge) | hand-copied in security.nix                                | firewall generator (`via=direct;iface=tailscale0`)            | ✓ identical                |
-| firewall `tailscale0` `8443`/`9443` (vhost listen)       | hand-copied in security.nix                                | firewall generator (`scope=tailnet;listenPort`)               | ✓ identical                |
-| firewall public `80`/`443`/`853`, `22`/`53`/`5252`       | hand-listed baseline                                       | unchanged (baseline, §5.1 #7); gap E keeps entry #1 silent    | ✓ no change                |
-| cert directories + `certReadyUnits` consumers            | `config.security.acme.certs.<n>.directory`                 | same cert names → same paths/units                            | ✓ identical (gap D oracle) |
-| Technitium option module (runtime)                       | `aedilisConfig` in complete.nix                            | unchanged (only the acme import removed)                      | ✓ identical                |
-| DNS records (`dns`/`dns-admin`/`dns-metrics`/`aedilis`)  | `ensureDnsRecords.zones = c.dnsRecords.private`            | unchanged (dns-records migration owns it; `dns.enable=false`) | ✓ no change                |
+| Surface                                                  | Today                                                      | After (source)                                                   | Equivalent?                |
+| -------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------- |
+| `security.acme.certs."dns…"` (public LE)                 | hand-written (LE, email, group=cfg.group, 3 reloads)       | acme generator (`ca=letsencrypt`, `tls.cert.own.email`, gap A/B) | ✓ (needs gap A + B)        |
+| `security.acme.certs."dns-admin…"` (step-ca)             | hand-written (step-ca, group=cfg.certGroup, [caddy])       | acme generator (`ca=internal`, certGroup override)               | ✓ identical                |
+| `security.acme.certs."dns-metrics…"` (step-ca)           | hand-written (step-ca, group=cfg.certGroup, [caddy,alloy]) | acme generator (`ca=internal`, reloadServices=[alloy])           | ✓ identical                |
+| `http://dns…` challenge vhost (handle + redirect)        | `handle /.well-known…` + `handle { redir … }`              | acme generator, `body.handle.redirectToHttps=true` (gap C)       | ✓ (needs gap C redirect)   |
+| `http://dns-admin…` challenge vhost (bare)               | `reverse_proxy 127.0.0.1:22483\n`                          | acme generator, `challenge.body.bare = { }` (gap C)              | ✓ (needs gap C bare body)  |
+| `http://dns-metrics…` challenge vhost (bare)             | `reverse_proxy 127.0.0.1:22481\n`                          | acme generator, `challenge.body.bare = { }` (gap C)              | ✓ (needs gap C bare body)  |
+| `services.homelab-acme.defaultCA`                        | `"internal"`                                               | unchanged (set in the catalog feature or kept in complete)       | ✓ identical                |
+| firewall `tailscale0` `22481`/`22483` (direct challenge) | hand-copied in security.nix                                | firewall generator (`via=direct;iface=tailscale0`)               | ✓ identical                |
+| firewall `tailscale0` `8443`/`9443` (vhost listen)       | hand-copied in security.nix                                | firewall generator (`scope.tailnet;listenPort`)                  | ✓ identical                |
+| firewall public `80`/`443`/`853`, `22`/`53`/`5252`       | hand-listed baseline                                       | unchanged (baseline, §5.1 #7); gap E keeps entry #1 silent       | ✓ no change                |
+| cert directories + `certReadyUnits` consumers            | `config.security.acme.certs.<n>.directory`                 | same cert names → same paths/units                               | ✓ identical (gap D oracle) |
+| Technitium option module (runtime)                       | `aedilisConfig` in complete.nix                            | unchanged (only the acme import removed)                         | ✓ identical                |
+| DNS records (`dns`/`dns-admin`/`dns-metrics`/`aedilis`)  | `ensureDnsRecords.zones = c.dnsRecords.private`            | unchanged (dns-records migration owns it; `dns = null`)          | ✓ no change                |
 
 **Conclusion:** every realized attribute is identical before and after, **conditional on schema gaps
-(A) `tls.email`, (B) `reloadServices` prepend-caddy convention, (C) challenge redirect + verbatim-body
+(A) `tls.cert.own.email`, (B) `reloadServices` prepend-caddy convention, (C) challenge redirect + verbatim-body
 
 - upstream-host token, and (E) cert-only `raw`/no-listenPort entry**, plus the gap (D) **verification
   obligation** that cert names/directories/units stay identical. With those, the deploy is a theoretical
@@ -920,36 +927,36 @@ nixos-rebuild build --flake .#aedilis
 ## 6. Migration checklist
 
 > Depends on the catalog schema + generators ([./catalog-and-generators.md](./catalog-and-generators.md))
-> **including the schema additions this plan surfaces** (§7): gap (A) `tls.email`, gap (B) confirmed
+> **including the schema additions this plan surfaces** (§7): gap (A) `tls.cert.own.email`, gap (B) confirmed
 > `reloadServices` prepend-caddy convention, gap (C) challenge redirect + verbatim-body +
 > upstream-host token, gap (E) cert-only `raw`/no-listenPort entry. Sequence in parent plan §3 step 4
 > (cert-terminating services) / step 5 (firewall) — alongside the companion
 > [./technitium-caddy.md](./technitium-caddy.md), which must land together so the `8443`/`9443` vhost
 > bodies and their firewall openings are consistent.
 
-1. **Land schema gaps first** (§7): `tls.email`, challenge `redirectToHttps` + `tls.challenge.body =
-   "bare"` (shared with kanidm), cert-only `backend.kind = "raw"` + `listenPort = null` handling in
+1. **Land schema gaps first** (§7): `tls.cert.own.email`, challenge `body.handle.redirectToHttps` +
+   `challenge.body.bare` (shared with kanidm), cert-only `backend.raw = { }` + `listenPort = null` handling in
    the firewall generator. (Challenge upstream is the renderer's global `127.0.0.1` — no per-entry
    field.) Re-confirm the keystone "introducing the module is a no-op" gate (all `managedBy.*` false).
 2. **Capture baseline.** Run §5.1 (three certs `--json`), §5.2 (three challenge vhosts `--raw`), §5.3
    (certGroup/defaultCA), §5.4 (firewall sets), §5.5 (cert-dir consumers), §5.6 (vhost keys) →
    `/tmp/tech-*.before`.
 3. **Create `features/technitium-aedilis/catalog.nix`** with the three entries (§2.1):
-   - `technitium` (public LE): `subdomain=dns`, `tls.ca=letsencrypt`, `tls.email="rae@plato-splunk.media"`,
-     `tls.acmePort=22482`, `tls.certGroup="technitium"`,
-     `tls.reloadServices=["technitium-dns-server.service" "technitium-provision.service"]`,
-     `tls.challenge={via="caddy80"; redirectToHttps=true}`, `backend.kind="raw"`,
-     `access.scope="public"` (with `listenPort=null` so no vhost port opens), `dns.enable=false`.
-   - `technitium-admin` (step-ca): `subdomain=dns-admin`, `listenPort=8443`, `tls.ca=internal`,
-     `tls.acmePort=22483`, `tls.certGroup=<cfg.certGroup>`, `tls.reloadServices=[]`,
-     `tls.challenge={via="direct"; iface="tailscale0"; body="bare"}`,
-     `access.scope="tailnet"`, `dns.enable=false`. **`managedBy.caddy` OFF** (vhost body is companion).
-   - `technitium-metrics` (step-ca): `subdomain=dns-metrics`, `listenPort=9443`, `tls.ca=internal`,
-     `tls.acmePort=22481`, `tls.certGroup=<cfg.certGroup>`, `tls.reloadServices=["alloy.service"]`,
-     `tls.challenge={via="direct"; iface="tailscale0"; body="bare"}`,
-     `access.scope="tailnet"`, `dns.enable=false`. **`managedBy.caddy` OFF**.
+   - `technitium` (public LE): `subdomain=dns`, `tls.cert.own.ca=letsencrypt`, `tls.cert.own.email="rae@plato-splunk.media"`,
+     `tls.cert.own.acmePort=22482`, `tls.cert.own.certGroup="technitium"`,
+     `tls.cert.own.reloadServices=["technitium-dns-server.service" "technitium-provision.service"]`,
+     `tls.cert.own.challenge={via="caddy80"; body.handle.redirectToHttps=true}`, `backend.raw={ }`,
+     `access.scope.public={ }` (with `listenPort=null` so no vhost port opens), `dns=null`.
+   - `technitium-admin` (step-ca): `subdomain=dns-admin`, `listenPort=8443`, `tls.cert.own.ca=internal`,
+     `tls.cert.own.acmePort=22483`, `tls.cert.own.certGroup=<cfg.certGroup>`, `tls.cert.own.reloadServices=[]`,
+     `tls.cert.own.challenge={via="direct"; iface="tailscale0"; body.bare={ }}`,
+     `access.scope.tailnet={ }`, `dns=null`. **`managedBy.caddy` OFF** (vhost body is companion).
+   - `technitium-metrics` (step-ca): `subdomain=dns-metrics`, `listenPort=9443`, `tls.cert.own.ca=internal`,
+     `tls.cert.own.acmePort=22481`, `tls.cert.own.certGroup=<cfg.certGroup>`, `tls.cert.own.reloadServices=["alloy.service"]`,
+     `tls.cert.own.challenge={via="direct"; iface="tailscale0"; body.bare={ }}`,
+     `access.scope.tailnet={ }`, `dns=null`. **`managedBy.caddy` OFF**.
 4. **Resolve `<cfg.certGroup>`** to the concrete string (read it from the base revision, §5.3) and set
-   `tls.certGroup` for the two step-ca entries to that exact value (or read it from
+   `tls.cert.own.certGroup` for the two step-ca entries to that exact value (or read it from
    `config.services.technitium-server-complete.certGroup` to keep one source of truth).
 5. **Opt in** `managedBy.acme = true` and `managedBy.firewall = true` for all three entries on
    aedilis. (`managedBy.caddy` and `managedBy.dns` stay OFF — companion + dns-records plans own those.)
@@ -986,21 +993,21 @@ technitium-aedilis is the stress test for the **public-LE + multi-group + direct
 cert case. It surfaces four schema additions (A, C, E, and a confirmation of B) plus one
 verification obligation (D). All are small, typed, reusable, and keep "one declaration per surface".
 
-### Gap (A) — `tls.email` (Let's Encrypt account email)
+### Gap (A) — `tls.cert.own.email` (Let's Encrypt account email)
 
 The keystone acme generator (catalog-and-generators §3.4) has no `email` field; it only swaps the
 `server` directory for `ca == "letsencrypt"`. The public `dns` cert sets `email =
 "rae@plato-splunk.media"` (the LE account email). This is the only LE cert in the fleet (the parent
 plan §2.4 even calls it out as "the one real example").
 
-- **Add:** `tls.email = mkOption { type = nullOr str; default = null; }`. The acme generator emits
-  `email = e.tls.email` only when non-null (internal certs leave it null). The field is LE-specific
-  but harmless (and ignored) for internal certs.
+- **Add:** `email = mkOption { type = nullOr str; default = null; }` inside the `tls.cert.own` variant.
+  The acme generator emits `email = e.tls.cert.own.email` only when non-null (internal certs leave it
+  null). The field is LE-specific but harmless (and ignored) for internal certs.
 
-### Gap (B) — confirm `reloadServices = [ "caddy.service" ] ++ tls.reloadServices` (caddy first)
+### Gap (B) — confirm `reloadServices = [ "caddy.service" ] ++ tls.cert.own.reloadServices` (caddy first)
 
 Not a new field, but a convention this plan **relies on** and must be pinned. All three current certs
-list `caddy.service` **first**, then service-specific units. The catalog supplies `tls.reloadServices`
+list `caddy.service` **first**, then service-specific units. The catalog supplies `tls.cert.own.reloadServices`
 as the list **without** the leading `caddy.service`, in order (`dns`:
 `[technitium-dns-server.service, technitium-provision.service]`; `dns-admin`: `[]`; `dns-metrics`:
 `[alloy.service]`). The generator's prepend reproduces the exact ordered list.
@@ -1016,16 +1023,16 @@ The keystone acme generator defaults the challenge body to a single `handle
 variants in one deployment:
 
 1. **`dns` (public):** the default `handle` block **plus** a trailing `handle { redir
-   https://<fqdn>{uri} }` HTTPS-redirect block. **Add:** `tls.challenge.redirectToHttps = bool`
+   https://<fqdn>{uri} }` HTTPS-redirect block. **Add:** `challenge.body.handle.redirectToHttps = bool`
    (default false); when true, the generator appends the redirect `handle`.
 2. **`dns-admin` / `dns-metrics` (direct):** the **bare** `reverse_proxy 127.0.0.1:<acmePort>` form
-   (no `handle` wrapper). This is the same "bare body" the kanidm plan requests (`tls.challenge.body =
-   "bare"`, kanidm.md §7). **Reuse** that selector.
+   (no `handle` wrapper). This is the same "bare body" the kanidm plan requests (`challenge.body.bare
+   = { }`, kanidm.md §7). **Reuse** that variant.
 3. **Upstream-host token.** The renderer's global `127.0.0.1` standardization (§7.8 #22) covers both
    technitium's bare body and kanidm's — both emit `127.0.0.1`. No per-entry host-token field is
    needed; the `handle` default already uses `127.0.0.1` too.
 
-- **Net:** `redirectToHttps` (new), `tls.challenge.body = "bare"` (shared with kanidm). Both reproduce
+- **Net:** `body.handle.redirectToHttps` (new), `challenge.body.bare` (shared with kanidm). Both reproduce
   the current bodies exactly (the `localhost → 127.0.0.1` substitution on bare bodies is the approved
   global standardization, not a per-entry concern).
 
@@ -1036,7 +1043,7 @@ The public `dns` cert entry requests a cert and a `:80` challenge **but has no C
 Technitium-native baseline infra, not a catalog `listenPort`. The firewall generator must **not**
 open a listen port for this entry.
 
-- **Add:** support `backend.kind = "raw"` **with `listenPort = null`** (or `access.scope = "none"` for
+- **Add:** support `backend.raw = { }` **with `listenPort = null`** (or `access.scope.none = { }` for
   the firewall half while still allowing the cert to be requested). The firewall generator opens a
   listen port only when `listenPort != null`; a cert-only entry contributes solely its challenge-port
   opening (here `via = "caddy80"` → none). The caddy generator emits **no** vhost for a `raw`
@@ -1077,7 +1084,7 @@ replace the Caddy/ACME pieces":
 | `aedilisConfig` cert-dir reads + `certReadyUnits`  | **LEAVE UNTOUCHED**                           | Consumption contract; same cert names keep it byte-identical (gap D).           |
 | `services.technitium-server-complete.*` (runtime)  | **LEAVE UNTOUCHED**                           | Service runtime — the option module is already the single source of truth.      |
 | Admin/metrics HTTPS vhost **bodies**               | **Companion plan** [./technitium-caddy.md]    | Those are `managedBy.caddy` surfaces; this plan owns only their certs/firewall. |
-| `dns`/`dns-admin`/`dns-metrics`/`aedilis` DNS      | **Deferred** to [./dns-records.md]            | Centralized authoritative zone; `dns.enable=false` here to avoid duplication.   |
+| `dns`/`dns-admin`/`dns-metrics`/`aedilis` DNS      | **Deferred** to [./dns-records.md]            | Centralized authoritative zone; `dns = null` here to avoid duplication.         |
 
 The catalog **feeds** the three cross-cutting surfaces (cert, challenge vhost, firewall) and
 **replaces** only the hand-rolled acme module + the drifting firewall ports; it **does not** replace

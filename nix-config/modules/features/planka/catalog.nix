@@ -10,19 +10,14 @@ in
       homelab.catalog.planka = {
         subdomain = svc.subdomain;
         host = "augustus";
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port; # 1337
-        };
-        tls.ca = null;
-        access.scope = "tailnet";
-        dns.enable = true;
+        backend.reverseProxy.port = svc.port; # 1337
+        tls.cert.shared = { };
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         oidc = {
-          enable = true;
           clientId = svc.clientId; # "planka"
-          public = false;
-          secretRef = "planka_client_secret";
+          client.basic.secretRef = "planka_client_secret";
           allowInsecureClientDisablePkce = true;
           callbackPath = "/oidc-callback";
           landingPath = "/";

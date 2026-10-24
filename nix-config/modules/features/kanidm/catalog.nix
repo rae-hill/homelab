@@ -24,8 +24,8 @@ in
       homelab.catalog.kanidm = {
         subdomain = svc.subdomain; # "idm"
         host = "augustus";
-        backend.kind = "raw"; # bespoke body below; renderer emits ONLY extraCaddyConfig
-        tls = {
+        backend.raw = { }; # bespoke body below; renderer emits ONLY extraCaddyConfig
+        tls.cert.own = {
           ca = "internal";
           acmePort = svc.acmePort; # 64073
           certGroup = "idm"; # per-service group (default would be "kanidm")
@@ -33,11 +33,11 @@ in
           reloadCaddy = true;
           challenge = {
             via = "caddy80";
-            body = "bare"; # today's http://idm vhost is a bare reverse_proxy
+            body.bare = { }; # today's http://idm vhost is a bare reverse_proxy
           };
         };
-        access.scope = "tailnet";
-        dns.enable = true;
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         # Bespoke vhost body — reproduces today's kanidm.nix verbatim (explicit cert, tracing
         # span [unconditional, matching the source], HTTPS-upstream transport with pinned SNI).

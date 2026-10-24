@@ -46,11 +46,11 @@ oneshot/timer.
 | Client-cert challenge vhost   | `http://prometheus-client…` → `reverse_proxy 127.0.0.1:22480`                     | emitted by the ACME generator when the cert is modeled             |
 | `scrapeConfigs` `tls_config`  | 5 jobs reference the cert dir (`ca_file`/`cert_file`/`key_file`)                  | stays verbatim in `service.nix` — references the cert path         |
 | **`prometheus` server vhost** | `tls { client_auth … }` + `tracing { span prometheus }` + `reverse_proxy`         | mTLS+tracing (identical to loki) — see §3.1 (do NOT silently drop) |
-| Client-cert challenge port    | `prometheus-client.acmePort = 22480`, loopback (Caddy fronts :80)                 | `tls.challenge.via = "caddy80"` → no firewall opening              |
+| Client-cert challenge port    | `prometheus-client.acmePort = 22480`, loopback (Caddy fronts :80)                 | `tls.cert.own.challenge.via = "caddy80"` → no firewall opening     |
 | Exporters (node, postgres)    | `exporters.node` :9100, `exporters.postgres` :9187 (loopback)                     | stays verbatim in `service.nix`                                    |
 | postgres monitoring wiring    | `prometheus_exporter` user/db/role + `pg_monitor`                                 | stays verbatim in `service.nix`                                    |
 | Technitium token oneshot      | mTLS login → short-lived bearer token for the `aedilis-dns` scrape job            | stays verbatim in `service.nix` (uses the client cert)             |
-| DNS (`prometheus`)            | centralized `tailnetRewrites.prometheus = "augustus"`                             | if the vhost stays: `dns.enable` on the vhost entry                |
+| DNS (`prometheus`)            | centralized `tailnetRewrites.prometheus = "augustus"`                             | if the vhost stays: `dns.tailnet` on the vhost entry               |
 | DNS (`prometheus-client`)     | centralized `tailnetRewrites.prometheus-client = "augustus"`                      | see §2.1 — a client-cert domain that still needs an A/AAAA record  |
 | failure-notifs                | `attachServices = [ "prometheus" "prometheus-node-exporter" ]`                    | stays in `service.nix`, colocated with the units                   |
 
@@ -204,7 +204,7 @@ services.caddy.virtualHosts."http://prometheus-client.plato-splunk.media" = {
 > standardizes to **`127.0.0.1`** (operator-approved, catalog-and-generators §7.8 #22), so the
 > generated body is `reverse_proxy 127.0.0.1:22480\n` and the parity gate shows **only** that
 > `localhost → 127.0.0.1` substitution. The bare-vs-`handle` form must still be preserved via
-> `tls.challenge.body = "bare"` (keystone §7.2 #8 — see §5). The cert block uses `group =
+> `tls.cert.own.challenge.body.bare = { }` (keystone §7.2 #8 — see §5). The cert block uses `group =
 > "prometheus"` and reloads **`prometheus.service`** (not `caddy.service`) on
 > renewal — the opposite of a server cert, because the _consumer_ (prometheus) must pick up the
 > rotated client cert, and there is no Caddy vhost serving this name.
@@ -259,7 +259,7 @@ prometheus-client.plato-splunk.media.  A    100.95.250.77   / AAAA fd7a:115c:a1e
 > `prometheus-client` name to validate issuance — Caddy fronts :80 and proxies
 > `/.well-known/acme-challenge/*` to loopback `22480`. For that, `prometheus-client.plato-splunk.media`
 > must resolve (to augustus, where the challenge listener lives). So even a no-vhost, cert-only service
-> needs DNS — a subtlety the catalog's `dns.enable` must express for the client-cert entry (§2.1).
+> needs DNS — a subtlety the catalog's `dns` field must express for the client-cert entry (§2.1).
 
 ### 1.6 The Technitium metrics-token oneshot (consumes the client cert too)
 
@@ -330,12 +330,12 @@ features/prometheus/
 represent it? Three candidate shapes, evaluated against the keystone schema
 ([./catalog-and-generators.md](./catalog-and-generators.md) §2):
 
-**Option A — `backend = { kind = "none"; }` (a no-backend vhost class).** Add a `"none"` variant to
-`backendType.kind`. The Caddy generator, seeing `kind == "none"`, emits **no** `https://` reverse-proxy
-vhost, but the ACME generator still emits the cert + the `http://` challenge vhost (driven by `tls.ca
-!= null`). Pros: reuses the existing `tls`/`dns` fields unchanged; the cert, challenge, and DNS all
-flow from one entry. Cons: `backend` is currently non-nullable with a required `port`/`root`; adding
-`"none"` means the `kind == reverseProxy → port required` assertion must special-case it.
+**Option A — `backend.none = { }` (a no-backend vhost class).** Add a `none` variant to
+the `backend` attrTag. The Caddy generator, seeing `backend.none`, emits **no** `https://` reverse-proxy
+vhost, but the ACME generator still emits the cert + the `http://` challenge vhost (driven by
+`tls.cert.own`). Pros: reuses the existing `tls`/`dns` fields unchanged; the cert, challenge, and DNS all
+flow from one entry. Cons: adding a `none` variant means the `reverseProxy → port required` assertion
+must special-case it.
 
 **Option B — a dedicated `clientCert` flag / sub-block, decoupled from `backend`.** Add
 `tls.clientCert = true` (or a top-level `clientCertOnly = true`) meaning "this entry exists only to
@@ -356,8 +356,8 @@ and the firewall/DNS for `prometheus-client` are not catalog-derived.
 
 **Recommendation: Option B (a `clientCertOnly` entry), with Option C as the pragmatic fallback.**
 Option B cleanly captures the reality that `prometheus-client` is a **cert-only, scraped-from,
-internal** service: it has `tls.ca = "internal"` + `acmePort = 22480` (so the ACME generator mints
-it), `dns.enable = true` (so the challenge name resolves — §1.5), **no `backend`** and **no server
+internal** service: it has `tls.cert.own` + `acmePort = 22480` (so the ACME generator mints
+it), `dns.tailnet = { }` (so the challenge name resolves — §1.5), **no `backend`** (`backend.none = { }`) and **no server
 vhost**, and `access.scope` that opens nothing (the challenge is loopback-fronted). Concretely:
 
 ```nix
@@ -368,25 +368,29 @@ homelab.catalog.prometheus-client = {
 
   # NO backend — this entry fronts nothing. (Option B: a clientCertOnly marker.)
   clientCertOnly = true;            # NEW schema field: emit cert + challenge + DNS, but NO https vhost
+  backend.none = { };               # fronts nothing
 
   tls = {
-    ca = "internal";                # mint via step-ca -> security.acme.certs entry
-    acmePort = 22480;
-    certGroup = "prometheus";       # the consumer's group reads the cert
-    reloadServices = [ "prometheus.service" ];   # reload the CONSUMER, not caddy
-    challenge = { via = "caddy80"; };            # loopback acmePort, Caddy fronts :80 -> no firewall opening
-    # the bare `reverse_proxy localhost:<acmePort>` challenge body (NOT handle-wrapped) — see §5
+    cert.own = {
+      # mint via step-ca -> security.acme.certs entry
+      acmePort = 22480;
+      certGroup = "prometheus";       # the consumer's group reads the cert
+      reloadServices = [ "prometheus.service" ];   # reload the CONSUMER, not caddy
+      challenge.via = "caddy80";                   # loopback acmePort, Caddy fronts :80 -> no firewall opening
+      # the bare `reverse_proxy localhost:<acmePort>` challenge body (NOT handle-wrapped) — see §5
+      challenge.body.bare = { };
+    };
   };
 
   # The cert name must still resolve for the ACME HTTP-01 challenge (§1.5).
-  dns.enable = true;                # A/AAAA for prometheus-client -> augustus
-  access.scope = "tailnet";         # opens nothing new (loopback challenge; 80/443 baseline)
+  dns.tailnet = { };                # A/AAAA for prometheus-client -> augustus
+  access.scope.tailnet = { };       # opens nothing new (loopback challenge; 80/443 baseline)
 };
 ```
 
 This answers the task's schema question directly: **a client-cert-only service is modeled as an entry
-with no `backend` and a `clientCertOnly` marker — it drives the ACME cert + challenge + DNS, but the
-Caddy server-vhost generator skips it.** `tls.ca` is "internal" (it genuinely mints a cert), `gate` is
+with `backend.none = { }` and a `clientCertOnly` marker — it drives the ACME cert + challenge + DNS, but the
+Caddy server-vhost generator skips it.** `tls.cert.own` genuinely mints a cert, `tls.gate` is
 irrelevant (no vhost to gate), and `reloadServices` points at the **consumer** process. The consumer
 side (the scrape `tls_config` referencing the cert directory) stays in `service.nix` — the catalog
 expresses "this cert exists and resolves"; the service expresses "I use it to scrape X."
@@ -408,14 +412,13 @@ identical in shape to loki's `loki-push`:
 homelab.catalog.prometheus = {
   subdomain = "prometheus";
   host = "augustus";
-  backend = { kind = "reverseProxy"; port = 9090; };
+  backend.reverseProxy.port = 9090;
   tls = {
-    ca = null;                        # Caddy-managed server cert (no security.acme.certs)
-    gate = "mtls";
-    mtlsTrustPoolFile = c.ca.rootCert;
+    cert.shared = { };                # Caddy-managed server cert (no security.acme.certs)
+    gate.mtls.trustPoolFile = c.ca.rootCert;
   };
-  access.scope = "tailnet";
-  dns.enable = true;                  # prometheus A/AAAA -> augustus
+  access.scope.tailnet = { };
+  dns.tailnet = { };                  # prometheus A/AAAA -> augustus
 };
 ```
 
@@ -485,7 +488,7 @@ review.
 
 - Today: `tailnetRewrites.prometheus = "augustus"` and `tailnetRewrites.prometheus-client =
   "augustus"` → two apex A+AAAA pairs at augustus's tailnet IPs.
-- New: the §2.2 (`prometheus`) and §2.1 (`prometheus-client`) entries both set `dns.enable = true;
+- New: the §2.2 (`prometheus`) and §2.1 (`prometheus-client`) entries both set `dns.tailnet = { };
   host = "augustus"` → the DNS generator emits the same A/AAAA pairs from
   `constants.hosts.augustus.tailscale.{v4,v6}`. Identical; upsert-only preserved. (Under Option C,
   `prometheus-client` DNS stays in `tailnetRewrites` until separately migrated.)
@@ -612,7 +615,7 @@ producer plans did not:
 1. **Client-cert-only / no-vhost / scraped-from service shape (the central schema question).** The
    catalog, as drafted, assumes every entry fronts a `backend` and serves a vhost. `prometheus-client`
    owns a cert but fronts nothing — it is consumed _outbound_ by scrape jobs. **Resolution
-   (recommended, §2.1 Option B):** add a `clientCertOnly` marker (or a `backend.kind = "none"`
+   (recommended, §2.1 Option B):** add a `clientCertOnly` marker (or a `backend.none = { }`
    variant) so an entry can drive `security.acme.certs` + the HTTP-01 challenge vhost + DNS **without**
    emitting an `https://` server vhost, with `reloadServices` pointing at the **consumer** process. The
    key insight: **cert ownership is orthogonal to serving a vhost** — a cert can be a client

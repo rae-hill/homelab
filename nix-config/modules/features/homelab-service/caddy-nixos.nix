@@ -28,7 +28,11 @@ in
       mkBody =
         name: e:
         let
-          certDir = if e.tls.ca != null then config.security.acme.certs.${catLib.fqdn e}.directory else null;
+          certDir =
+            if catLib.tagOf e.tls.cert == "own" then
+              config.security.acme.certs.${catLib.fqdn e}.directory
+            else
+              null;
         in
         catLib.renderVhostBody {
           hostCfg = config;

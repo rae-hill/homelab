@@ -26,21 +26,21 @@ Sibling: [./homelab-api.md](./homelab-api.md)
 
 Concerns emitted today (per the [index](./README.md)): **V (static)** — exactly one Caddy vhost that
 serves static files. It is `low`-complexity but it is the **only** service whose
-`backend.kind == "static"`, so it is the end-to-end exercise of the catalog's static backend:
+`backend.static` is set, so it is the end-to-end exercise of the catalog's static backend:
 
 - **Static backend** — `root * <uiPkg>` + a `header /*.html Cache-Control` directive + `file_server`,
-  instead of `reverse_proxy`. The keystone `catalogLib.backendBlock` (`kind == "static"`) models
+  instead of `reverse_proxy`. The keystone `catalogLib.backendBlock` (`backend.static`) models
   exactly this shape ([catalog-and-generators §3.1](./catalog-and-generators.md)).
 - **Tempo-gated tracing** — a `tracing { span homelab-ui }` block emitted only when
   `config.services.tempo.enable`, identical mechanism to homelab-api.
-- **Package root as the backend** — the `backend.root` is a derivation
-  (`inputs.self.packages.x86_64-linux.homelab-ui`), not a port. This is the schema's `backend.root`
+- **Package root as the backend** — the `backend.static.root` is a derivation
+  (`inputs.self.packages.x86_64-linux.homelab-ui`), not a port. This is the schema's `backend.static.root`
   path field.
 
 What stays out of scope / absent:
 
 - **No OIDC** — the UI is a static SPA; auth is handled by the API. No Kanidm client.
-- **No manual TLS cert** — shares Caddy's managed cert (`tls.ca = null`), no `security.acme.certs`,
+- **No manual TLS cert** — shares Caddy's managed cert (`tls.cert.shared = { }`), no `security.acme.certs`,
   no challenge vhost.
 - **No firewall opening** — nothing to bind; served by Caddy on `443`, a baseline host opening.
 - **No `service.nix` / systemd unit / failure-notifs** — there is no process to run; the package is
@@ -188,24 +188,33 @@ file_server
 Unlike [homelab-api](./homelab-api.md), homelab-ui forces **no new schema beyond the existing static
 backend**. The keystone already covers it:
 
-### 2.1 Static backend (`backend.kind == "static"`, `backend.root`)
+### 2.1 Static backend (`backend.static`, `backend.static.root`)
 
-The keystone `backendType` (`catalog-and-generators §2`) already has:
+The keystone `backend` attrTag (`catalog-and-generators §2`) already has:
 
 ```nix
-kind = mkOption { type = types.enum [ "reverseProxy" "static" ]; … };
-root = mkOption { type = types.nullOr types.path; default = null;
-                  description = "Static site root (a package/derivation). Required when kind == static."; };
+backend = mkOption {
+  type = types.attrTag {
+    reverseProxy = mkOption { type = types.submodule { options.port = mkOption { type = types.port; }; }; };
+    static = mkOption {
+      type = types.submodule {
+        options.root = mkOption { type = types.path;
+          description = "Static site root (a package/derivation)."; };
+      };
+    };
+    # … none, raw variants
+  };
+};
 ```
 
 and `catalogLib.backendBlock` (`§3.1`) already emits the exact 3-line static body:
 
 ```nix
 backendBlock = e:
-  if e.backend.kind == "reverseProxy"
-  then "reverse_proxy localhost:${toString e.backend.port}\n"
+  if e.backend ? reverseProxy
+  then "reverse_proxy localhost:${toString e.backend.reverseProxy.port}\n"
   else ''
-    root * ${e.backend.root}
+    root * ${e.backend.static.root}
     header /*.html Cache-Control "no-cache, must-revalidate"
     file_server
   '';
@@ -222,13 +231,13 @@ As with homelab-api, `catalogLib.tracingBlock hostCfg name` emits `tracing { spa
 named `homelab-ui` for the span to read `span homelab-ui`. `renderVhostBody` prepends it before the
 static backend block, reproducing `${tracingBlock}root * …`.
 
-### 2.3 One genuine verification point: the `backend.root` path value
+### 2.3 One genuine verification point: the `backend.static.root` path value
 
-`backend.root` is `types.nullOr types.path`. The catalog entry must set it to **the same derivation**
+`backend.static.root` is `types.path`. The catalog entry must set it to **the same derivation**
 the current module references (`inputs.self.packages.x86_64-linux.homelab-ui`) so the embedded store
 path matches byte-for-byte. The entry reads the package from `inputs.self.packages` exactly as
 `caddy.nix` does today — no indirection, no rebuild trigger. (The keystone renderer interpolates
-`${e.backend.root}`, which stringifies the derivation to its out-path, identical to `${pkg}` today.)
+`${e.backend.static.root}`, which stringifies the derivation to its out-path, identical to `${pkg}` today.)
 
 > This is the only schema interaction worth calling out, and it is already supported — `types.path`
 > accepts a derivation and stringifies to the store path. The static backend is strictly less
@@ -245,7 +254,7 @@ OIDC), matching the parent-plan static-frontend shape (§2.0).
 
 ```
 features/homelab-ui/
-├── catalog.nix    # NEW — homelab.catalog.homelab-ui = { backend.kind = "static"; root = <pkg>; … }
+├── catalog.nix    # NEW — homelab.catalog.homelab-ui = { backend.static.root = <pkg>; … }
 ├── caddy.nix      # REMOVED — replaced by catalog.nix + caddy-nixos generator
 └── complete.nix   # UPDATED — import homelab-ui-catalog instead of homelab-ui-caddy
 ```
@@ -268,20 +277,17 @@ in
         zone = "plato-splunk.media";         # default baseDomain; stated for clarity
         host = "augustus";                   # the FULL deployment runs on augustus
 
-        backend = {
-          kind = "static";
-          root = pkg;                        # root * <store path> + header + file_server
-        };
+        backend.static.root = pkg;           # root * <store path> + header + file_server
 
         # Shares Caddy's managed cert (no manual ACME cert, no challenge vhost).
-        tls.ca = null;
+        tls.cert.shared = { };
 
-        access.scope = "tailnet";            # reachable over tailscale0; 443 is a baseline opening
+        access.scope.tailnet = { };          # reachable over tailscale0; 443 is a baseline opening
 
-        dns.enable = true;                   # emit homelab A/AAAA on aedilis (reproduces tailnetRewrites)
-        # dns.kind defaults to "tailnet" -> A/AAAA from constants.hosts.augustus.tailscale.
+        dns.tailnet = { };                   # emit homelab A/AAAA on aedilis (reproduces tailnetRewrites)
+        # dns.tailnet -> A/AAAA from constants.hosts.augustus.tailscale.
 
-        # No oidc block -> OIDC generator skips it. No firewall opening (443 baseline).
+        # No oidc block (oidc = null) -> OIDC generator skips it. No firewall opening (443 baseline).
       };
     };
 }
@@ -291,11 +297,11 @@ Notes:
 
 - **`subdomain = "homelab"`** (not `homelab-api`) — the UI origin. This resolves to
   `https://homelab.plato-splunk.media`, exactly today's `svc.frontendUrl` vhost key.
-- **`backend.kind = "static"; root = pkg`** — drives the `root * <pkg>` + `header` + `file_server`
+- **`backend.static.root = pkg`** — drives the `root * <pkg>` + `header` + `file_server`
   block via the keystone static renderer (§2.1).
-- **`tls.ca = null`** — shares Caddy's managed cert; no cert, no challenge vhost.
+- **`tls.cert.shared = { }`** — shares Caddy's managed cert; no cert, no challenge vhost.
 - **No `oidc`** — the static UI has no Kanidm client.
-- **`dns.enable = true; dns.kind = "tailnet"`** — the DNS generator (aedilis) emits
+- **`dns.tailnet = { }`** — the DNS generator (aedilis) emits
   `homelab.plato-splunk.media` A/AAAA from `constants.hosts.augustus.tailscale`, replacing
   `tailnetRewrites.homelab = "augustus"`. (The `homelab-api` record is owned by the homelab-api
   feature, not here.)
@@ -321,7 +327,7 @@ Notes:
 
 ### 3.3 What the caddy-nixos generator must render
 
-Filtered to `host == augustus`, `backend.kind == "static"`:
+Filtered to `host == augustus`, `backend.static`:
 
 ```nix
 services.caddy.virtualHosts."https://homelab.plato-splunk.media".extraConfig = ''
@@ -409,7 +415,7 @@ nix eval '.#nixosConfigurations.augustus.config.networking.firewall.allowedTCPPo
 ### 4.4 DNS parity (deferred to the dns-records migration)
 
 The `homelab` A/AAAA record (→ augustus) stays produced by `tailnetRewrites` until
-[./dns-records.md](./dns-records.md) switches on the DNS generator. `dns.enable = true` here declares
+[./dns-records.md](./dns-records.md) switches on the DNS generator. `dns.tailnet = { }` here declares
 intent; verify at cutover:
 
 ```sh
@@ -444,9 +450,9 @@ nixos-rebuild build --flake .#augustus       # closure builds; diff store path i
    (whole-vhost JSON), §4.3 (no-oauth2 / no-cert / firewall). Save to `/tmp/ui-*.before`.
 
 2. **Create `features/homelab-ui/catalog.nix`** — the `homelab.catalog.homelab-ui` entry from §3.1
-   (`subdomain = "homelab"`, `host = "augustus"`, `backend = { kind = "static"; root =
-   inputs.self.packages.x86_64-linux.homelab-ui; }`, `tls.ca = null`, `access.scope = "tailnet"`,
-   `dns.enable = true`). Entry name MUST be `homelab-ui` (tracing span). **No `oidc`.**
+   (`subdomain = "homelab"`, `host = "augustus"`, `backend.static.root =
+   inputs.self.packages.x86_64-linux.homelab-ui`, `tls.cert.shared = { }`, `access.scope.tailnet = { }`,
+   `dns.tailnet = { }`). Entry name MUST be `homelab-ui` (tracing span). **No `oidc`.**
 
 3. **Opt the entry into the caddy generator** (`managedBy.caddy = true;` per the keystone incremental
    opt-in) so the caddy-nixos generator renders the static vhost **instead of** the hand-written
@@ -480,8 +486,8 @@ nixos-rebuild build --flake .#augustus       # closure builds; diff store path i
 - [ ] Baseline captured: vhost `--raw` (Tempo OFF **and** ON), whole-vhost JSON, no-oauth2/no-cert/
       firewall → `*.before`
 - [ ] `features/homelab-ui/catalog.nix` — static entry (`subdomain = "homelab"`,
-      `backend = { kind = "static"; root = <uiPkg>; }`, `tls.ca = null`, `access.scope = "tailnet"`,
-      `dns.enable = true`, entry named `homelab-ui`, **no `oidc`**)
+      `backend.static.root = <uiPkg>`, `tls.cert.shared = { }`, `access.scope.tailnet = { }`,
+      `dns.tailnet = { }`, entry named `homelab-ui`, **no `oidc`**)
 - [ ] `caddy.nix` removed; `complete.nix` imports `homelab-ui-catalog` instead of `homelab-ui-caddy`
 - [ ] No `service.nix`/`oidc.nix` created (static frontend has no runtime/OIDC)
 - [ ] `package.nix` **untouched**

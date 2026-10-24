@@ -20,8 +20,8 @@ in
       homelab.catalog.postgres = lib.mkIf config.services.peesequel.enable {
         subdomain = svc.subdomain; # "postgres-augustus"
         host = "augustus";
-        backend.kind = "none"; # no https vhost
-        tls = {
+        backend.none = { }; # no https vhost
+        tls.cert.own = {
           ca = "internal";
           acmePort = svc.acmePort; # 41872
           certGroup = "postgres-certs";
@@ -30,11 +30,11 @@ in
           postRun = "${pkgs.systemd}/bin/systemctl start postgresql-update-certs.service";
           challenge = {
             via = "caddy80";
-            body = "bare"; # today's http://postgres-augustus vhost is a bare reverse_proxy
+            body.bare = { }; # today's http://postgres-augustus vhost is a bare reverse_proxy
           };
         };
-        access.scope = "tailnet";
-        dns.enable = true;
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         managedBy.acme = true;
       };

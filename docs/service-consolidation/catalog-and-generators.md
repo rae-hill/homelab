@@ -112,10 +112,10 @@ in {
     homelab.catalog.it-tools = {
       subdomain = "dev-tools";
       host = "augustus";
-      backend = { kind = "reverseProxy"; port = svc.port; };
-      tls.ca = null; # shares Caddy's managed cert; no security.acme.certs entry
-      access.scope = "tailnet";
-      dns.enable = true;
+      backend.reverseProxy.port = svc.port;
+      tls.cert.shared = { }; # shares Caddy's managed cert; no security.acme.certs entry
+      access.scope.tailnet = { };
+      dns.tailnet = { };
     };
   };
 }
@@ -131,314 +131,192 @@ submodule has access to `config.constants` for defaults (`zone`, interface selec
 arg. `host` is typed as an **enum of the real host names** so a typo is an eval error, and the DNS
 generator can resolve `constants.hosts.<host>.tailscale` safely.
 
+### 2.0 Schema style — `attrTag` discriminated unions (NOT enum + booleans)
+
+Every field that is really a **"variant with per-variant data"** is modeled as a
+[`types.attrTag`](https://nixos.org/manual/nixos/stable/#sec-option-types-attribute-tagged-union)
+(available in nixpkgs ≥ 24.11; confirmed present in the pinned `nixos-26.05`). An `attrTag` value is
+a **one-key attrset** `{ <tag> = { …payload… }; }` carrying exactly one tag, and the type system —
+**not** prose "Required when …" descriptions — enforces which fields are legal for each variant.
+
+This replaces the earlier enum + sibling-nullable-field design. The win is that **illegal states
+become unrepresentable** and no "required when X" documentation is needed:
+
+| Concern              | ❌ old (enum + booleans/nullables)                               | ✅ new (`attrTag`)                                                                     |
+| -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `backend`            | `kind = enum; port = nullOr; root = nullOr`                      | `{ reverseProxy.port } \| { static.root } \| { none } \| { raw }`                      |
+| `tls.cert`           | `ca = nullOr enum` + sibling `acmePort`, `certGroup`, `reload*`… | `{ shared } \| { own = { ca; acmePort; certGroup; reload*; postRun; challenge } }`     |
+| `tls.gate`           | `gate = enum` + sibling `mtlsTrustPoolFile = nullOr`             | `{ none } \| { oidc } \| { mtls.trustPoolFile } \| { mtlsAllowlist.trustPoolFile }`    |
+| `tls…challenge.body` | `body = enum` + sibling `redirectToHttps`                        | `{ handle.redirectToHttps } \| { bare }`                                               |
+| `access.scope`       | `scope = enum` + sibling `fromHosts`                             | `{ public } \| { tailnet } \| { hostList.fromHosts } \| { funnel } \| { none }`        |
+| `dns`                | `enable = bool; kind = enum` + sibling `cnameTarget`/`publicV*`  | `nullOr ({ tailnet } \| { cname.target } \| { public = { v4; v6 } })` — `null` = none  |
+| `oidc`               | `enable = bool; public = bool` + sibling `secretRef = nullOr`    | `nullOr (submodule { client = { public } \| { basic.secretRef }; … })` — `null` = none |
+
+Consequences baked into the schema:
+
+- A `reverseProxy` backend **cannot** carry a `root`; a `static` backend **cannot** carry a `port`.
+- A **shared-cert** service has no `acmePort`/`certGroup`/`challenge` fields at all; only `{ own = …
+  }` exposes them, and `acmePort`/`certGroup` are **required** inside `own` (no nullable sentinels).
+- An **mTLS** gate must carry a `trustPoolFile`; a non-mTLS gate cannot.
+- `dns = null` / `oidc = null` mean "no DNS record" / "no OIDC client" — the old `enable` booleans
+  are gone. Setting `dns.tailnet = { }` or `oidc = { … }` opts in.
+
+Generators read an `attrTag` via two tiny helpers published on `constants.catalogLib` (§3.1):
+`tagOf v = head (attrNames v)` (the active tag) and `payloadOf v = v.${tagOf v}` (its payload). The
+`oidc` client-id default (entry name) is resolved **in the OIDC generator** (`o.clientId or name`),
+not in the submodule `config`, to avoid a self-referential `nullOr` (`config.oidc` read while
+defining `config.oidc`).
+
 ```nix
 { config, ... }@topLevel:
 {
-  flake.modules.nixos.homelab-catalog-options = { lib, ... }: sharedSchema lib topLevel;
-  flake.modules.darwin.homelab-catalog-options = { lib, ... }: sharedSchema lib topLevel;
+  flake.modules.nixos.homelab-catalog-options = { lib, ... }: sharedSchema lib;
+  flake.modules.darwin.homelab-catalog-options = { lib, ... }: sharedSchema lib;
 }
 ```
 
 where `sharedSchema` is the single schema definition reused by both classes (the submodule type is
-platform-independent; only the generators differ):
+platform-independent; only the generators differ). The authoritative source is
+`nix-config/modules/features/homelab-service/options.nix`; the abridged shape below shows the
+`attrTag` variants (full field descriptions live in the file):
 
 ```nix
-sharedSchema = lib: topLevel:
+sharedSchema = lib:
   let
-    inherit (lib) mkOption mkEnableOption types;
+    inherit (lib) mkOption types;
     c = topLevel.config.constants;
     hostNames = lib.attrNames c.hosts;             # ["augustus" "aedilis" "cicero" …]
 
-    backendType = types.submodule {
-      options = {
-        kind = mkOption {
-          type = types.enum [ "reverseProxy" "static" ];
-          description = ''
-            "reverseProxy" -> `reverse_proxy 127.0.0.1:<port>` (the common app case).
-            "static"       -> `root * <root>` + `file_server` (the homelab-ui frontend case).
-          '';
-        };
-        port = mkOption {
-          type = types.nullOr types.port;
-          default = null;
-          description = "Loopback port the app listens on. Required when kind == reverseProxy.";
-        };
-        root = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          description = "Static site root (a package/derivation). Required when kind == static.";
-        };
-      };
+    # backend: exactly one of the four shapes.
+    backendType = types.attrTag {
+      reverseProxy = mkOption { type = types.submodule { options.port = mkOption { type = types.port; }; }; };
+      static       = mkOption { type = types.submodule { options.root = mkOption { type = types.path; }; }; };
+      none         = mkOption { type = types.submodule { options = { }; }; };
+      raw          = mkOption { type = types.submodule { options = { }; }; };
     };
 
-    challengeType = types.submodule {
-      options = {
-        via = mkOption {
-          type = types.enum [ "caddy80" "direct" ];
-          default = "caddy80";
-          description = ''
-            How the ACME HTTP-01 challenge is reached:
-              "caddy80" -> loopback acmePort fronted by Caddy on :80 (no firewall opening).
-              "direct"  -> the ACME server connects straight to acmePort (needs a firewall
-                           opening on `iface`). The aedilis internal-CA tailnet certs.
-          '';
+    # tls.cert: shared (Caddy-managed) vs own (security.acme.certs.<fqdn>). ALL cert-only
+    # fields live INSIDE the `own` variant, so a shared service cannot set them.
+    certType = types.attrTag {
+      shared = mkOption { type = types.submodule { options = { }; }; };
+      own = mkOption { type = types.submodule {
+        options = {
+          ca             = mkOption { type = types.enum [ "internal" "letsencrypt" ]; default = "internal"; };
+          acmePort       = mkOption { type = types.port; };                 # required
+          email          = mkOption { type = types.nullOr types.str; default = null; };
+          certGroup      = mkOption { type = types.str; };                  # required (per-service)
+          reloadServices = mkOption { type = types.listOf types.str; default = [ ]; };
+          reloadCaddy    = mkOption { type = types.bool; default = true; };
+          postRun        = mkOption { type = types.nullOr types.str; default = null; };
+          challenge      = mkOption { type = challengeType; default = { }; };
         };
-        iface = mkOption {
-          type = types.enum [ "public" "tailscale0" ];
-          default = "tailscale0";
-          description = ''
-            Interface the direct-challenge opening lives on. Only consulted when
-            via == "direct". "public" -> networking.firewall.allowedTCPPorts;
-            "tailscale0" -> networking.firewall.interfaces.tailscale0.allowedTCPPorts.
-          '';
-        };
-      };
+      }; };
+    };
+
+    # tls.gate: the mTLS variants carry the required trust pool.
+    gateType = types.attrTag {
+      none          = mkOption { type = types.submodule { options = { }; }; };
+      oidc          = mkOption { type = types.submodule { options = { }; }; };
+      mtls          = mkOption { type = types.submodule { options.trustPoolFile = mkOption { type = types.path; }; }; };
+      mtlsAllowlist = mkOption { type = types.submodule { options.trustPoolFile = mkOption { type = types.path; }; }; };
     };
 
     tlsType = types.submodule {
       options = {
-        ca = mkOption {
-          type = types.nullOr (types.enum [ "internal" "letsencrypt" ]);
-          default = null;
-          description = ''
-            Cert authority for a service that terminates its OWN manual TLS cert:
-              "internal"    -> homelab step-ca (security.acme.certs server = ca.acmeDirectoryHttp).
-              "letsencrypt" -> public Let's Encrypt.
-              null          -> no security.acme.certs entry; shares Caddy's managed cert
-                               (the common reverse-proxy case). Parent plan §2.4 / decision §5.1 #6.
-          '';
-        };
-        acmePort = mkOption {
-          type = types.nullOr types.port;
-          default = null;
-          description = "Loopback HTTP-01 listener port (internal CA). Required when ca != null.";
-        };
-        certGroup = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = ''
-            Per-service cert group that Caddy (and any reloaders) join to read the cert.
-            Defaults to the service name. Per-service (NOT shared) — decision §5.1 #6.
-          '';
-        };
-        reloadServices = mkOption {
-          type = types.listOf types.str;
-          default = [ ];
-          description = ''
-            Extra systemd units to reload on renewal, besides caddy.service (e.g.
-            "kanidm.service"). Matches the current per-cert reloadServices lists.
-          '';
-        };
-        challenge = mkOption {
-          type = challengeType;
-          default = { };
-          description = "How/where the HTTP-01 challenge is reached (drives the firewall).";
-        };
-        gate = mkOption {
-          type = types.enum [ "none" "oidc" "mtls" "mtls+allowlist" ];
-          default = "none";
-          description = ''
-            Caddy-level access gate woven into the vhost body:
-              "none"           -> no Caddy auth.
-              "oidc"           -> app-handled OIDC (no extra Caddy config; documentation only).
-              "mtls"           -> `tls … { client_auth require_and_verify; trust_pool … }`.
-              "mtls+allowlist" -> mTLS plus a path allowlist (see access/extraCaddyConfig).
-          '';
-        };
-        mtlsTrustPoolFile = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          description = "PEM trust pool for client_auth. Required when gate uses mTLS.";
-        };
+        cert = mkOption { type = certType; default = { shared = { }; }; };
+        gate = mkOption { type = gateType; default = { none  = { }; }; };
       };
     };
 
+    # challenge.body: handle (+ optional HTTPS redirect) vs bare reverse_proxy.
+    challengeBodyType = types.attrTag {
+      handle = mkOption { type = types.submodule { options.redirectToHttps = mkOption { type = types.bool; default = false; }; }; };
+      bare   = mkOption { type = types.submodule { options = { }; }; };
+    };
+    challengeType = types.submodule {
+      options = {
+        via  = mkOption { type = types.enum [ "caddy80" "direct" ]; default = "caddy80"; };
+        iface = mkOption { type = types.enum [ "public" "tailscale0" ]; default = "tailscale0"; };
+        body = mkOption { type = challengeBodyType; default = { handle = { }; }; };
+      };
+    };
+
+    # access.scope: hostList carries the (declared-intent) peer list.
+    scopeType = types.attrTag {
+      public   = mkOption { type = types.submodule { options = { }; }; };
+      tailnet  = mkOption { type = types.submodule { options = { }; }; };
+      hostList = mkOption { type = types.submodule { options.fromHosts = mkOption { type = types.listOf (types.enum hostNames); default = [ ]; }; }; };
+      funnel   = mkOption { type = types.submodule { options = { }; }; };
+      none     = mkOption { type = types.submodule { options = { }; }; };
+    };
     accessType = types.submodule {
-      options = {
-        scope = mkOption {
-          type = types.enum [ "public" "tailnet" "host-list" "funnel" "none" ];
-          default = "tailnet";
-          description = ''
-            Allowed source scope. Drives the firewall interface:
-              "public"    -> public interface (allowedTCPPorts).
-              "tailnet" / "host-list" -> tailscale0 interface.
-              "funnel"    -> Tailscale Funnel ingress (tailscaled owns :443; Caddy listens
-                             on :8443; NO firewall opening — praeconinus). Parent plan §5.2 #1.
-              "none"      -> no inbound opening generated.
-          '';
-        };
-        fromHosts = mkOption {
-          type = types.listOf (types.enum hostNames);
-          default = [ ];
-          description = ''
-            When scope == "host-list", the peer hosts permitted to reach the service.
-            DECLARED INTENT ONLY today — the host firewall is inbound-only and this repo
-            does not own the tailnet ACL. Captured for the future headscale DERP ACLs
-            (parent plan §2.7 / §5.2). Not auto-applied; may be rendered to a reference table.
-          '';
-        };
-      };
+      options.scope = mkOption { type = scopeType; default = { tailnet = { }; }; };
     };
 
-    dnsType = types.submodule {
-      options = {
-        enable = mkEnableOption "emit an A/AAAA (or CNAME) record into the authoritative zone on aedilis";
-        kind = mkOption {
-          type = types.enum [ "tailnet" "cname" "public" ];
-          default = "tailnet";
-          description = ''
-            "tailnet" -> A/AAAA from constants.hosts.<host>.tailscale.{v4,v6}.
-            "cname"   -> a CNAME (requires dns.cnameTarget).
-            "public"  -> public A/AAAA (requires dns.publicV4/publicV6).
-          '';
-        };
-        cnameTarget = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "CNAME target FQDN. Required when kind == cname.";
-        };
-        publicV4 = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Public IPv4 for kind == public.";
-        };
-        publicV6 = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Public IPv6 for kind == public.";
-        };
-      };
+    # dns: nullOr — null means NO record. Otherwise one of the three record kinds.
+    dnsRecordType = types.attrTag {
+      tailnet = mkOption { type = types.submodule { options = { }; }; };
+      cname   = mkOption { type = types.submodule { options.target = mkOption { type = types.str; }; }; };
+      public  = mkOption { type = types.submodule { options = { v4 = mkOption { type = types.str; }; v6 = mkOption { type = types.str; }; }; }; };
     };
 
+    # oidc: nullOr — null means NO client. client is public vs basic (carries secretRef).
+    oidcClientType = types.attrTag {
+      public = mkOption { type = types.submodule { options = { }; }; };
+      basic  = mkOption { type = types.submodule { options.secretRef = mkOption { type = types.str; }; }; };
+    };
     oidcType = types.submodule {
       options = {
-        enable = mkEnableOption "register a Kanidm OIDC client on augustus";
-        clientId = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "OAuth2 client id. Defaults to the catalog entry name.";
-        };
-        public = mkOption {
-          type = types.bool;
-          default = false;
-          description = "Public (PKCE, no secret) vs basic (basicSecretFile from secretRef).";
-        };
-        callbackPath = mkOption {
-          type = types.either types.str (types.listOf types.str);
-          description = ''
-            Redirect/callback path(s) appended to the service url to form originUrl.
-            A list supports multiple callback URLs (the homelab public client lists two).
-          '';
-        };
-        landingPath = mkOption {
-          type = types.str;
-          default = "/";
-          description = "Landing path appended to the service url to form originLanding.";
-        };
-        displayName = mkOption {
-          type = types.str;
-          description = "Human-facing client name shown in Kanidm.";
-        };
-        secretRef = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = ''
-            sops secret NAME providing basicSecretFile (basic clients). The generator
-            references config.sops.secrets.<secretRef>.path; the secret itself is declared
-            in the host sops config. Ignored when public == true.
-          '';
-        };
-        allowInsecureClientDisablePkce = mkOption {
-          type = types.bool;
-          default = false;
-          description = "Pass-through for basic clients that cannot do PKCE (e.g. planka).";
-        };
-        scopeMaps = mkOption {
-          type = types.attrsOf (types.listOf types.str);
-          default = { };
-          description = "Kanidm scopeMaps, passed through verbatim (service-specific).";
-        };
-        claimMaps = mkOption {
-          type = types.attrs;
-          default = { };
-          description = "Kanidm claimMaps, passed through verbatim (service-specific).";
-        };
+        clientId                       = mkOption { type = types.nullOr types.str; default = null; };  # defaults to entry name in the generator
+        client                         = mkOption { type = oidcClientType; };
+        callbackPath                   = mkOption { type = types.either types.str (types.listOf types.str); };
+        landingPath                    = mkOption { type = types.str; default = "/"; };
+        displayName                    = mkOption { type = types.str; };
+        allowInsecureClientDisablePkce = mkOption { type = types.bool; default = false; };
+        scopeMaps                      = mkOption { type = types.attrsOf (types.listOf types.str); default = { }; };
+        claimMaps                      = mkOption { type = types.attrs; default = { }; };
       };
     };
 
-    managedByType = types.submodule {
+    managedByType = types.submodule {         # plain bool opt-ins (not a discriminated union)
       options = {
-        caddy = mkEnableOption "let the caddy generator own this entry's vhost";
-        acme = mkEnableOption "let the acme generator own this entry's cert";
-        firewall = mkEnableOption "let the firewall generator own this entry's openings";
-        dns = mkEnableOption "let the dns generator own this entry's record";
-        oidc = mkEnableOption "let the oidc generator own this entry's client";
+        caddy    = mkOption { type = types.bool; default = false; };
+        acme     = mkOption { type = types.bool; default = false; };
+        firewall = mkOption { type = types.bool; default = false; };
+        dns      = mkOption { type = types.bool; default = false; };
+        oidc     = mkOption { type = types.bool; default = false; };
       };
     };
 
-    entryType = types.submodule ({ name, ... }: {
+    # The entry submodule wires the variants together. Plain scalars (subdomain/zone/host/
+    # listenPort/insecureHttp/clientCertOnly/tracing/extraCaddyConfig/managedBy) stay as
+    # before; the discriminated unions use the attrTag types above.
+    entryType = types.submodule ({ config, ... }: {
       options = {
-        subdomain = mkOption {
-          type = types.str;
-          description = "Left-most label; fqdn = <subdomain>.<zone>.";
-        };
-        zone = mkOption {
-          type = types.str;
-          default = c.baseDomain;                   # "plato-splunk.media"
-          description = "Base zone. fqdn/url derive from <subdomain>.<zone>. Default baseDomain.";
-        };
-        host = mkOption {
-          type = types.enum hostNames;
-          description = ''
-            Which host runs the service. Binds the DNS record target and scopes the
-            caddy/acme/firewall generators (host == networking.hostName).
-          '';
-        };
-        listenPort = mkOption {
-          type = types.port;
-          default = 443;
-          description = ''
-            Port Caddy listens on for this vhost. 443 normally; 8443 for Funnel
-            (access.scope == "funnel"), since tailscaled owns :443. Parent plan §5.2 #1.
-          '';
-        };
-        backend = mkOption { type = backendType; description = "Upstream the vhost serves."; };
-        tls = mkOption { type = tlsType; default = { }; description = "TLS/ACME + Caddy gate."; };
-        access = mkOption { type = accessType; default = { }; description = "Source scope / firewall."; };
-        dns = mkOption { type = dnsType; default = { }; description = "Authoritative DNS record."; };
-        oidc = mkOption { type = oidcType; default = { }; description = "Kanidm OIDC client."; };
-
-        extraCaddyConfig = mkOption {
-          type = types.lines;
-          default = "";
-          description = ''
-            Free-form Caddyfile directives appended to the vhost body. Escape hatch for
-            bespoke cases (metrics path allowlists, praeconinus base-path rewrites,
-            redirects) without forcing every variant into typed options. Parent plan §2.3.
-          '';
-        };
-
-        managedBy = mkOption {
-          type = managedByType;
-          default = { };
-          description = ''
-            Internal, per-entry migration opt-in. During the incremental migration each
-            generator only acts on entries where its managedBy.<concern> is true, so the
-            hand-written config and the generated config never both fire for one service.
-            Flipped to true as each service migrates; the field is retired once migration
-            completes. Parent plan §3 step 1.
-          '';
-        };
-
-        # ---- derived (read-only) convenience, set via config in the submodule ----
-        fqdn = mkOption { type = types.str; readOnly = true; description = "<subdomain>.<zone>."; };
-        url = mkOption { type = types.str; readOnly = true; description = "https://<fqdn>."; };
+        subdomain      = mkOption { type = types.str; };
+        zone           = mkOption { type = types.str; default = c.baseDomain; };
+        host           = mkOption { type = types.enum hostNames; };
+        listenPort     = mkOption { type = types.port; default = 443; };   # 8443 for Funnel
+        insecureHttp   = mkOption { type = types.bool; default = false; }; # sibling http:// vhost
+        clientCertOnly = mkOption { type = types.bool; default = false; }; # cert but no https vhost
+        backend        = mkOption { type = backendType; default = { reverseProxy.port = 80; }; };
+        tracing        = mkOption { type = types.submodule { options.enable = mkOption { type = types.bool; default = false; }; }; default = { }; };
+        tls            = mkOption { type = tlsType; default = { }; };
+        access         = mkOption { type = accessType; default = { }; };
+        dns            = mkOption { type = types.nullOr dnsRecordType; default = null; };  # null = no record
+        oidc           = mkOption { type = types.nullOr oidcType; default = null; };       # null = no client
+        extraCaddyConfig = mkOption { type = types.lines; default = ""; };
+        managedBy      = mkOption { type = managedByType; default = { }; };
+        # derived read-only convenience:
+        fqdn = mkOption { type = types.str; readOnly = true; };
+        url  = mkOption { type = types.str; readOnly = true; };
       };
       config = {
-        oidc.clientId = lib.mkDefault name;
-        tls.certGroup = lib.mkDefault name;
-        fqdn = "${config.subdomain}.${config.zone or c.baseDomain}";  # resolved at use site
-        url = "https://${config.subdomain}.${config.zone or c.baseDomain}";
+        fqdn = "${config.subdomain}.${config.zone}";
+        url  = "https://${config.subdomain}.${config.zone}";
+        # NOTE: oidc.clientId default (= entry name) is resolved in the OIDC generator, NOT
+        # here — reading config.oidc to set config.oidc on a nullOr field is self-referential
+        # and triggers infinite recursion.
       };
     });
   in
@@ -449,16 +327,27 @@ sharedSchema = lib: topLevel:
       description = ''
         Registry of externally-reachable services. One entry per service, contributed by
         that service's own feature (features/<service>/catalog.nix). Consumed by the five
-        generators (caddy/acme/firewall/dns/oidc) to render all cross-cutting networking
-        config from a single declaration. Parent plan §2.1.
+        generators (caddy/acme/firewall/dns/oidc). Parent plan §2.1.
       '';
     };
   };
 ```
 
-> `fqdn`/`url` are shown as `readOnly` derived options for ergonomics; equivalently they can be
-> computed inside each generator from `subdomain`/`zone` (the generators do this anyway). The field
-> list above is the authoritative schema the per-module plans reference.
+> `fqdn`/`url` are `readOnly` derived options for ergonomics. The **authoritative** schema is
+> `options.nix` itself (fully-described `attrTag` variants); the abridged listing above shows the
+> variant shapes the per-module plans reference. A catalog entry now reads, e.g.:
+>
+> ```nix
+> homelab.catalog.grafana = {
+>   subdomain = "grafana"; host = "augustus";
+>   backend.reverseProxy.port = 3000;     # was: backend = { kind = "reverseProxy"; port = 3000; }
+>   tls.cert.shared = { };                # was: tls.ca = null
+>   access.scope.tailnet = { };           # was: access.scope = "tailnet"
+>   dns.tailnet = { };                    # was: dns.enable = true (+ dns.kind = "tailnet")
+>   oidc = { client.basic.secretRef = "grafana_client_secret"; /* was: public = false; secretRef = … */ … };
+>   managedBy = { caddy = true; oidc = true; };
+> };
+> ```
 
 ---
 
@@ -471,20 +360,22 @@ folds the catalog and emits config for exactly one subsystem.
 ### 3.1 Shared pure renderer (`lib.nix` → `constants.catalogLib`)
 
 Published as `config.constants.catalogLib` so both Caddy backends (and the acme generator, for cert
-paths) consume the identical logic. It is a set of **pure string functions** — no module output:
+paths) consume the identical logic. It is a set of **pure string functions** (plus two `attrTag`
+helpers) — no module output. The authoritative source is `lib.nix`; it reads the `attrTag` variants
+via `tagOf`/`payloadOf`:
 
 ```nix
 # features/homelab-service/lib.nix
-{ config, lib, ... }@topLevel:
+{ lib, ... }@topLevel:
 {
   config.constants.catalogLib = rec {
-    inherit (topLevel.config.constants) baseDomain hosts;
+    # attrTag helpers: a value is a one-key attrset { <tag> = { …payload… }; }.
+    tagOf     = v: lib.head (lib.attrNames v);   # the active tag, e.g. "reverseProxy"/"own"/"mtls"
+    payloadOf = v: v.${tagOf v};                 # its payload submodule
 
     fqdn = e: "${e.subdomain}.${e.zone}";
     url  = e: "https://${fqdn e}";
 
-    # Tracing span appended only when the host enables Tempo (mirrors homelab-api/
-    # homelab-ui caddy.nix behavior exactly).
     tracingBlock = hostCfg: name:
       lib.optionalString hostCfg.services.tempo.enable ''
         tracing {
@@ -492,21 +383,22 @@ paths) consume the identical logic. It is a set of **pure string functions** —
         }
       '';
 
-    # The backend directive: reverse_proxy OR static file_server. Matches today's
-    # `reverse_proxy localhost:<port>` and homelab-ui's `root * <pkg>` + `file_server`.
+    # backend directive — switch on the backend attrTag. 127.0.0.1 upstream (approved §7.8 #22).
     backendBlock = e:
-      if e.backend.kind == "reverseProxy"
-      then "reverse_proxy localhost:${toString e.backend.port}\n"
-      else ''
-        root * ${e.backend.root}
+      let kind = tagOf e.backend; in
+      if kind == "reverseProxy" then "reverse_proxy 127.0.0.1:${toString e.backend.reverseProxy.port}\n"
+      else if kind == "static" then ''
+        root * ${e.backend.static.root}
         header /*.html Cache-Control "no-cache, must-revalidate"
         file_server
-      '';
+      ''
+      else "";  # "none" / "raw" -> no auto backend directive
 
-    # mTLS wrapper for gate == "mtls" / "mtls+allowlist" (factored from technitium/caddy.nix).
-    # certPem/certKey are the explicit cert files; trustPool is e.tls.mtlsTrustPoolFile.
-    mtlsTlsLine = { certPem, certKey, trustPool }: ''
-      tls ${certPem} ${certKey} {
+    # mTLS wrapper for gate == { mtls = …; } / { mtlsAllowlist = …; }. certPem/certKey null ->
+    # Caddy-managed server cert (cert-less `tls { client_auth }`); otherwise explicit cert named.
+    mtlsTlsLine = { certPem ? null, certKey ? null, trustPool }:
+      let certPrefix = lib.optionalString (certPem != null) "${certPem} ${certKey} "; in ''
+      tls ${certPrefix}{
         client_auth {
           mode require_and_verify
           trust_pool file {
@@ -516,40 +408,65 @@ paths) consume the identical logic. It is a set of **pure string functions** —
       }
     '';
 
-    # Explicit cert line for a manual-TLS vhost (tls.ca != null), matching kanidm.nix.
     plainTlsLine = { certPem, certKey }: "tls ${certPem} ${certKey}\n";
 
-    # THE shared vhost body. `certDir` is the ACME cert directory when tls.ca != null
-    # (security.acme.certs.<fqdn>.directory on nixos; the Caddy-managed cert dir on darwin
-    #  is not named — darwin passes certDir = null and relies on Caddy-native ACME).
+    # THE shared vhost body. certDir = security.acme.certs.<fqdn>.directory when the vhost names
+    # an explicit cert (tls.cert == { own = …; } on nixos); null for Caddy-managed / darwin.
     renderVhostBody = { hostCfg, entry, name, certDir ? null }:
-      let
-        e = entry;
-        tls =
-          if e.tls.gate == "mtls" || e.tls.gate == "mtls+allowlist" then
-            mtlsTlsLine {
-              certPem = "${certDir}/fullchain.pem";
-              certKey = "${certDir}/key.pem";
-              trustPool = e.tls.mtlsTrustPoolFile;
+      let e = entry; in
+      if tagOf e.backend == "raw" then e.extraCaddyConfig   # kanidm / praeconinus: body verbatim
+      else
+        let
+          gateTag = tagOf e.tls.gate;
+          isMtls  = gateTag == "mtls" || gateTag == "mtlsAllowlist";
+          tls =
+            if isMtls then mtlsTlsLine {
+              certPem = if certDir != null then "${certDir}/fullchain.pem" else null;
+              certKey = if certDir != null then "${certDir}/key.pem" else null;
+              trustPool = (payloadOf e.tls.gate).trustPoolFile;
             }
-          else if certDir != null then
-            plainTlsLine { certPem = "${certDir}/fullchain.pem"; certKey = "${certDir}/key.pem"; }
-          else "";
-      in
-      lib.concatStrings [
-        (tracingBlock hostCfg name)
-        tls
-        (backendBlock e)
-        e.extraCaddyConfig        # escape hatch, appended verbatim
-      ];
+            else if certDir != null then plainTlsLine {
+              certPem = "${certDir}/fullchain.pem"; certKey = "${certDir}/key.pem";
+            }
+            else "";
+          # mtlsAllowlist supplies the body via extraCaddyConfig -> suppress the auto backend.
+          backend = lib.optionalString (gateTag != "mtlsAllowlist") (backendBlock e);
+        in
+        lib.concatStrings [
+          tls
+          (lib.optionalString e.tracing.enable (tracingBlock hostCfg name))
+          backend
+          e.extraCaddyConfig
+        ];
   };
 }
 ```
+
+> **Block ordering:** `tls → tracing → backend → extraCaddyConfig` (matches loki-push's
+> `tls { client_auth }` → `tracing` → `reverse_proxy`). `tracing` is opt-in per entry
+> (`tracing.enable`) and additionally gated on the host's `services.tempo.enable`.
 
 This single function reproduces every current vhost shape: the plain `reverse_proxy` (it-tools,
 planka), the static `file_server` (homelab-ui), the explicit `tls …` + `reverse_proxy` + tracing
 (kanidm/homelab-api), and the mTLS `client_auth` block (technitium metrics). The bespoke bits
 (metrics path allowlist, redirects) flow through `extraCaddyConfig`.
+
+> **Generator snippets §3.2–§3.7 below are illustrative.** The authoritative source is each
+> generator file under `features/homelab-service/`. Where a snippet still shows a pre-`attrTag`
+> read (`e.backend.kind`, `e.tls.ca != null`, `e.dns.enable`, `o.public`, `e.access.scope == …`),
+> the implemented file uses the `attrTag` form instead:
+>
+> | illustrative (old)               | implemented (`attrTag`)                                      |
+> | -------------------------------- | ------------------------------------------------------------ |
+> | `e.backend.kind == "x"`          | `catLib.tagOf e.backend == "x"`                              |
+> | `e.backend.port` / `.root`       | `e.backend.reverseProxy.port` / `e.backend.static.root`      |
+> | `e.tls.ca != null`               | `catLib.tagOf e.tls.cert == "own"`                           |
+> | `e.tls.acmePort` / `.certGroup`  | `e.tls.cert.own.acmePort` / `.certGroup` (etc.)              |
+> | `e.tls.challenge.body == "bare"` | `catLib.tagOf e.tls.cert.own.challenge.body == "bare"`       |
+> | `e.tls.gate == "mtls"`           | `catLib.tagOf e.tls.gate == "mtls"` (+ `…mtlsAllowlist`)     |
+> | `e.access.scope == "tailnet"`    | `catLib.tagOf e.access.scope == "tailnet"` (`hostList` etc.) |
+> | `e.dns.enable` / `e.dns.kind`    | `e.dns != null` / `catLib.tagOf e.dns`                       |
+> | `e.oidc.enable` / `o.public`     | `e.oidc != null` / `catLib.tagOf o.client == "public"`       |
 
 ### 3.2 `homelab-service-caddy` (nixos backend)
 
@@ -878,15 +795,15 @@ For planka this reproduces `originUrl = "${url}/oidc-callback"`, `originLanding 
 
 ## 4. How each current shape maps onto the catalog
 
-| Current module                  | Shape today                                                                  | Catalog entry fields                                                                                                                                                      |
-| ------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `services/it-tools.nix`         | `reverse_proxy localhost:47309`                                              | `backend={reverseProxy;47309}`, `tls.ca=null`, `access.scope=tailnet`, `dns.enable`                                                                                       |
-| `services/planka.nix`           | `reverse_proxy` + full oauth2 block                                          | `backend={reverseProxy;1337}`, `tls.ca=null`, `oidc.enable` (callbackPath `/oidc-callback`)                                                                               |
-| `features/homelab-ui/caddy.nix` | `root * <pkg>` + `file_server` + tracing                                     | `backend={static;root=<pkg>}`, `tls.ca=null`                                                                                                                              |
-| `services/kanidm.nix`           | explicit `tls … fullchain/key` + tracing + proxy; manual cert on `idm` group | `tls.ca=internal`, `tls.acmePort=64073`, `tls.certGroup=idm`, `tls.reloadServices=["kanidm.service"]`, `extraCaddyConfig` for the `header_up`/`tls_server_name` transport |
-| `features/technitium/caddy.nix` | mTLS `client_auth` + path allowlist                                          | `tls.gate=mtls`, `tls.mtlsTrustPoolFile=…`, `extraCaddyConfig` for the `@node/@dns/@login` allowlist                                                                      |
-| aedilis internal certs          | `security.acme.certs` + direct tailnet acmePort                              | `tls.ca=internal`, `tls.challenge={via=direct;iface=tailscale0}` (→ firewall opens 22481/22483)                                                                           |
-| `constants.dnsRecords.private`  | `ts` + `tailnetRewrites` fold                                                | per-entry `dns.enable` + `dns.kind=tailnet`; DNS generator folds by `zone`                                                                                                |
+| Current module                  | Shape today                                                                  | Catalog entry fields (`attrTag`)                                                                                                                                                                      |
+| ------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `services/it-tools.nix`         | `reverse_proxy localhost:47309`                                              | `backend.reverseProxy.port=47309`, `tls.cert.shared={}`, `access.scope.tailnet={}`, `dns.tailnet={}`                                                                                                  |
+| `services/planka.nix`           | `reverse_proxy` + full oauth2 block                                          | `backend.reverseProxy.port=1337`, `tls.cert.shared={}`, `oidc={client.basic.secretRef=…; callbackPath="/oidc-callback"; …}`                                                                           |
+| `features/homelab-ui/caddy.nix` | `root * <pkg>` + `file_server` + tracing                                     | `backend.static.root=<pkg>`, `tls.cert.shared={}`                                                                                                                                                     |
+| `services/kanidm.nix`           | explicit `tls … fullchain/key` + tracing + proxy; manual cert on `idm` group | `backend.raw={}`, `tls.cert.own={ca="internal"; acmePort=64073; certGroup="idm"; reloadServices=["kanidm.service"]; challenge.body.bare={};}`, `extraCaddyConfig` for the `tls_server_name` transport |
+| `features/technitium/caddy.nix` | mTLS `client_auth` + path allowlist                                          | `tls.gate.mtlsAllowlist.trustPoolFile=…`, `extraCaddyConfig` for the `@node/@dns/@login` allowlist                                                                                                    |
+| aedilis internal certs          | `security.acme.certs` + direct tailnet acmePort                              | `tls.cert.own={ca="internal"; challenge={via="direct"; iface="tailscale0";};}` (→ firewall opens 22481/22483)                                                                                         |
+| `constants.dnsRecords.private`  | `ts` + `tailnetRewrites` fold                                                | per-entry `dns.tailnet={}` (non-null); DNS generator folds by `zone`                                                                                                                                  |
 
 ---
 
@@ -976,6 +893,12 @@ The per-service plans in this directory each flagged schema/renderer needs local
 the authoritative pre-implementation to-do so the catalog + generators are complete before any
 service migrates. Each item is **required for byte-exact operational equivalence** unless marked
 optional. Cross-references point to the per-module plan that motivates it.
+
+> **Notation:** items below were written against the original enum+boolean draft and refer to fields
+> like `backend.kind = "raw"`, `tls.ca`, `tls.gate = "mtls"`, `tls.challenge.body = "bare"`. The
+> implemented schema models these as `attrTag` variants — read them per the §2.0 mapping table
+> (`backend.raw={}`, `tls.cert.own={…}`, `tls.gate.mtls={trustPoolFile=…}`,
+> `tls.cert.own.challenge.body.bare={}`, etc.). The requirements themselves are unchanged.
 
 ### 7.1 Renderer / Caddy vhost body
 

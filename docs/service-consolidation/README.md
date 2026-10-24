@@ -5,6 +5,35 @@ This directory holds one concrete implementation plan per module affected by the
 **catalog registry + generators + colocated features** design; these documents are the
 module-by-module execution plans for migrating onto it.
 
+## Current status (updated 2026-10-23, morning session)
+
+The keystone module and the first wave of service migrations are **implemented and committed**
+(locally, on `main`, not pushed). The catalog schema uses the **`attrTag` discriminated-union**
+style throughout (see [catalog-and-generators §2.0](./catalog-and-generators.md); the earlier
+enum+boolean draft was fully converted). `nix flake check` passes for every host, and the attrTag
+refactor was proven a byte-for-byte no-op against the pre-refactor revision (all hosts' caddy
+vhosts + augustus certs/oauth2 identical modulo the inherent flake-`self` store-path hash).
+
+| Area                                     | State                                                                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `features/homelab-service/` (keystone)   | ✅ implemented (schema + 5 generators + renderer + role aggregators), attrTag style                                                                           |
+| it-tools, grafana, openwebui, planka     | ✅ migrated (`managedBy.caddy`[`+oidc`]); vhost+OIDC on catalog                                                                                               |
+| home-assistant, habitsync                | ✅ migrated (OIDC edge cases: non-`/` landing, public client w/ absolute callback)                                                                            |
+| radius, kanidm, postgres                 | ✅ migrated (cert-terminating: `tls.cert.own`, bare challenge, postRun/reload variants)                                                                       |
+| **loki, prometheus**                     | ⏳ TODO — mTLS (cert-less `tls { client_auth }`) + client-cert-only consumer                                                                                  |
+| **homelab-ui, homelab-api**              | ⏳ TODO — static backend; dual secure+insecure vhost (`insecureHttp`) + public client                                                                         |
+| **cicero-observability, mini**           | ⏳ TODO — cicero mTLS metrics vhosts; mini darwin Caddyfile backend                                                                                           |
+| **technitium-caddy, technitium-aedilis** | ⏳ TODO — mTLS/OIDC admin+metrics vhosts; public LE `dns` cert + direct-tailnet challenge certs                                                               |
+| **praeconinus**                          | ⏳ TODO (decision) — recommended to keep the Funnel vhost bespoke (`access.scope.funnel`)                                                                     |
+| **firewall generator cutover**           | ⏳ DEFERRED — flip `managedBy.firewall` per host; set-equality gate vs baseline (needs go-ahead)                                                              |
+| **DNS generator cutover**                | ⏳ DEFERRED — flip `managedBy.dns`, add `constants.dnsExtraRecords`, delete `ts`+`tailnetRewrites`; realize apprise+ldap removals (riskiest; hold for review) |
+
+Only **augustus** currently imports a generator aggregate (`homelab-service-oidc-host`). aedilis,
+cicero, praeconinus, and mini still need their aggregate import added when their services migrate.
+Per-entry `managedBy.*` flags gate each generator, so migrated and un-migrated services coexist
+without double-emitting. See the appended "Remaining work" entry in the
+[overnight log](../service-consolidation-overnight-log.md) for the full task list and sequencing.
+
 ## Overriding principle: operational equivalence
 
 **Deploying every revision in this directory must be a theoretical no-op.** The migration changes

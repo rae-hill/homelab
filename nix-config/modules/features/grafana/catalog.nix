@@ -10,19 +10,14 @@ in
       homelab.catalog.grafana = {
         subdomain = svc.subdomain;
         host = "augustus";
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port; # 3000
-        };
-        tls.ca = null; # shares Caddy's managed cert
-        access.scope = "tailnet";
-        dns.enable = true;
+        backend.reverseProxy.port = svc.port; # 3000
+        tls.cert.shared = { }; # shares Caddy's managed cert
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         oidc = {
-          enable = true;
           clientId = svc.clientId; # "grafana"
-          public = false;
-          secretRef = "grafana_client_secret";
+          client.basic.secretRef = "grafana_client_secret";
           callbackPath = "/login/generic_oauth";
           landingPath = "/";
           displayName = "Grafana";

@@ -119,20 +119,16 @@ features/planka/
 homelab.catalog.planka = {
   subdomain = "planka";                 # -> https://planka.plato-splunk.media
   host = "augustus";
-  backend = { kind = "reverseProxy"; port = 1337; };
+  backend.reverseProxy.port = 1337;
 
-  tls = {
-    ca = null;                          # shares Caddy's managed cert; no security.acme.certs entry
-    gate = "oidc";                      # app-gated OIDC; no Caddy-level auth — emits no extra config
-  };
+  tls.cert.shared = { };                # shares Caddy's managed cert; no security.acme.certs entry
+  tls.gate.oidc = { };                  # app-gated OIDC; no Caddy-level auth — emits no extra config
 
-  dns.enable = true;                    # emits planka A/AAAA on aedilis -> augustus tailnet IPs
+  dns.tailnet = { };                    # emits planka A/AAAA on aedilis -> augustus tailnet IPs
 
   oidc = {
-    enable = true;
     clientId = "planka";
-    public = false;                     # basic client -> basicSecretFile
-    secretRef = "planka_client_secret"; # -> config.sops.secrets.planka_client_secret.path
+    client.basic.secretRef = "planka_client_secret";  # -> config.sops.secrets.planka_client_secret.path
     displayName = "Planka";
     callbackPath = "/oidc-callback";    # originUrl  = url + /oidc-callback
     landingPath = "/";                  # originLanding = url + /
@@ -153,13 +149,13 @@ homelab.catalog.planka = {
 };
 ```
 
-`subdomain`/`host` derive the vhost + DNS; `tls.ca = null` means the Caddy generator emits only the
-`reverse_proxy` body with no explicit cert and the ACME generator emits nothing.
+`subdomain`/`host` derive the vhost + DNS; `tls.cert.shared` means the Caddy generator emits only
+the `reverse_proxy` body with no explicit cert and the ACME generator emits nothing.
 
 ### 2.2 Generator output
 
 **Caddy** (`homelab-service-caddy`, nixos, filtered to `host == "augustus"`) renders the vhost body
-from `backend.kind == "reverseProxy"` + `port`:
+from the `backend.reverseProxy` `port`:
 
 ```caddy
 reverse_proxy 127.0.0.1:1337
@@ -174,7 +170,7 @@ reverse_proxy 127.0.0.1:1337
 
 **OIDC** (`homelab-service-oidc`, nixos, augustus only) reconstructs `oauth2.planka` from the `oidc`
 field: `originUrl = url + callbackPath`, `originLanding = url + landingPath`,
-`basicSecretFile = config.sops.secrets.<secretRef>.path`, `displayName`,
+`basicSecretFile = config.sops.secrets.<client.basic.secretRef>.path`, `displayName`,
 `allowInsecureClientDisablePkce`, and `scopeMaps` / `claimMaps` passed through verbatim. Output must
 equal §1.2 exactly.
 
@@ -182,7 +178,7 @@ equal §1.2 exactly.
 
 - **Vhost.** The catalog + Caddy generator produce the same `reverse_proxy` body to port `1337` on
   augustus, with the approved `localhost → 127.0.0.1` upstream-token substitution (§2.2) as the only
-  textual difference. No TLS gate, mTLS, or explicit cert is introduced — `tls.ca = null` keeps the
+  textual difference. No TLS gate, mTLS, or explicit cert is introduced — `tls.cert.shared` keeps the
   managed-cert behavior.
 - **OIDC client.** The OIDC generator must reproduce the **exact** `oauth2.planka` attribute set,
   including:
@@ -194,7 +190,7 @@ equal §1.2 exactly.
     (`planka.admins → admin`, `planka.project_owner → project_owner`, `planka.access → board_user`).
 - **Container, DB, backups, failure-notifs.** Moved verbatim into `service.nix`; byte-identical, so
   the container env (including the `OIDC_*_ROLES` values that mirror the claim map) is unchanged.
-- **DNS.** `dns.enable = true` reproduces the existing `planka → augustus` tailnet A/AAAA record
+- **DNS.** `dns.tailnet = { }` reproduces the existing `planka → augustus` tailnet A/AAAA record
   that `tailnetRewrites` emits today (covered end-to-end by the DNS cutover plan; parity verified
   there).
 
@@ -239,8 +235,9 @@ nix eval --json .#nixosConfigurations.augustus.config.services.failure-notifs.at
 ## 5. Schema-completeness note
 
 The generic catalog `oidc` schema in the parent plan (§2.1/§2.6) lists
-`enable / clientId / public / callbackPath / landingPath / displayName / secretRef / scopeMaps /
-claimMaps`. Planka needs **one additional passthrough field** not in that list:
+`clientId / client (client.basic.secretRef | client.public) / callbackPath / landingPath /
+displayName / scopeMaps / claimMaps`. Planka needs **one additional passthrough field** not in that
+list:
 
 - **`allowInsecureClientDisablePkce` (bool, default `false`).** Must be surfaced as an optional
   catalog `oidc` field and passed straight through to

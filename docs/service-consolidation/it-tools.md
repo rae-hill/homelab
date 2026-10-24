@@ -173,8 +173,8 @@ decision §5.1 #7.)
 
 - **No OIDC.** it-tools has no Kanidm client; the catalog entry omits `oidc` entirely → OIDC
   generator emits nothing.
-- **No manual TLS cert.** The vhost names no cert and shares Caddy's managed cert → `tls.ca = null`,
-  no `security.acme.certs` entry, no challenge vhost (parent plan §2.4).
+- **No manual TLS cert.** The vhost names no cert and shares Caddy's managed cert → `tls.cert.shared
+  = { }`, no `security.acme.certs` entry, no challenge vhost (parent plan §2.4).
 - **443 already open on augustus.** No new firewall opening.
 - **failure-notifs unchanged.** `attachServices = [ "podman-it-tools" ]` stays, colocated with the
   container in `service.nix`.
@@ -224,20 +224,17 @@ in
     zone = "plato-splunk.media";
     host = "augustus";
 
-    backend = {
-      kind = "reverseProxy";
-      port = svc.port; # 47309
-    };
+    backend.reverseProxy.port = svc.port; # 47309
 
     # Shares Caddy's managed cert — no manual ACME cert, no challenge vhost.
-    tls.ca = null;
+    tls.cert.shared = { };
 
     # Reachable over the tailnet (opens nothing new: 443 is a baseline host opening).
-    access.scope = "tailnet";
+    access.scope.tailnet = { };
 
     # Emit the dev-tools A/AAAA record on aedilis (reproduces today's tailnetRewrites entry).
-    dns.enable = true;
-    # dns.kind defaults to "tailnet" -> A/AAAA from constants.hosts.augustus.tailscale.
+    dns.tailnet = { };
+    # dns.tailnet -> A/AAAA from constants.hosts.augustus.tailscale.
   };
 }
 ```
@@ -245,12 +242,12 @@ in
 Notes:
 
 - **No `oidc` block** → OIDC generator skips it.
-- **`tls.ca = null`** → ACME generator skips it (no cert, no challenge vhost, shares Caddy's managed
-  cert — parent plan §2.4).
-- **`access.scope = "tailnet"`** documents reachability; the firewall generator maps `tailnet` to
+- **`tls.cert.shared = { }`** → ACME generator skips it (no cert, no challenge vhost, shares Caddy's
+  managed cert — parent plan §2.4).
+- **`access.scope.tailnet = { }`** documents reachability; the firewall generator maps `tailnet` to
   `tailscale0`, but since 443 is already a baseline opening owned by the host, nothing new is added
   (parent plan §2.7 / §5.1 #7).
-- **`dns.enable = true; dns.kind = "tailnet"`** → the DNS generator (on aedilis) emits
+- **`dns.tailnet = { }`** → the DNS generator (on aedilis) emits
   `dev-tools.plato-splunk.media` A/AAAA from `constants.hosts.augustus.tailscale.{v4,v6}`, replacing
   the `tailnetRewrites.dev-tools = "augustus"` line.
 
@@ -308,7 +305,7 @@ in
 ### 2.4 What the Caddy generator must render for it-tools
 
 The generator (parent plan §2.3) filters catalog entries to `host == config.networking.hostName`
-(so this only materializes on augustus), and for `backend.kind == "reverseProxy"` renders the vhost
+(so this only materializes on augustus), and for a `backend.reverseProxy` entry renders the vhost
 body. For it-tools it produces:
 
 ```nix
@@ -353,7 +350,7 @@ upstream substitution. Per surface:
 
 - Today: `tailnetRewrites.dev-tools = "augustus"` → apex A `100.95.250.77` + AAAA
   `fd7a:115c:a1e0::6301:fa4d` in the `plato-splunk.media` Primary zone.
-- New: `dns.enable = true; dns.kind = "tailnet"; host = "augustus"` → the DNS generator emits A/AAAA
+- New: `dns.tailnet = { }; host = "augustus"` → the DNS generator emits A/AAAA
   from `constants.hosts.augustus.tailscale.{v4,v6}`. Those MUST equal the `ts.augustus` values
   (`100.95.250.77` / `fd7a:115c:a1e0::6301:fa4d`) — the parent plan notes `ts` is a duplicate of
   `constants.hosts.<name>.tailscale` and is deleted only after the DNS parity diff is clean
@@ -363,7 +360,7 @@ upstream substitution. Per surface:
   change the provisioning mechanism, only the record source.
 
 > **Sequencing:** the Caddy/feature move (steps below) and the DNS generator cutover are independent.
-> it-tools' `dns.enable = true` is declared now, but the `dev-tools` A/AAAA record continues to be
+> it-tools' `dns.tailnet = { }` is declared now, but the `dev-tools` A/AAAA record continues to be
 > produced by `tailnetRewrites` until the DNS generator is switched on and `tailnetRewrites` is
 > deleted ([./dns-records.md](./dns-records.md), parent plan §3 step 9). During the overlap the record
 > is produced by exactly one source at a time (the DNS plan deletes the `tailnetRewrites` entry in the
@@ -372,7 +369,7 @@ upstream substitution. Per surface:
 
 ### 3.3 Firewall (augustus) — no change
 
-- it-tools opens nothing today; `access.scope = "tailnet"` maps to `tailscale0`, but 443 is a
+- it-tools opens nothing today; `access.scope.tailnet` maps to `tailscale0`, but 443 is a
   baseline host opening (owned by `_private/augustus/security.nix`, not service-attributable). The
   firewall generator adds **no** new port for it-tools. `networking.firewall` must be byte-identical.
 
@@ -501,8 +498,8 @@ nixos-rebuild build --flake .#augustus        # closure builds; compare store pa
 2. **Create the feature directory** `nix-config/modules/features/it-tools/`:
    - `catalog.nix` — the `homelab.catalog.it-tools` entry from §2.1
      (`subdomain = "dev-tools"`, `host = "augustus"`,
-     `backend = { kind = "reverseProxy"; port = 47309; }`, `tls.ca = null`,
-     `access.scope = "tailnet"`, `dns.enable = true`). **No `oidc`.**
+     `backend.reverseProxy.port = 47309`, `tls.cert.shared = { }`,
+     `access.scope.tailnet = { }`, `dns.tailnet = { }`). **No `oidc`.**
    - `service.nix` — the container + `failure-notifs.attachServices = [ "podman-it-tools" ]`,
      copied verbatim from §2.2.
    - `complete.nix` — aggregate both into `flake.modules.nixos.it-tools` (§2.3), preserving the
@@ -529,7 +526,7 @@ nixos-rebuild build --flake .#augustus        # closure builds; compare store pa
    missing/extra trailing newline, changed vhost key, leading indentation).
 
 8. **DNS (deferred to the dns-records migration).** Leave `tailnetRewrites.dev-tools = "augustus"` in
-   place for now; it-tools' `dns.enable = true` is declared but the record is still produced by
+   place for now; it-tools' `dns.tailnet = { }` is declared but the record is still produced by
    `tailnetRewrites`. When [./dns-records.md](./dns-records.md) switches on the DNS generator, verify
    §4.3 parity and delete the `tailnetRewrites` entry in that same change.
 
@@ -545,8 +542,8 @@ nixos-rebuild build --flake .#augustus        # closure builds; compare store pa
 ## 6. Migration checklist (condensed)
 
 - [ ] Baseline captured (§4.1/§4.2/§4.4 → `*.before`)
-- [ ] `features/it-tools/catalog.nix` — catalog entry (no OIDC, `tls.ca = null`, `access.scope =
-      "tailnet"`, `dns.enable = true`)
+- [ ] `features/it-tools/catalog.nix` — catalog entry (no OIDC, `tls.cert.shared = { }`,
+      `access.scope.tailnet = { }`, `dns.tailnet = { }`)
 - [ ] `features/it-tools/service.nix` — container + `failure-notifs.attachServices` (verbatim)
 - [ ] `features/it-tools/complete.nix` — aggregates to `flake.modules.nixos.it-tools`
 - [ ] Caddy generator opted in; hand-written vhost deleted
@@ -568,11 +565,11 @@ nixos-rebuild build --flake .#augustus        # closure builds; compare store pa
   every reverse-proxy service inherits the `localhost → 127.0.0.1` substitution as its one approved
   parity-gate diff — verify the renderer once here, then only the per-service _delta_ (OIDC maps, cert
   group, mTLS block, base-path rewrites) needs re-arguing in the other plans.
-- **`tls.ca = null` is the common case** (shared Caddy managed cert). Only manual-TLS services
+- **`tls.cert.shared = { }` is the common case** (shared Caddy managed cert). Only manual-TLS services
   (kanidm, postgres, radius, aedilis technitium) diverge with a `security.acme.certs` entry and a
-  per-service cert group (parent plan §5.1 #6).
+  per-service `tls.cert.own.certGroup` (parent plan §5.1 #6).
 - **failure-notifs always lives in `service.nix`**, never the catalog — it belongs to the service's
   systemd unit (parent plan §5.1 #2). Services with a `restic` backup or `services.*` block put those
   in `service.nix` too.
 - **DNS is centralized on aedilis** and migrated once (dns-records plan); per-service plans only
-  declare `dns.enable`/`dns.kind` and verify their record survives the cutover with the §4.3 eval.
+  declare their `dns.*` variant and verify their record survives the cutover with the §4.3 eval.

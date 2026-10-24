@@ -279,35 +279,35 @@ in
         host = "augustus";
 
         # radiusd serves its own TLS (RADSEC); Caddy only answers the HTTP-01 challenge.
-        # backend.port models the CHALLENGE vhost body target (acmePort), NOT a proxied app port.
-        backend = {
-          kind = "reverseProxy";
-          port = svc.acmePort;     # 22378 — challenge listener
-        };
+        # No Caddy-proxied app port; the challenge body is driven by tls.cert.own.challenge.
+        backend.none = { };
 
         tls = {
-          ca = "internal";                               # homelab step-ca
-          acmePort = svc.acmePort;                       # 22378
-          certGroup = "radiusd";                         # per-service group (parent §5.1 #6)
-          reloadServices = [ "podman-radiusd.service" ]; # standard reload (NOT postRun)
-          challenge = {
-            via = "caddy80";                             # Caddy fronts :80 -> loopback; no FW opening
+          cert.own = {
+            ca = "internal"; # homelab step-ca
+            acmePort = svc.acmePort; # 22378
+            certGroup = "radiusd"; # per-service group (parent §5.1 #6)
+            reloadServices = [ "podman-radiusd.service" ]; # standard reload (NOT postRun)
+            challenge = {
+              via = "caddy80"; # Caddy fronts :80 -> loopback; no FW opening
+              body.bare = { };
+            };
           };
-          gate = "none";
+          gate.none = { };
         };
 
         # radius is reachable on the PUBLIC interface for its own app ports (RADIUS 1812/1813,
         # TCP+UDP). This is the firewall-generator schema need (§5): service-attributable PUBLIC
         # ports, spanning both protocols, distinct from the 443/challenge openings.
         access = {
-          scope = "public";
+          scope.public = { };
           # SCHEMA NEED (§5): extra service-owned port openings beyond the vhost listenPort.
           extraPublicTCPPorts = [ 1812 1813 ];
           extraPublicUDPPorts = [ 1812 1813 ];
         };
 
         # The radius A/AAAA record stays in tailnetRewrites until dns-records.md.
-        dns.enable = false;
+        dns = null;
 
         # No oidc block -> OIDC generator emits nothing.
       };
@@ -320,7 +320,7 @@ in
 > they are judged out of scope for the firewall generator, the fallback (also §5) is to **leave the
 > `1812`/`1813` openings hand-listed in `_private/augustus/security.nix`** as baseline-ish
 > service ports (the same treatment radius/Technitium baseline ports already get per parent-plan
-> decision §5.1 #7), and have the catalog entry merely **document** them via `access.scope = "public"`
+> decision §5.1 #7), and have the catalog entry merely **document** them via `access.scope.public = { }`
 > without generating them. Either way the realized firewall is identical; §5 argues both options.
 
 ### 2.2 `features/radius/service.nix`
@@ -381,7 +381,7 @@ services.caddy.virtualHosts."http://radius.plato-splunk.media".extraConfig = ''
 
 > **`reloadServices` subtlety.** Today's radius cert has `reloadServices = [ "podman-radiusd.service"
 > ]` — **without** `caddy.service`. The keystone generator default is `reloadServices = [
-> "caddy.service" ] ++ e.tls.reloadServices`, which would yield `[ "caddy.service"
+> "caddy.service" ] ++ e.tls.cert.own.reloadServices`, which would yield `[ "caddy.service"
 > "podman-radiusd.service" ]` — a **superset** of today. Adding a `caddy.service` reload to radius's
 > cert is a (harmless) behavioral change — **not** a byte-exact no-op. Two ways to make it a true
 > no-op, decided at migration time against the parity diff (§4.1):
@@ -413,9 +413,9 @@ Deploying this revision must change nothing on augustus. Per surface:
 
 - **Key:** `radius.plato-splunk.media`, derived `<subdomain>.<zone>` → identical to
   `mkDomain "radius"`.
-- **`listenHTTP`:** `127.0.0.1:22378` from `tls.acmePort = 22378` → identical.
+- **`listenHTTP`:** `127.0.0.1:22378` from `tls.cert.own.acmePort = 22378` → identical.
 - **`server`:** `c.ca.acmeDirectoryHttp` for `ca == "internal"` → identical.
-- **`group`:** `radiusd` from `tls.certGroup` → identical (per-service group preserved).
+- **`group`:** `radiusd` from `tls.cert.own.certGroup` → identical (per-service group preserved).
 - **`reloadServices`:** must equal `[ "podman-radiusd.service" ]` exactly. With the §2.4(a)
   `reloadCaddy = false` refinement the generator emits exactly that; without it, it emits the
   superset `[ "caddy.service" "podman-radiusd.service" ]` (a flagged deviation). The parity gate
@@ -575,7 +575,7 @@ are:
 
 - **app ports**, not a vhost listen port or an ACME port — the generator has no concept of
   "additional service-owned ports";
-- **PUBLIC** (`0.0.0.0`), i.e. on the default interface, which `access.scope = "public"` already
+- **PUBLIC** (`0.0.0.0`), i.e. on the default interface, which `access.scope.public = { }` already
   selects, **but**
 - span **both TCP and UDP** — the generator emits no UDP at all.
 
@@ -616,7 +616,7 @@ Two ways to make radius a no-op:
   decision §5.1 #7, non-vhost infrastructure ports (SSH `22`, TS metrics `5252`, Technitium
   `53/80/443/853`, **and radius `1812/1813`**) already stay hand-listed in
   `_private/augustus/security.nix`. The radius catalog entry then only **documents** reachability
-  (`access.scope = "public"`) and the firewall generator contributes **nothing** for radius. This is
+  (`access.scope.public = { }`) and the firewall generator contributes **nothing** for radius. This is
   the smaller change and matches the parent plan's existing treatment of radius ports as baseline.
 
 **Recommendation:** Option B for the initial migration (smaller, matches parent §5.1 #7 which already
@@ -660,10 +660,10 @@ These are additive schema refinements that yield byte-identical realized config.
 
 3. **Create the feature directory** `nix-config/modules/features/radius/`:
    - `catalog.nix` — the `homelab.catalog.radius` entry from §2.1: `subdomain = "radius"`,
-     `host = "augustus"`, `tls = { ca = "internal"; acmePort = 22378; certGroup = "radiusd";
-     reloadServices = [ "podman-radiusd.service" ]; reloadCaddy = false; challenge.via = "caddy80"; }`,
-     `access.scope = "public"` (+ `extraPublic{TCP,UDP}Ports = [ 1812 1813 ]` **only if** Option A),
-     `dns.enable = false`. **No `oidc`.**
+     `host = "augustus"`, `tls.cert.own = { ca = "internal"; acmePort = 22378; certGroup = "radiusd";
+     reloadServices = [ "podman-radiusd.service" ]; reloadCaddy = false; challenge = { via = "caddy80";
+     body.bare = { }; }; }`, `access.scope.public = { }` (+ `extraPublic{TCP,UDP}Ports = [ 1812 1813 ]`
+     **only if** Option A), `dns = null`. **No `oidc`.**
    - `service.nix` — the `radiusd` container, the `radius_config` sops template, the `radiusCaDir`/
      `caCert` derivations, and `failure-notifs.attachServices = [ "podman-radiusd" ]` — copied
      verbatim.
@@ -698,7 +698,7 @@ These are additive schema refinements that yield byte-identical realized config.
    culprits: a spurious `caddy.service` reload, `handle` vs bare challenge body, `127.0.0.1` vs
    `localhost`, missing UDP openings under Option A).
 
-10. **DNS (deferred).** Leave `tailnetRewrites.radius = "augustus"` in place; `dns.enable = false`
+10. **DNS (deferred).** Leave `tailnetRewrites.radius = "augustus"` in place; `dns = null`
     here. The record cutover happens in [./dns-records.md](./dns-records.md).
 
 11. **Format + check + build.** `nix run .#nixfmt -- …`, `nix flake check`,
@@ -715,10 +715,10 @@ These are additive schema refinements that yield byte-identical realized config.
 - [ ] Generator refinements landed (§5: bare challenge body default, `tls.reloadCaddy` suppression,
       and `access.extraPublic{TCP,UDP}Ports` **iff** firewall Option A)
 - [ ] Baseline captured (§4.1–§4.4 → `*.before`)
-- [ ] `features/radius/catalog.nix` — entry: `tls.ca = "internal"`, `acmePort = 22378`,
-      `certGroup = "radiusd"`, `reloadServices = ["podman-radiusd.service"]`, `reloadCaddy = false`,
-      `challenge.via = "caddy80"`; `access.scope = "public"` (+ `extraPublic*Ports = [1812 1813]` iff
-      Option A); **no OIDC**; `dns.enable = false`
+- [ ] `features/radius/catalog.nix` — entry: `tls.cert.own = { ca = "internal"; acmePort = 22378;
+      certGroup = "radiusd"; reloadServices = ["podman-radiusd.service"]; reloadCaddy = false;
+      challenge = { via = "caddy80"; body.bare = { }; }; }`; `access.scope.public = { }`
+      (+ `extraPublic*Ports = [1812 1813]` iff Option A); **no OIDC**; `dns = null`
 - [ ] `features/radius/service.nix` — `radiusd` container + `radius_config` sops template + CA
       derivations + `failure-notifs.attachServices` (verbatim)
 - [ ] `features/radius/complete.nix` — aggregates to `flake.modules.nixos.radius`

@@ -290,32 +290,31 @@ in
           host = "augustus";
 
           # postgres serves TLS itself; Caddy only answers the HTTP-01 challenge.
-          # backend.port is the loopback challenge target (acmePort), NOT a proxied app port.
-          # (The reverseProxy backend models the CHALLENGE vhost body; see §2.4.)
-          backend = {
-            kind = "reverseProxy";
-            port = svc.acmePort;    # 41872 — challenge listener
-          };
+          # No Caddy-proxied app port; the challenge body is driven by tls.cert.own.challenge.
+          backend.none = { };
 
           tls = {
-            ca = "internal";                 # homelab step-ca
-            acmePort = svc.acmePort;         # 41872
-            certGroup = "postgres-certs";    # per-service group (parent plan §5.1 #6)
-            # SCHEMA GAP (§5): the cert renews via a postRun hook, NOT reloadServices.
-            postRun = "systemctl start postgresql-update-certs.service";
-            reloadServices = [ ];            # explicitly empty — postgres uses postRun
-            challenge = {
-              via = "caddy80";               # Caddy fronts :80 -> loopback 41872; no FW opening
+            cert.own = {
+              ca = "internal"; # homelab step-ca
+              acmePort = svc.acmePort; # 41872
+              certGroup = "postgres-certs"; # per-service group (parent plan §5.1 #6)
+              # SCHEMA GAP (§5): the cert renews via a postRun hook, NOT reloadServices.
+              postRun = "systemctl start postgresql-update-certs.service";
+              reloadServices = [ ]; # explicitly empty — postgres uses postRun
+              challenge = {
+                via = "caddy80"; # Caddy fronts :80 -> loopback 41872; no FW opening
+                body.bare = { };
+              };
             };
-            gate = "none";                   # no Caddy-level auth on the challenge vhost
+            gate.none = { }; # no Caddy-level auth on the challenge vhost
           };
 
           # 5432 is a baseline tailnet opening owned by the host; the challenge is caddy80
           # (loopback). The firewall generator adds nothing. scope documents reachability.
-          access.scope = "tailnet";
+          access.scope.tailnet = { };
 
           # The postgres-augustus A/AAAA record stays in tailnetRewrites until dns-records.md.
-          dns.enable = false;
+          dns = null;
 
           # No oidc block -> OIDC generator emits nothing.
         };
@@ -326,16 +325,16 @@ in
 
 Notes:
 
-- **`backend.port = acmePort`** — for a manual-TLS service the generated `http://` **challenge**
-  vhost body is `reverse_proxy localhost:<acmePort>`, which is exactly what the reverseProxy renderer
-  produces. See §2.4 for the subtlety that the acme generator (not the caddy generator) owns the
-  `http://` vhost, so we must avoid double-emitting.
-- **`tls.ca = "internal"`**, **`acmePort = 41872`**, **`certGroup = "postgres-certs"`** → the acme
+- **`backend.none = { }`** — for a manual-TLS service Caddy proxies no app port; the generated
+  `http://` **challenge** vhost body (`reverse_proxy localhost:<acmePort>`) is driven by
+  `tls.cert.own.challenge.body.bare`, not the backend. See §2.4 for the subtlety that the acme
+  generator (not the caddy generator) owns the `http://` vhost, so we must avoid double-emitting.
+- **`tls.cert.own.ca = "internal"`**, **`acmePort = 41872`**, **`certGroup = "postgres-certs"`** → the acme
   generator emits the `security.acme.certs` entry with the per-service group.
-- **`tls.postRun`** (NEW field, §5) → the generator must set `security.acme.certs.<fqdn>.postRun`
+- **`tls.cert.own.postRun`** (NEW field, §5) → the generator must set `security.acme.certs.<fqdn>.postRun`
   from it. **`reloadServices = [ ]`** is explicit — postgres must NOT get the generator's default
   `[ "caddy.service" ]` reload (see the equivalence argument §3.2 for how this is reconciled).
-- **`dns.enable = false`** — the record is owned by `tailnetRewrites` today; flipping to generator
+- **`dns = null`** — the record is owned by `tailnetRewrites` today; flipping to generator
   output happens in [./dns-records.md](./dns-records.md).
 
 ### 2.2 `features/postgres/service.nix`
@@ -405,9 +404,9 @@ services.caddy.virtualHosts."http://postgres-augustus.plato-splunk.media".extraC
 Two generator behaviors this service pins down:
 
 1. **`postRun` passthrough (schema gap, §5).** The keystone acme generator only emits
-   `reloadServices = [ "caddy.service" ] ++ e.tls.reloadServices`. postgres has **no** caddy reload
+   `reloadServices = [ "caddy.service" ] ++ e.tls.cert.own.reloadServices`. postgres has **no** caddy reload
    and instead needs `postRun`. The generator's `mkCert` must be extended to emit
-   `postRun = e.tls.postRun` when set, and to **omit the default `caddy.service` reload** when
+   `postRun = e.tls.cert.own.postRun` when set, and to **omit the default `caddy.service` reload** when
    `reloadServices == [ ]` and `postRun` is set (postgres's current cert has neither a
    `reloadServices` nor a `caddy.service` reload). See §3.2 for why the current block has no caddy
    reload at all.
@@ -447,21 +446,21 @@ false`). Per surface:
 
 - **Key:** `postgres-augustus.plato-splunk.media`, derived `<subdomain>.<zone>` with the same base
   domain → identical to `cfg.tlsDomain` / `mkDomain "postgres-augustus"`.
-- **`listenHTTP`:** `127.0.0.1:41872` from `tls.acmePort = 41872` → identical.
+- **`listenHTTP`:** `127.0.0.1:41872` from `tls.cert.own.acmePort = 41872` → identical.
 - **`server`:** `c.ca.acmeDirectoryHttp` (the acme generator uses the same constant for
   `ca == "internal"`) → identical.
-- **`group`:** `postgres-certs` from `tls.certGroup` → identical (per-service group preserved).
+- **`group`:** `postgres-certs` from `tls.cert.own.certGroup` → identical (per-service group preserved).
 - **`postRun`:** `<pkgs.systemd>/bin/systemctl start postgresql-update-certs.service` from
-  `tls.postRun` → identical, **provided the generator emits `postRun`** (schema gap §5). The `pkgs`
+  `tls.cert.own.postRun` → identical, **provided the generator emits `postRun`** (schema gap §5). The `pkgs`
   reference resolves to the same store path on a given revision, so the string is byte-identical.
 
 ### 3.2 `reloadServices` — the subtle part
 
 Today's postgres cert has **neither** `reloadServices` **nor** a `caddy.service` reload — it relies
 solely on `postRun`. The keystone generator's default is `reloadServices = [ "caddy.service" ] ++
-e.tls.reloadServices`. If applied unchanged, postgres would **gain** a `caddy.service` reload it does
+e.tls.cert.own.reloadServices`. If applied unchanged, postgres would **gain** a `caddy.service` reload it does
 not have today — a behavioral change (not a no-op). Resolution: the generator must treat a
-`postRun`-only cert specially — when `tls.postRun != null` and `tls.reloadServices == [ ]`, emit
+`postRun`-only cert specially — when `tls.cert.own.postRun != null` and `tls.cert.own.reloadServices == [ ]`, emit
 **no** `reloadServices` attr at all (matching today). This is part of the §5 schema addition and is
 required for byte-exact parity. The parity gate (§4.1) will show any spurious `reloadServices` or
 `caddy.service` entry as a failing diff.
@@ -626,7 +625,7 @@ This migration **cannot** be a no-op without an additive change to the keystone 
 ([./catalog-and-generators.md](./catalog-and-generators.md) §2 `tlsType`, §3.4 `mkCert`). postgres is
 the service that surfaces it:
 
-1. **`tls.postRun` passthrough (NEW field).** Add an optional field to the `tlsType` submodule:
+1. **`tls.cert.own.postRun` passthrough (NEW field).** Add an optional field to the `cert.own` submodule:
 
    ```nix
    postRun = mkOption {
@@ -644,17 +643,17 @@ the service that surfaces it:
    and in `mkCert`, emit it:
 
    ```nix
-   // lib.optionalAttrs (e.tls.postRun != null) { postRun = e.tls.postRun; }
+   // lib.optionalAttrs (e.tls.cert.own.postRun != null) { postRun = e.tls.cert.own.postRun; }
    ```
 
 2. **`postRun`-only certs must not gain the default `caddy.service` reload.** Today's postgres cert
    has **no** `reloadServices` at all. The generator's default (`reloadServices = [ "caddy.service" ]
-   ++ e.tls.reloadServices`) would add one. For byte-exact parity, when `tls.postRun != null` **and**
-   `tls.reloadServices == [ ]`, the generator must emit **no** `reloadServices` attribute:
+   ++ e.tls.cert.own.reloadServices`) would add one. For byte-exact parity, when `tls.cert.own.postRun != null` **and**
+   `tls.cert.own.reloadServices == [ ]`, the generator must emit **no** `reloadServices` attribute:
 
    ```nix
-   // lib.optionalAttrs (e.tls.reloadServices != [ ] || e.tls.postRun == null) {
-        reloadServices = [ "caddy.service" ] ++ e.tls.reloadServices;
+   // lib.optionalAttrs (e.tls.cert.own.reloadServices != [ ] || e.tls.cert.own.postRun == null) {
+        reloadServices = [ "caddy.service" ] ++ e.tls.cert.own.reloadServices;
       }
    ```
 
@@ -680,7 +679,7 @@ that yield byte-identical realized config — not runtime behavior changes.
 > landed**, and follows the parent-plan ordering (cert-terminating services after the simple ones,
 > parent §3 step 4).
 
-1. **Land the acme-generator schema additions (§5)** in `features/homelab-service/`: `tls.postRun`
+1. **Land the acme-generator schema additions (§5)** in `features/homelab-service/`: `tls.cert.own.postRun`
    field, `mkCert` `postRun` emission, and the `postRun`-only no-`reloadServices` handling. Re-run the
    keystone §5 parity gate (introducing the fields with no entry using them stays a no-op).
 
@@ -691,9 +690,9 @@ that yield byte-identical realized config — not runtime behavior changes.
    - `options.nix` — move the `services.peesequel.*` option definitions verbatim.
    - `catalog.nix` — the `homelab.catalog.postgres` entry from §2.1, gated on
      `services.peesequel.enable`: `subdomain = "postgres-augustus"`, `host = "augustus"`,
-     `tls = { ca = "internal"; acmePort = 41872; certGroup = "postgres-certs"; postRun =
-     "systemctl start postgresql-update-certs.service"; reloadServices = [ ]; challenge.via =
-     "caddy80"; }`, `access.scope = "tailnet"`, `dns.enable = false`. **No `oidc`.**
+     `tls.cert.own = { ca = "internal"; acmePort = 41872; certGroup = "postgres-certs"; postRun =
+     "systemctl start postgresql-update-certs.service"; reloadServices = [ ]; challenge = { via =
+     "caddy80"; body.bare = { }; }; }`, `access.scope.tailnet = { }`, `dns = null`. **No `oidc`.**
    - `service.nix` — the server, `postgresql-update-certs` oneshot + `updateCertsScript`,
      `postgres-certs` group, provision/grant oneshots, backup, and failure-notifs — copied verbatim,
      all under `lib.mkIf cfg.enable`.
@@ -722,7 +721,7 @@ that yield byte-identical realized config — not runtime behavior changes.
    spurious `caddy.service` reload, `handle` vs bare challenge body, `127.0.0.1` vs `localhost`).
 
 9. **DNS (deferred).** Leave `tailnetRewrites.postgres-augustus = "augustus"` in place;
-   `dns.enable = false` here. The record cutover happens in [./dns-records.md](./dns-records.md).
+   `dns = null` here. The record cutover happens in [./dns-records.md](./dns-records.md).
 
 10. **Format + check + build.** `nix run .#nixfmt -- …`, `nix flake check`,
     `nixos-rebuild build --flake .#augustus`. All must pass.
@@ -735,13 +734,14 @@ that yield byte-identical realized config — not runtime behavior changes.
 
 ## 7. Migration checklist (condensed)
 
-- [ ] acme-generator schema additions landed (§5: `tls.postRun`, `mkCert` emission, `postRun`-only
+- [ ] acme-generator schema additions landed (§5: `tls.cert.own.postRun`, `mkCert` emission, `postRun`-only
       no-`reloadServices`)
 - [ ] Baseline captured (§4.1–§4.4 → `*.before`)
 - [ ] `features/postgres/options.nix` — `services.peesequel.*` options (verbatim)
-- [ ] `features/postgres/catalog.nix` — entry gated on `peesequel.enable`; `tls.ca = "internal"`,
-      `acmePort = 41872`, `certGroup = "postgres-certs"`, `postRun = …`, `reloadServices = [ ]`,
-      `challenge.via = "caddy80"`; **no OIDC**; `dns.enable = false`
+- [ ] `features/postgres/catalog.nix` — entry gated on `peesequel.enable`;
+      `tls.cert.own = { ca = "internal"; acmePort = 41872; certGroup = "postgres-certs"; postRun = …;
+      reloadServices = [ ]; challenge = { via = "caddy80"; body.bare = { }; }; }`; **no OIDC**;
+      `dns = null`
 - [ ] `features/postgres/service.nix` — server + update-certs oneshot + `postgres-certs` group +
       provision/grant + backup + `failure-notifs.attachServices` (verbatim, under `mkIf cfg.enable`)
 - [ ] `features/postgres/complete.nix` — aggregates to `flake.modules.nixos.postgres`

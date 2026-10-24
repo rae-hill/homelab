@@ -41,7 +41,7 @@ Two things set mini apart from every NixOS per-service plan:
    existing Caddyfile `import`s — the recommended option (b) in parent plan §2.2a. The mini-specific
    **global options** (`email`, `acme_ca`, `acme_ca_root`, `storage`, `admin off`, `metrics`,
    `debug`) stay **hand-written**, since they are not expressible through the catalog.
-2. **Caddy-native ACME (no `security.acme`).** `tls.acmePort` / `tls.challenge` are **ignored** by
+2. **Caddy-native ACME (no `security.acme`).** `tls.cert.own.acmePort` / `tls.cert.own.challenge` are **ignored** by
    the darwin backend (parent plan §2.2a); the generator emits **no** explicit `tls <fullchain>
    <key>` line for a non-mTLS vhost, so Caddy's global `acme_ca` issues/renews the server cert. For
    mTLS vhosts it emits only the `tls { client_auth … }` block (cert-less — Caddy's ACME supplies the
@@ -334,50 +334,46 @@ in
     mini-caddy-metrics = {
       subdomain = "mini-caddy-metrics";
       host = "mini";
-      # backend has no upstream: use a "none"/extraConfig-only shape. The `metrics`
+      # backend has no upstream: use a "none" shape. The `metrics`
       # directive is emitted via extraCaddyConfig (see §5 gap: metrics-only vhost).
-      backend = { kind = "reverseProxy"; port = null; };   # see §5 #2 (no-upstream vhost)
+      backend.none = { };                  # see §5 #2 (no-upstream vhost)
       tls = {
-        gate = "mtls";
-        mtlsTrustPoolFile = rootCert;
-        mtlsServerCert = null;           # cert-less; Caddy-native ACME server cert
-        ca = null;                       # darwin ignores ACME anyway (no security.acme)
+        gate.mtls.trustPoolFile = rootCert;
+        cert.shared = { };                 # darwin ignores ACME anyway (no security.acme)
       };
       extraCaddyConfig = ''
         metrics
       '';
-      dns.enable = false;                 # mini-caddy-metrics A/AAAA stays in tailnetRewrites
+      dns = null;                          # mini-caddy-metrics A/AAAA stays in tailnetRewrites
     };
 
     # (2) Jellyfin metrics scrape, mTLS + rewrite.
     mini-jellyfin-metrics = {
       subdomain = "mini-jellyfin-metrics";
       host = "mini";
-      backend = { kind = "reverseProxy"; port = 8096; };   # 127.0.0.1:8096
+      backend.reverseProxy.port = 8096;    # 127.0.0.1:8096
       tls = {
-        gate = "mtls";
-        mtlsTrustPoolFile = rootCert;
-        mtlsServerCert = null;
-        ca = null;
+        gate.mtls.trustPoolFile = rootCert;
+        cert.shared = { };
       };
       extraCaddyConfig = ''
         rewrite / /metrics
       '';
-      dns.enable = false;
+      dns = null;
     };
 
     # (3) Public Jellyfin, plain reverse-proxy + /metrics redirect.
     jellyfin = {
       subdomain = "jellyfin";
       host = "mini";
-      backend = { kind = "reverseProxy"; port = 8096; };   # 127.0.0.1:8096 (renderer std; was localhost)
-      tls.ca = null;                      # Caddy-native server cert; no gate
+      backend.reverseProxy.port = 8096;   # 127.0.0.1:8096 (renderer std; was localhost)
+      tls.cert.shared = { };              # Caddy-native server cert; no gate
       extraCaddyConfig = ''
         handle_path /metrics {
           redir https://mini-jellyfin-metrics.plato-splunk.media
         }
       '';
-      dns.enable = false;
+      dns = null;
     };
   };
 }
@@ -618,8 +614,8 @@ These are the catalog-schema and darwin-mechanism shortfalls this module surface
    `catalogHost.<host>.caddyGlobal` block), parallel to the cicero `https_port` host-config gap
    ([./cicero-observability.md](./cicero-observability.md) §5 #1). Not recommended for mini.
 2. **No-upstream (metrics-only) vhost.** The `mini-caddy-metrics` block has **no** `reverse_proxy` —
-   just the `metrics` directive. The catalog `backend.kind` enum is `reverseProxy | static`, both of
-   which emit an upstream directive. Add a `backend.kind = "none"` (or allow `port = null` to emit no
+   just the `metrics` directive. The catalog `backend` attrTag's upstream variants are `reverseProxy`
+   and `static`, both of which emit an upstream directive. Use `backend.none = { }` (which emits no
    backend directive) so a vhost can be body-only (`extraCaddyConfig` supplies `metrics`). Without
    this the renderer would emit a spurious `reverse_proxy` line.
 3. **~~Explicit upstream host token~~ RESOLVED by global `127.0.0.1` standardization.** Block (2) uses
@@ -636,12 +632,13 @@ These are the catalog-schema and darwin-mechanism shortfalls this module surface
    passes regardless. If **textual** byte-parity is wanted, add a `preBackendCaddyConfig` (lines
    emitted before the backend directive) so `rewrite`/`handle_path` can precede `reverse_proxy`
    exactly as today.
-5. **Caddy-native ACME on darwin (no `security.acme`, `tls.acmePort`/`challenge` ignored).** Not a gap
+5. **Caddy-native ACME on darwin (no `security.acme`, `tls.cert.own`/`challenge` ignored).** Not a gap
    so much as a **confirmed design point** (parent plan §2.2a / decision §5.1 #4): the darwin backend
-   emits **no** cert config. `tls.ca`, `tls.acmePort`, `tls.challenge` are **ignored** for
+   emits **no** cert config. `tls.cert`, its `acmePort`, and `challenge` are **ignored** for
    `host == mini` entries; the server cert comes from the global `acme_ca`. The catalog entries above
-   set `ca = null` for clarity, but even `ca = "internal"` would be ignored on darwin. Document this
-   so a future contributor doesn't expect a `security.acme.certs` entry for a mini service.
+   use `tls.cert.shared = { }` for clarity, but even `tls.cert.own.ca = "internal"` would be ignored
+   on darwin. Document this so a future contributor doesn't expect a `security.acme.certs` entry for a
+   mini service.
 
 ---
 
@@ -649,14 +646,14 @@ These are the catalog-schema and darwin-mechanism shortfalls this module surface
 
 - [ ] Baseline captured: §4.1 (current Caddyfile `--raw` → adapted JSON), §4.3 (launchd command,
       pki trust) → `*.before`
-- [ ] Keystone schema gaps resolved: fragment-import darwin backend (§5 #1), `backend.kind = "none"`/
-      `port = null` no-upstream vhost (§5 #2), explicit upstream host token (§5 #3), optional
+- [ ] Keystone schema gaps resolved: fragment-import darwin backend (§5 #1), `backend.none = { }`
+      no-upstream vhost (§5 #2), explicit upstream host token (§5 #3), optional
       `preBackendCaddyConfig` / adapted-JSON parity approach (§5 #4); confirm darwin ignores ACME (§5 #5)
 - [ ] `features/mini-jellyfin/catalog.nix` — three entries (`mini-caddy-metrics`,
-      `mini-jellyfin-metrics`, `jellyfin`) with `host = "mini"`, mTLS gates + `mtlsTrustPoolFile =
-      c.ca.rootCert` + `mtlsServerCert = null` for (1)/(2), `extraCaddyConfig` for `metrics` /
+      `mini-jellyfin-metrics`, `jellyfin`) with `host = "mini"`, `gate.mtls.trustPoolFile =
+      c.ca.rootCert` for (1)/(2), `tls.cert.shared = { }`, `extraCaddyConfig` for `metrics` /
       `rewrite` / `handle_path redir`, upstream `127.0.0.1:8096` (2) vs `localhost:8096` (3),
-      `dns.enable = false` (§2.1)
+      `dns = null` (§2.1)
 - [ ] `features/mini-jellyfin/caddy-host.nix` — hand-written global block + `import
       /etc/caddy_nix/catalog-sites.caddy` + unchanged `launchd.daemons.caddy` (§2.2)
 - [ ] darwin Caddy generator opted in (`managedBy.caddy`) → emits `caddy_nix/catalog-sites.caddy`

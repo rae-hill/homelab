@@ -10,18 +10,14 @@ in
       homelab.catalog.habitsync = {
         subdomain = svc.subdomain;
         host = "augustus";
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port; # 6842 (source already used 127.0.0.1 — byte-identical)
-        };
-        tls.ca = null;
-        access.scope = "tailnet";
-        dns.enable = true;
+        backend.reverseProxy.port = svc.port; # 6842 (source already used 127.0.0.1 — byte-identical)
+        tls.cert.shared = { };
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         oidc = {
-          enable = true;
           clientId = svc.clientId; # "habitsync"
-          public = true;
+          client.public = { };
           # Two callbacks: the relative web one (appended to url) and the ABSOLUTE custom-scheme
           # mobile one (used verbatim — contains "://").
           callbackPath = [

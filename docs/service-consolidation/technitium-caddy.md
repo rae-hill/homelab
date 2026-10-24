@@ -13,7 +13,7 @@ Companion (certs/firewall): [./technitium-aedilis.md](./technitium-aedilis.md)
 > Technitium itself — not Caddy — with no mTLS), and a **metrics** vhost (`https://dns-metrics:9443`)
 > that terminates **mutual TLS** (`client_auth require_and_verify`) **and** enforces a **path
 > allowlist** (`@node /metrics`, `@dns /api/dashboard/metrics/text`, `@login /api/user/login`, else
-> `respond 404`). The allowlist is the one case the keystone `gate = "mtls+allowlist"` + the
+> `respond 404`). The allowlist is the one case the keystone `gate.mtlsAllowlist` variant + the
 > `extraCaddyConfig` escape hatch were designed for. This plan owns the two HTTPS vhost **bodies**
 > (concern **V**, incl. mTLS + allowlist); the **certs + challenge vhosts + firewall openings** for
 > these same names are the companion plan [./technitium-aedilis.md](./technitium-aedilis.md).
@@ -268,8 +268,8 @@ As with the companion, two shapes; the first is recommended:
   module keeps producing the values.** The two catalog entries `technitium-admin` /
   `technitium-metrics` (the **same** entries defined in the companion plan
   [./technitium-aedilis.md](./technitium-aedilis.md) §2.1) gain `managedBy.caddy = true` and the
-  fields needed to render the body: `backend` (upstream port), `tls.gate` (`"oidc"` for admin,
-  `"mtls+allowlist"` for metrics), `tls.mtlsTrustPoolFile`, and `extraCaddyConfig` for the metrics
+  fields needed to render the body: `backend` (upstream port), `tls.gate` (`oidc` for admin,
+  `mtlsAllowlist` for metrics), `tls.gate.mtlsAllowlist.trustPoolFile`, and `extraCaddyConfig` for the metrics
   allowlist. The caddy generator reads the ACME cert directory (created by the acme generator in the
   companion plan) to render the explicit `tls <pem> <key>` line — exactly as the keystone renderer
   does for kanidm. `technitium/caddy.nix`'s two `services.caddy.virtualHosts` blocks are deleted; the
@@ -312,14 +312,14 @@ in
         subdomain = "dns-admin";
         host = "aedilis";
         listenPort = tech.adminPort;                 # 8443 -> vhost key gets :8443 suffix
-        backend = { kind = "reverseProxy"; port = tech.webHttpPort; };  # 127.0.0.1:5380
+        backend.reverseProxy.port = tech.webHttpPort;  # 127.0.0.1:5380
         tls = {
-          ca = "internal";                           # explicit step-ca cert named in the vhost
-          # … companion plan's acmePort/certGroup/reloadServices/challenge (not repeated here) …
-          gate = "oidc";                             # OIDC handled by Technitium, NOT Caddy -> no Caddy auth
+          cert.own.ca = "internal";                  # explicit step-ca cert named in the vhost
+          # … companion plan's own.acmePort/certGroup/reloadServices/challenge (not repeated here) …
+          gate.oidc = { };                           # OIDC handled by Technitium, NOT Caddy -> no Caddy auth
           # upstream token is 127.0.0.1 (the renderer's global default — §7.8 #22; matches source).
         };
-        access.scope = "tailnet";
+        access.scope.tailnet = { };
         # managedBy.caddy = true;  (flipped on in this plan's migration step)
       };
 
@@ -328,14 +328,13 @@ in
         subdomain = "dns-metrics";
         host = "aedilis";
         listenPort = dnsMetrics.port;                # 9443
-        backend = { kind = "reverseProxy"; port = dnsMetrics.nodeExporterPort; };  # 127.0.0.1:9100 (@node)
+        backend.reverseProxy.port = dnsMetrics.nodeExporterPort;  # 127.0.0.1:9100 (@node)
         tls = {
-          ca = "internal";
-          gate = "mtls+allowlist";                   # mTLS client_auth + the path allowlist below
-          mtlsTrustPoolFile = c.ca.rootCert;         # trust_pool pem_file (= metricsMtlsTrustPoolFile)
-          # … companion plan's acmePort/certGroup/reloadServices/challenge …
+          cert.own.ca = "internal";
+          gate.mtlsAllowlist.trustPoolFile = c.ca.rootCert; # mTLS client_auth + the path allowlist below
+          # … companion plan's own.acmePort/certGroup/reloadServices/challenge …
         };
-        access.scope = "tailnet";
+        access.scope.tailnet = { };
         # The path allowlist is bespoke -> escape hatch. The @node handle is the "backend"
         # (/metrics -> nodeExporterPort), but @dns/@login proxy a DIFFERENT upstream (webHttpPort),
         # and the catch-all is `respond 404`. The whole allowlist is supplied verbatim so it is
@@ -366,9 +365,10 @@ in
 }
 ```
 
-> The `tls.acmePort`, `tls.certGroup`, `tls.reloadServices`, and `tls.challenge` fields on these two
-> entries are defined by the companion plan (which owns cert/challenge/firewall). This plan only adds
-> `backend`, `tls.gate`, `tls.mtlsTrustPoolFile`, `extraCaddyConfig`, and flips `managedBy.caddy`.
+> The `tls.cert.own.acmePort`, `tls.cert.own.certGroup`, `tls.cert.own.reloadServices`, and
+> `tls.cert.own.challenge` fields on these two entries are defined by the companion plan (which owns
+> cert/challenge/firewall). This plan only adds `backend`, `tls.gate`,
+> `tls.gate.mtlsAllowlist.trustPoolFile`, `extraCaddyConfig`, and flips `managedBy.caddy`.
 > Both plans contribute to the **same** two entries — no duplication of the shared facts.
 
 ### 2.2 What the caddy generator must render
@@ -377,17 +377,17 @@ The keystone caddy generator (catalog-and-generators §3.2) for `host == aedilis
 reading `certDir = config.security.acme.certs.<fqdn>.directory` (created by the companion plan's acme
 generator), must render the shared vhost body (`renderVhostBody`, keystone §3.1):
 
-- **Admin** (`gate = "oidc"`, `backend.kind = "reverseProxy"`): the renderer emits `plainTlsLine`
+- **Admin** (`gate.oidc`, `backend.reverseProxy`): the renderer emits `plainTlsLine`
   (explicit `tls <fullchain> <key>` from `certDir`) then `backendBlock` (`reverse_proxy
-  127.0.0.1:5380`). `gate = "oidc"` adds **no** Caddy auth (app-handled — keystone §3.1). Vhost key
+  127.0.0.1:5380`). `gate.oidc` adds **no** Caddy auth (app-handled — keystone §3.1). Vhost key
   gets the `:8443` suffix because `listenPort != 443` (keystone §3.2). Byte-exact to §1.3 —
   **conditional on the upstream token being `127.0.0.1`** (gap F; keystone default is `localhost` for
   reverse-proxy, which would diverge).
-- **Metrics** (`gate = "mtls+allowlist"`): the renderer emits `mtlsTlsLine` (explicit `tls <fullchain>
-  <key> { client_auth { mode require_and_verify; trust_pool file { pem_file <mtlsTrustPoolFile> } } }`)
-  then — for `mtls+allowlist` — **suppresses** the default `backendBlock` (the allowlist's `@node`
+- **Metrics** (`gate.mtlsAllowlist`): the renderer emits `mtlsTlsLine` (explicit `tls <fullchain>
+  <key> { client_auth { mode require_and_verify; trust_pool file { pem_file <trustPoolFile> } } }`)
+  then — for `mtlsAllowlist` — **suppresses** the default `backendBlock` (the allowlist's `@node`
   handle IS the backend) and emits the `extraCaddyConfig` allowlist verbatim. Vhost key gets `:9443`.
-  Byte-exact to §1.4 — **conditional on gap (G)**: `mtls+allowlist` must emit cert + mTLS block +
+  Byte-exact to §1.4 — **conditional on gap (G)**: `mtlsAllowlist` must emit cert + mTLS block +
   `extraCaddyConfig` and **not** an auto `backendBlock` (else the body would double a `reverse_proxy`).
 
 ### 2.3 `services.caddy.enable`/`useInternalCA` + cert-group membership — preserved in the feature
@@ -420,7 +420,7 @@ DNS (`dns-admin`/`dns-metrics` records) is [./dns-records.md](./dns-records.md).
 
 ### 3.1 Admin vhost — explicit-cert reverse proxy, OIDC gate is app-side
 
-The keystone renderer for `gate = "oidc"` + `backend.kind = "reverseProxy"` + `certDir != null`
+The keystone renderer for `gate.oidc` + `backend.reverseProxy` + `certDir != null`
 produces:
 
 ```
@@ -441,13 +441,13 @@ reverse_proxy 127.0.0.1:5380
   upstream token on **`127.0.0.1`** (operator-approved, catalog-and-generators §7.8 #22), which
   matches today's source **exactly** — so there is **no** deviation here (gap (F) is resolved by the
   global standardization; no `backend.upstreamHost` field needed). ✓
-- **`gate = "oidc"`** adds no Caddy auth (correct — Technitium does OIDC itself). ✓
+- **`gate.oidc`** adds no Caddy auth (correct — Technitium does OIDC itself). ✓
 - No tracing span (aedilis has no `services.tempo.enable` fronting this, and today's body has none) —
   the renderer's `tracingBlock` emits nothing. Confirm via parity gate. ✓
 
 ### 3.2 Metrics vhost — mTLS + path allowlist (the escape-hatch case)
 
-The keystone renderer for `gate = "mtls+allowlist"` + `certDir != null` + `mtlsTrustPoolFile` + the
+The keystone renderer for `gate.mtlsAllowlist` + `certDir != null` + `trustPoolFile` + the
 `extraCaddyConfig` allowlist produces:
 
 ```
@@ -455,7 +455,7 @@ tls <certDir>/fullchain.pem <certDir>/key.pem {
   client_auth {
     mode require_and_verify
     trust_pool file {
-      pem_file <mtlsTrustPoolFile>
+      pem_file <trustPoolFile>
     }
   }
 }
@@ -484,21 +484,21 @@ handle {
 
 - **Key:** `https://dns-metrics.plato-splunk.media:9443` (`listenPort = 9443`). Identical. ✓
 - **mTLS `tls` block:** `mtlsTlsLine { certPem = <certDir>/fullchain.pem; certKey = <certDir>/key.pem;
-  trustPool = mtlsTrustPoolFile }` (keystone §3.1) renders exactly the `tls <pem> <key> { client_auth
+  trustPool = gate.mtlsAllowlist.trustPoolFile }` (keystone §3.1) renders exactly the `tls <pem> <key> { client_auth
   { mode require_and_verify; trust_pool file { pem_file <root> } } }` block. `certDir =
   /var/lib/acme/dns-metrics.plato-splunk.media` = today's `metricsCertPemFile`/`metricsCertKeyFile`;
-  `mtlsTrustPoolFile = c.ca.rootCert` = today's `metricsMtlsTrustPoolFile`. ✓
+  `tls.gate.mtlsAllowlist.trustPoolFile = c.ca.rootCert` = today's `metricsMtlsTrustPoolFile`. ✓
 - **The allowlist** comes **verbatim** from `extraCaddyConfig` (§2.1) — same three matcher/handle
   pairs in the same order, same upstreams (`9100` for `@node`, `5380` for `@dns`/`@login`), same
   catch-all `respond 404`. Character-for-character copy of today's block (minus the Nix `#` comment,
   which was never part of the rendered string). ✓
 - **No double backend.** The keystone renderer **always** appends `backendBlock` before
-  `extraCaddyConfig`. For `mtls+allowlist` the backend IS the allowlist, so the auto `backendBlock`
+  `extraCaddyConfig`. For `mtlsAllowlist` the backend IS the allowlist, so the auto `backendBlock`
   must be **suppressed** (else a stray `reverse_proxy 127.0.0.1:9100` would precede the allowlist).
-  → **gap (G):** `gate = "mtls+allowlist"` suppresses `backendBlock`, emitting only the mTLS `tls`
-  block + `extraCaddyConfig`. (The `backend.port` is then only documentary / used by the firewall
-  generator — not rendered. Alternatively set `backend.kind = "raw"` for this entry so the renderer
-  emits only the mTLS line + `extraCaddyConfig`; §7 gap (G) recommends the `mtls+allowlist`
+  → **gap (G):** `gate.mtlsAllowlist` suppresses `backendBlock`, emitting only the mTLS `tls`
+  block + `extraCaddyConfig`. (The `backend.reverseProxy.port` is then only documentary / used by the firewall
+  generator — not rendered. Alternatively set `backend.raw = { }` for this entry so the renderer
+  emits only the mTLS line + `extraCaddyConfig`; §7 gap (G) recommends the `mtlsAllowlist`
   suppression so the mTLS line is still auto-rendered.)
 - **Blank-line spacing.** Today's body has a blank line between the closing `}` of the `tls` block and
   `@node` (the heredoc has an empty line there). The renderer must reproduce that exact spacing: the
@@ -521,12 +521,12 @@ handle {
 
 ### 3.4 OIDC / mTLS gating semantics (documentation parity)
 
-- **Admin:** `gate = "oidc"` documents that OIDC is enforced by **Technitium itself** (its
+- **Admin:** `gate.oidc` documents that OIDC is enforced by **Technitium itself** (its
   `services.technitium-server-complete.oidc.*` config), not Caddy. The catalog's `oidc` block is
   **omitted** on this entry (no Kanidm client is registered by this vhost — Technitium's OIDC client
   is configured in the option module, and the Kanidm-side registration, if any, is a separate
   concern). So the OIDC generator emits nothing for `technitium-admin`. ✓ No behavior change.
-- **Metrics:** `gate = "mtls+allowlist"` — client cert is the only authN. No OIDC. ✓
+- **Metrics:** `gate.mtlsAllowlist` — client cert is the only authN. No OIDC. ✓
 
 ---
 
@@ -535,9 +535,9 @@ handle {
 | Surface                                                   | Today                                                 | After (source)                                              | Equivalent?               |
 | --------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------- | ------------------------- |
 | Admin vhost key `https://dns-admin…:8443`                 | `https://${adminDomain}:${adminPort}`                 | `https://${fqdn}:${listenPort}` (8443)                      | ✓ identical               |
-| Admin vhost body (`tls` + `reverse_proxy 127.0.0.1:5380`) | hand-written `extraConfig`                            | caddy generator, `gate=oidc`, renderer upstream `127.0.0.1` | ✓ identical               |
+| Admin vhost body (`tls` + `reverse_proxy 127.0.0.1:5380`) | hand-written `extraConfig`                            | caddy generator, `gate.oidc`, renderer upstream `127.0.0.1` | ✓ identical               |
 | Metrics vhost key `https://dns-metrics…:9443`             | `https://${metricsDomain}:${metricsPort}`             | `https://${fqdn}:${listenPort}` (9443)                      | ✓ identical               |
-| Metrics `tls` + mTLS `client_auth` block                  | explicit cert + `trust_pool file { pem_file <root> }` | `gate=mtls+allowlist`, `mtlsTrustPoolFile` (mtlsTlsLine)    | ✓ identical               |
+| Metrics `tls` + mTLS `client_auth` block                  | explicit cert + `trust_pool file { pem_file <root> }` | `gate.mtlsAllowlist.trustPoolFile` (mtlsTlsLine)            | ✓ identical               |
 | Metrics path allowlist (@node/@dns/@login + 404)          | hand-written matcher/handle + `respond 404`           | `extraCaddyConfig` verbatim, no auto backend (gap G)        | ✓ (needs gap G + spacing) |
 | `users.groups.<certGroup>.members`                        | `[ "caddy" ]`                                         | unchanged in the feature                                    | ✓ identical               |
 | `services.caddy.enable` / `useInternalCA`                 | `true` / `true`                                       | unchanged in the feature                                    | ✓ identical               |
@@ -669,10 +669,10 @@ nixos-rebuild build --flake .#aedilis
    (caddy-enable/useInternalCA/cert-group), §5.5 (OIDC absent) → `/tmp/tech-*.before`.
 3. **Add Caddy-body fields to the two companion catalog entries** (`technitium-admin`,
    `technitium-metrics`) in `features/technitium-aedilis/catalog.nix` (§2.1):
-   - admin: `backend = { kind="reverseProxy"; port=5380; }`, `tls.gate="oidc"`, `listenPort=8443`.
+   - admin: `backend.reverseProxy.port=5380`, `tls.gate.oidc={ }`, `listenPort=8443`.
      **No `oidc` block.** (Upstream `127.0.0.1` via the renderer default.)
-   - metrics: `backend = { kind="reverseProxy"; port=9100; }`, `tls.gate="mtls+allowlist"`,
-     `tls.mtlsTrustPoolFile=c.ca.rootCert`, `listenPort=9443`, and the verbatim allowlist
+   - metrics: `backend.reverseProxy.port=9100`, `tls.gate.mtlsAllowlist.trustPoolFile=c.ca.rootCert`,
+     `listenPort=9443`, and the verbatim allowlist
      `extraCaddyConfig` (@node/@dns/@login + `respond 404`).
 4. **Preserve the non-vhost Caddy config** in the feature: `services.caddy = { enable = true;
    useInternalCA = true; }` and `users.groups.${cfg.certGroup}.members = [ "caddy" ]` (move from
@@ -700,7 +700,7 @@ nixos-rebuild build --flake .#aedilis
 
 technitium-caddy is the stress test for the **OIDC-gated explicit-cert proxy** and the
 **`mtls+allowlist`** vhost. It surfaces two schema additions (F, G) that complement the companion
-plan's (A/C/E) and the keystone's existing `gate`/`mtlsTrustPoolFile`/`extraCaddyConfig`.
+plan's (A/C/E) and the keystone's existing `tls.gate` variants/`extraCaddyConfig`.
 
 ### Gap (F) — ~~per-entry upstream-host token~~ RESOLVED by global `127.0.0.1` standardization
 
@@ -719,19 +719,19 @@ vhost the "backend" is the allowlist's own `@node … handle` block, and the cat
 — so an auto `backendBlock` would inject a stray `reverse_proxy 127.0.0.1:9100` ahead of the
 allowlist, breaking byte-equivalence and the gating semantics.
 
-- **Add:** `gate = "mtls+allowlist"` in `renderVhostBody` emits **only** the mTLS `tls` block
+- **Add:** `gate.mtlsAllowlist` in `renderVhostBody` emits **only** the mTLS `tls` block
   (`mtlsTlsLine`) + `extraCaddyConfig` — **no** `backendBlock`, **no** `plainTlsLine` (the mTLS line
-  already carries the cert). (`backend.port` on the entry is then consumed only by the firewall
-  generator / documentation, not rendered — or use `backend.kind = "raw"` with the mTLS line still
+  already carries the cert). (`backend.reverseProxy.port` on the entry is then consumed only by the firewall
+  generator / documentation, not rendered — or use `backend.raw = { }` with the mTLS line still
   auto-emitted; recommend the `gate`-driven suppression so the mTLS block stays generated.)
 - **Spacing requirement.** The current body has a **blank line** between the `tls { … }` block's
   closing `}` and the first matcher `@node`. The renderer must place exactly one `\n` separator
   between `mtlsTlsLine`'s trailing `}\n` and `extraCaddyConfig` (which starts with `@node`). The
-  `mtls+allowlist` path must therefore join the mTLS block and `extraCaddyConfig` with a single blank
+  `mtlsAllowlist` path must therefore join the mTLS block and `extraCaddyConfig` with a single blank
   line. This is the single most likely byte-diff; the parity gate §5.2 pins it.
 
-> These two additions (F, G), together with the keystone's existing `gate = "mtls" | "mtls+allowlist"`,
-> `tls.mtlsTrustPoolFile`, and `extraCaddyConfig`, are exactly enough to represent the tight-allowlist
+> These two additions (F, G), together with the keystone's existing `gate.mtls` / `gate.mtlsAllowlist` variants,
+> their `trustPoolFile`, and `extraCaddyConfig`, are exactly enough to represent the tight-allowlist
 > metrics vhost and the explicit-cert admin vhost byte-for-byte. They are small and reusable (F helps
 > any `127.0.0.1`-upstream vhost; G helps any mTLS-gated allowlist/deny-by-default vhost), and keep
 > technitium as two catalog entries (shared with the companion plan) that feed the caddy generator
@@ -753,7 +753,7 @@ allowlist, breaking byte-equivalence and the gating semantics.
 | `dns-admin`/`dns-metrics` DNS records                      | **Deferred** to [./dns-records.md]             | Centralized authoritative zone.                                                               |
 
 The catalog **replaces** only the two hand-rolled vhost bodies (moving the mTLS gate into
-`gate = "mtls+allowlist"` + the allowlist into `extraCaddyConfig`), **feeds** the interpolated values
+`gate.mtlsAllowlist` + the allowlist into `extraCaddyConfig`), **feeds** the interpolated values
 from the still-authoritative Technitium option module, and **leaves** the service runtime and the
 cert/firewall/DNS surfaces to the option module and the companion/dns-records plans. That is the
 careful reconciliation the already-option-driven Technitium Caddy module demands.

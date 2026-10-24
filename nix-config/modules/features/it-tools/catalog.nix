@@ -13,13 +13,10 @@ in
       homelab.catalog.it-tools = {
         subdomain = svc.subdomain; # "dev-tools"
         host = "augustus";
-        backend = {
-          kind = "reverseProxy";
-          port = svc.port; # 47309 (renderer emits 127.0.0.1 upstream)
-        };
-        tls.ca = null; # shares Caddy's managed cert; no security.acme.certs entry
-        access.scope = "tailnet";
-        dns.enable = true;
+        backend.reverseProxy.port = svc.port; # 47309 (renderer emits 127.0.0.1 upstream)
+        tls.cert.shared = { }; # shares Caddy's managed cert; no security.acme.certs entry
+        access.scope.tailnet = { };
+        dns.tailnet = { };
 
         # Migration opt-in: caddy generator owns the vhost now. DNS/firewall deferred to
         # their cross-cutting migration steps.

@@ -7,6 +7,22 @@ Running log of the autonomous overnight implementation of the
 
 ## ⚠️ IMPORTANT — read first (morning)
 
+> **CORRECTION (morning session, 2026-10-23):** the stash diagnosis below was **wrong**. The husky
+> hook did **not** create `stash@{0}` during the overnight run. `stash@{0}` was created
+> **2026-10-10 16:55** — ~13 days _before_ the overnight session — and is genuinely your own older
+> WIP (7 files). The stash reflog holds exactly 7 stashes, newest from Oct 10; **no stash was created
+> on 2026-10-23.** `git fsck` is clean, the stash is intact and readable, nothing is lost or
+> corrupted. The overnight agent saw a pre-existing `WIP on main` stash with 7 unrelated files and
+> mis-attributed it to its own first commit triggering the hook, but the timestamps make that
+> impossible. The husky `lint-staged` config does not itself leave a persistent stash, and a clean
+> working tree has nothing to stash. **Net: your Oct-10 stash is fine; restore it whenever you like
+> with `git stash apply stash@{0}` (expect the `technitium/service.nix` conflict noted below). The
+> real, valid takeaway — commit with `--no-verify` — is now codified in
+> `.kiro/steering/git-commits.md`.** The (incorrect) original note is preserved verbatim below for
+> the record.
+
+### (original overnight note — kept for the record; diagnosis superseded above)
+
 **Your pre-existing uncommitted work is saved in `git stash@{0}`, not in the working tree.**
 
 When I made my first commit, the repo's **husky pre-commit hook** fired. In this non-interactive
@@ -188,3 +204,111 @@ generators are validated except the two cross-cutting cutovers below.
 - Baselines for re-running parity gates are in `/tmp/sc-baseline/` (may not survive a reboot; they
   can be re-captured from the `2400b041` revision).
 - Nothing was deployed — only `nixos-rebuild build`-equivalent eval/checks.
+
+---
+
+## Morning session (2026-10-23) — attrTag refactor + stash triage + remaining-work summary
+
+Follow-up session addressing operator requests. Four things done, plus this summary.
+
+### 1. Stash investigation (see the corrected note at the top)
+
+Inspected all 7 stashes (`git stash list`, `git log -1 --format` per stash, `git reflog stash`,
+`git fsck`). **Finding:** `stash@{0}` is genuine pre-existing work from **2026-10-10**, not an
+artifact of the overnight hook; the reflog is intact, `fsck` clean, nothing missing. The overnight
+"husky created the stash" diagnosis was a misattribution (timestamps rule it out). Left every stash
+untouched.
+
+### 2. Schema converted enum+booleans → `attrTag`
+
+The catalog schema (`features/homelab-service/options.nix`) now models every discriminated union as
+a `types.attrTag` instead of an enum + sibling nullable/boolean fields. This makes illegal states
+unrepresentable and removes all the "Required when …" prose — the Nix type system enforces it:
+
+- `backend` → `{ reverseProxy.port } | { static.root } | { none } | { raw }`
+- `tls.cert` → `{ shared } | { own = { ca; acmePort; email; certGroup; reload*; postRun; challenge } }`
+  (all cert-only fields live inside `own`; a shared-cert service literally has no `acmePort` field)
+- `tls.gate` → `{ none } | { oidc } | { mtls.trustPoolFile } | { mtlsAllowlist.trustPoolFile }`
+  (was `gate = "mtls+allowlist"` + sibling `mtlsTrustPoolFile`; the tag is now `mtlsAllowlist`)
+- `tls.cert.own.challenge.body` → `{ handle.redirectToHttps } | { bare }`
+- `access.scope` → `{ public } | { tailnet } | { hostList.fromHosts } | { funnel } | { none }`
+- `dns` → `nullOr ({ tailnet } | { cname.target } | { public = { v4; v6 } })` — `null` = no record
+  (replaces `dns.enable` bool)
+- `oidc` → `nullOr (submodule { client = { public } | { basic.secretRef }; … })` — `null` = no client
+  (replaces `oidc.enable` + `public` bool)
+
+Generators read tags via two helpers on `constants.catalogLib`: `tagOf` / `payloadOf`. The
+`oidc.clientId` default (= entry name) moved into the OIDC generator (`o.clientId or name`) to avoid
+a self-referential `nullOr` recursion.
+
+**Files updated:** `options.nix`, `lib.nix`, `caddy-nixos.nix`, `acme.nix`, `firewall.nix`,
+`dns.nix`, `oidc.nix` (the 7 keystone files), plus all **9** migrated `catalog.nix` entries
+(it-tools, grafana, openwebui, planka, home-assistant, habitsync, radius, kanidm, postgres).
+
+**Parity proven:** captured augustus/aedilis/cicero/praeconinus caddy vhosts + augustus
+`security.acme.certs` + `oauth2` as JSON on the pre-refactor revision (git worktree at the prior
+`HEAD`) and on the attrTag revision; after normalizing the inherent `/nix/store/<hash>-source` flake
+paths, **every output is byte-identical**. `nix flake check --no-build` passes for all hosts. The
+refactor is a true no-op — it only changes how options are _declared_.
+
+### 3. Steering doc for agent commits
+
+Added `.kiro/steering/git-commits.md`: agents must commit with `--no-verify` (the husky/lint-staged
+hook misbehaves non-interactively — git-stash churn + SIGKILL'd `nix run .#nixfmt` — and is redundant
+since the agent runs its own validation).
+
+### 4. Planning docs updated to attrTag
+
+All 21 `docs/service-consolidation/*.md` plans (keystone + every per-module doc) were rewritten to
+the attrTag field shapes, in code blocks and prose/tables. Verified: no stale enum+boolean catalog
+patterns remain (the only `public = true`/`enable = true` left are genuine downstream Kanidm
+`oauth2.*` provision options and NixOS `services.*.enable` toggles — not catalog fields). README gained
+a "Current status" table.
+
+---
+
+## ✅ Remaining work (authoritative, supersedes the overnight "Still TODO")
+
+Services on the catalog so far (9, all on augustus): **it-tools, grafana, openwebui, planka,
+home-assistant, habitsync, radius, kanidm, postgres**. All five generators are validated except the
+cross-cutting cutovers. Remaining, in recommended order:
+
+1. **loki + prometheus** — loki: cert-less mTLS `tls { client_auth }` push vhost
+   (`tls.gate.mtls.trustPoolFile`, server cert Caddy-managed so `tls.cert.shared`). prometheus:
+   `clientCertOnly` consumer cert (`tls.cert.own` + `reloadServices = ["prometheus.service"]`) **and**
+   keep its existing `prometheus` mTLS vhost (dropping it would not be a no-op).
+2. **homelab-ui + homelab-api** — homelab-ui: `backend.static.root` + `tracing.enable`. homelab-api:
+   dual vhost via `insecureHttp = true` + public client with a **list** `callbackPath` (some
+   absolute). Requires flipping `managedBy.caddy`/`oidc` and deleting `homelab-api/caddy.nix`+
+   `kanidm.nix`.
+3. **cicero-observability + mini** — cicero: mTLS metrics vhosts (`tls.gate.mtlsAllowlist`) + alloy
+   client cert (`clientCertOnly`); add cicero's `homelab-service-apphost` import. mini: darwin
+   Caddyfile backend — add `homelab-service-apphost` import to `hosts/mini.nix`; parity is a
+   `caddy adapt`→JSON diff of the generated fragment.
+4. **technitium-caddy + technitium-aedilis** (aedilis) — admin/metrics mTLS+OIDC vhosts; the public
+   Let's Encrypt `dns` cert (`tls.cert.own.ca = "letsencrypt"` + `email` +
+   `challenge.body.handle.redirectToHttps = true`); direct-tailnet step-ca challenge certs
+   (`challenge = { via = "direct"; iface = "tailscale0"; }` → firewall opens 22481/22483). Add
+   aedilis's `homelab-service-dns-host` import.
+5. **praeconinus** (decision) — recommended: keep the Funnel vhost as a bespoke `_private` override
+   rather than catalog-izing a one-off restricted host. If catalog-ized: `backend.raw` +
+   `access.scope.funnel` + `listenPort = 8443` + `dns = null`/`oidc = null`.
+
+### DEFERRED cross-cutting cutovers (need operator go-ahead — do NOT start unprompted)
+
+- **firewall generator** — flip `managedBy.firewall` per host; prove `service-derived ∪ baseline`
+  equals today's `networking.firewall` per host (set-equality gate). Baseline infra ports
+  (SSH 22, TS metrics 5252, radius 1812/1813, Technitium 53/80/443/853, postgres 5432, minecraft
+  25565) stay hand-listed.
+- **DNS generator** — flip `managedBy.dns`, add `constants.dnsExtraRecords` (nas + public-endpoint +
+  host-apex records), delete the `ts` table + `tailnetRewrites` map, and realize the approved
+  **apprise** + **kanidm ldap** record removals. The set-equality gate should show exactly the
+  expected removed lines. This is the riskiest step — hold for review.
+
+### Validation reminders
+
+- All work is local, on `main`, **not pushed**, and committed (or to be committed) with `--no-verify`.
+- Re-run parity by capturing `nix eval … --json` on a worktree at the prior revision and diffing with
+  `/nix/store/<hash>-source` normalized.
+- Your Oct-10 `stash@{0}` is intact — restore with `git stash apply stash@{0}` (expect a
+  `technitium/service.nix` conflict to merge by hand).

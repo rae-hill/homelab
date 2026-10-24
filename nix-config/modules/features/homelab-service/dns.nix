@@ -25,34 +25,35 @@ in
         mapAttrs
         ;
 
-      wanted = attrValues (filterAttrs (_: e: e.managedBy.dns && e.dns.enable) config.homelab.catalog);
+      wanted = attrValues (filterAttrs (_: e: e.managedBy.dns && e.dns != null) config.homelab.catalog);
 
       mkRecordsFor =
         e:
         let
           apex = catLib.fqdn e;
+          kind = catLib.tagOf e.dns;
         in
-        if e.dns.kind == "cname" then
+        if kind == "cname" then
           [
             {
               CNAME = {
                 name = apex;
-                cname = e.dns.cnameTarget;
+                cname = e.dns.cname.target;
               };
             }
           ]
-        else if e.dns.kind == "public" then
+        else if kind == "public" then
           [
             {
               A = {
                 name = apex;
-                address = e.dns.publicV4;
+                address = e.dns.public.v4;
               };
             }
             {
               AAAA = {
                 name = apex;
-                address = e.dns.publicV6;
+                address = e.dns.public.v6;
               };
             }
           ]

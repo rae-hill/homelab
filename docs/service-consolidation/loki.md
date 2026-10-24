@@ -1,4 +1,4 @@
-# loki — mTLS + Tracing Push Ingest (the `gate = "mtls"` + tracing reference)
+# loki — mTLS + Tracing Push Ingest (the `tls.gate.mtls` + tracing reference)
 
 Status: **PROPOSED**
 Date: 2026-10-22
@@ -10,7 +10,7 @@ Keystone: [./catalog-and-generators.md](./catalog-and-generators.md)
 > **augustus** and exposes a single externally-reachable surface — the **`loki-push`** ingest
 > vhost — that is client-cert-gated **and** carries a `tracing { span loki-push }` block **and**
 > reverse-proxies to the local loki HTTP listener. This is the exact combination the catalog's
-> `tls.gate = "mtls"` renderer must reproduce: the mTLS `client_auth` block, the tracing span, and
+> `tls.gate.mtls` renderer must reproduce: the mTLS `client_auth` block, the tracing span, and
 > the `reverse_proxy` body, composed in that order. No other migrated service exercises all three at
 > once, so loki is the reference for the mTLS-with-tracing composition.
 >
@@ -29,15 +29,15 @@ TLS — Caddy manages the `loki-push` server cert via its managed/on-demand issu
 service-attributable firewall opening beyond the shared `443`, and no DNS record _owned by this
 module_ (the `loki-push` A/AAAA lives in the centralized `tailnetRewrites` map).
 
-| Surface           | Today                                                                    | Catalog entry                                          |
-| ----------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
-| Caddy vhost       | `tls { client_auth … }` + `tracing { span loki-push }` + `reverse_proxy` | `tls.gate = "mtls"`, tracing via Tempo-enable, backend |
-| ACME cert         | **none** — Caddy manages the `loki-push` server cert                     | `tls.ca = null` (no `security.acme.certs` entry)       |
-| OIDC              | none                                                                     | omit `oidc`                                            |
-| Firewall          | nothing new (443 is baseline on augustus)                                | `access.scope = "tailnet"` (opens nothing new)         |
-| DNS (`loki-push`) | centralized `tailnetRewrites.loki-push = "augustus"`                     | `dns.enable = true; dns.kind = "tailnet"`              |
-| `services.loki`   | full loki runtime config                                                 | stays verbatim in `service.nix` (not in the catalog)   |
-| failure-notifs    | `attachServices = [ "loki" ]`                                            | stays in `service.nix`, colocated with the unit        |
+| Surface           | Today                                                                    | Catalog entry                                              |
+| ----------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| Caddy vhost       | `tls { client_auth … }` + `tracing { span loki-push }` + `reverse_proxy` | `tls.gate.mtls = { … }`, tracing via Tempo-enable, backend |
+| ACME cert         | **none** — Caddy manages the `loki-push` server cert                     | `tls.cert.shared = { }` (no `security.acme.certs` entry)   |
+| OIDC              | none                                                                     | omit `oidc` (`oidc = null`)                                |
+| Firewall          | nothing new (443 is baseline on augustus)                                | `access.scope.tailnet = { }` (opens nothing new)           |
+| DNS (`loki-push`) | centralized `tailnetRewrites.loki-push = "augustus"`                     | `dns.tailnet = { }`                                        |
+| `services.loki`   | full loki runtime config                                                 | stays verbatim in `service.nix` (not in the catalog)       |
+| failure-notifs    | `attachServices = [ "loki" ]`                                            | stays in `service.nix`, colocated with the unit            |
 
 > **Naming subtlety the catalog must respect.** The loki _runtime_ (`services.loki`, state dir,
 > system user) has **no public hostname** — it listens only on `127.0.0.1:3100`. The externally
@@ -213,8 +213,8 @@ Caddy supplies the **server** certificate itself from its managed/on-demand issu
 ACME issuer configured in the base `services/caddy.nix`). The `tls … client_auth` block constrains
 the **client** side (mutual TLS) using the step-ca root as the trust pool. This is the key
 distinction for the catalog: **loki is an mTLS _server_ that does not terminate its own manually
-provisioned cert** — so `tls.ca = null` (no `security.acme.certs` entry, no HTTP-01 challenge vhost),
-yet `tls.gate = "mtls"`. The schema already supports this split (gate is independent of `ca`).
+provisioned cert** — so `tls.cert.shared = { }` (no `security.acme.certs` entry, no HTTP-01 challenge vhost),
+yet `tls.gate.mtls = { … }`. The schema already supports this split (gate is independent of cert).
 
 ### 1.5 The DNS record (centralized, in `tailnetRewrites`)
 
@@ -255,7 +255,7 @@ rule to migrate**; the firewall generator must add nothing for this service.
 - **Reverse-proxy upstream preserved exactly:** `reverse_proxy 127.0.0.1:3100` (note `127.0.0.1`, not
   `localhost`).
 - **Block order preserved:** `tls` → `tracing` → `reverse_proxy`.
-- **No server cert named / no ACME cert:** `tls.ca = null`; no `security.acme.certs` entry; Caddy
+- **No server cert named / no ACME cert:** `tls.cert.shared = { }`; no `security.acme.certs` entry; Caddy
   manages the server cert.
 - **No OIDC, no new firewall opening.**
 - **`services.loki` runtime copied verbatim** (port, state dir, schema, limits, compactor, system
@@ -302,37 +302,33 @@ in
     host = "augustus";
 
     # Reverse-proxy into the loopback loki HTTP listener.
-    backend = {
-      kind = "reverseProxy";
-      port = loki.port;               # 3100
-    };
+    backend.reverseProxy.port = loki.port;   # 3100
 
     tls = {
       # loki does NOT terminate its own manual cert — Caddy manages the loki-push server
       # cert via managed/on-demand issuance. So NO security.acme.certs entry.
-      ca = null;
+      cert.shared = { };
       # But the vhost IS client-cert gated: mutual TLS using the step-ca root as trust pool.
-      gate = "mtls";
-      mtlsTrustPoolFile = c.ca.rootCert;   # alford-root.crt
+      gate.mtls.trustPoolFile = c.ca.rootCert;   # alford-root.crt
     };
 
     # Reachable over the tailnet (opens nothing new: 443 is a baseline host opening).
-    access.scope = "tailnet";
+    access.scope.tailnet = { };
 
     # Emit the loki-push A/AAAA record on aedilis (reproduces tailnetRewrites.loki-push).
-    dns.enable = true;
-    # dns.kind defaults to "tailnet" -> A/AAAA from constants.hosts.augustus.tailscale.
+    dns.tailnet = { };
+    # dns.tailnet -> A/AAAA from constants.hosts.augustus.tailscale.
   };
 }
 ```
 
 Notes:
 
-- **`tls.ca = null` with `tls.gate = "mtls"`** is the crucial combination: a client-cert-gated vhost
+- **`tls.cert.shared = { }` with `tls.gate.mtls = { … }`** is the crucial combination: a client-cert-gated vhost
   whose **server** cert is Caddy-managed (no `security.acme.certs`). The ACME generator skips it
-  (filters on `tls.ca != null`); the Caddy generator still emits the mTLS block because `gate ==
-  "mtls"`.
-- **`mtlsTrustPoolFile = c.ca.rootCert`** carries the `pem_file` path the `trust_pool file { … }`
+  (filters on entries with `tls.cert.own`); the Caddy generator still emits the mTLS block because the
+  gate is `tls.gate.mtls`.
+- **`tls.gate.mtls.trustPoolFile = c.ca.rootCert`** carries the `pem_file` path the `trust_pool file { … }`
   block needs. This is the field the keystone schema (§2 of
   [catalog-and-generators.md](./catalog-and-generators.md)) defines for exactly this case.
 - **Tracing is not a catalog field** — the renderer appends `tracing { span <name> }` automatically
@@ -428,7 +424,7 @@ in
 ### 2.3 What the Caddy generator must render for loki-push
 
 The generator (parent plan §2.3; keystone §3.1–§3.2) filters to `host == augustus` and, for
-`gate == "mtls"`, composes the body through the shared `renderVhostBody` helper. For `loki-push` it
+`tls.gate.mtls`, composes the body through the shared `renderVhostBody` helper. For `loki-push` it
 must produce **exactly** today's body:
 
 ```
@@ -451,7 +447,7 @@ reverse_proxy 127.0.0.1:3100
 
 1. **tracing block** — `tracingBlock hostCfg name`, emitted only when `hostCfg.services.tempo.enable`
    (augustus runs Tempo, so it fires). Produces `tracing {\n  span <name>\n}\n`.
-2. **tls block** — because `gate == "mtls"`, `mtlsTlsLine { certPem; certKey; trustPool }` emits the
+2. **tls block** — because the gate is `tls.gate.mtls`, `mtlsTlsLine { certPem; certKey; trustPool }` emits the
    `tls … { client_auth { mode require_and_verify; trust_pool file { pem_file <trustPool> } } }`
    wrapper.
 3. **backend block** — `backendBlock e` emits `reverse_proxy <upstream>:<port>`.
@@ -511,26 +507,26 @@ Deploying this revision must change nothing on augustus. Per surface:
 
 ### 3.2 ACME cert (augustus) — none, before and after
 
-- loki owns no `security.acme.certs` entry today, and `tls.ca = null` means the ACME generator emits
+- loki owns no `security.acme.certs` entry today, and `tls.cert.shared = { }` means the ACME generator emits
   nothing. No cert, no HTTP-01 challenge vhost, no change.
 
 ### 3.3 DNS (aedilis) — same A/AAAA pair reproduced
 
 - Today: `tailnetRewrites.loki-push = "augustus"` → apex A `100.95.250.77` + AAAA
   `fd7a:115c:a1e0::6301:fa4d` in the `plato-splunk.media` Primary zone.
-- New: `dns.enable = true; dns.kind = "tailnet"; host = "augustus"` → the DNS generator emits A/AAAA
+- New: `dns.tailnet = { }; host = "augustus"` → the DNS generator emits A/AAAA
   from `constants.hosts.augustus.tailscale.{v4,v6}`, which equal the `ts.augustus` values the
   `tailnetRewrites` fold uses today. Identical record set; upsert-only semantics preserved.
 
 > **Sequencing:** the Caddy/feature move and the DNS generator cutover are independent (parent plan
-> §3 steps 2 vs 9). `dns.enable = true` is declared now, but the `loki-push` A/AAAA continues to be
+> §3 steps 2 vs 9). `dns.tailnet = { }` is declared now, but the `loki-push` A/AAAA continues to be
 > produced by `tailnetRewrites` until the DNS generator is switched on and the `tailnetRewrites.
 > loki-push` entry is deleted in the same change ([./dns-records.md](./dns-records.md)). One source at
 > a time — never a duplicate or a gap.
 
 ### 3.4 Firewall (augustus) — no change
 
-- loki opens nothing; `access.scope = "tailnet"` maps to `tailscale0`, but `443` is a baseline host
+- loki opens nothing; `access.scope.tailnet = { }` maps to `tailscale0`, but `443` is a baseline host
   opening (owned by `_private/augustus/security.nix`, not service-attributable). The firewall
   generator adds **no** new port for loki. `networking.firewall` must be byte-identical.
 
@@ -653,17 +649,17 @@ parity gate can go green:
 2. **Managed-cert mTLS vs manual-cert mTLS (`mtlsTlsLine` shape).** The drafted `mtlsTlsLine` always
    emits `tls <certPem> <certKey> { client_auth … }` — the **manual-cert** form (technitium, which
    names an explicit server cert). loki needs the **managed-cert** form `tls { client_auth … }`
-   (Caddy supplies the server cert; **no** positional cert/key args), because `tls.ca = null`. **Fix:**
+   (Caddy supplies the server cert; **no** positional cert/key args), because `tls.cert.shared = { }`. **Fix:**
    `mtlsTlsLine` must branch on whether a server cert directory is present:
    - `certDir != null` → `tls ${certDir}/fullchain.pem ${certDir}/key.pem { client_auth … }`
-     (manual-cert mTLS — technitium, any `tls.ca != null` mTLS service);
+     (manual-cert mTLS — technitium, any `tls.cert.own` mTLS service);
    - `certDir == null` → `tls { client_auth … }` (managed-cert mTLS — loki).
 
-   Equivalently, the keystone's `renderVhostBody` already computes `certDir` (null when `tls.ca ==
-   null`); thread it into `mtlsTlsLine` so the bare form is chosen for loki. **This is the single most
-   important schema/renderer observation from the loki migration**: `gate = "mtls"` is **orthogonal**
-   to `tls.ca` — a vhost can be client-cert-gated while its _server_ cert is Caddy-managed. The schema
-   already allows this (gate independent of ca); the renderer must too.
+   Equivalently, the keystone's `renderVhostBody` already computes `certDir` (null when
+   `tls.cert.shared`); thread it into `mtlsTlsLine` so the bare form is chosen for loki. **This is the single most
+   important schema/renderer observation from the loki migration**: `tls.gate.mtls` is **orthogonal**
+   to the cert variant — a vhost can be client-cert-gated while its _server_ cert is Caddy-managed. The schema
+   already allows this (gate independent of cert); the renderer must too.
 
 3. **(Minor) Tracing span name = entry name.** The renderer derives the `span` name from the catalog
    entry name. loki's entry is named `loki-push`, so the span is `loki-push` — matching today. Any
@@ -683,8 +679,8 @@ here because loki is the reference that forces them.
 - [ ] Keystone renderer fixes landed: (a) `tls → tracing → reverse_proxy` ordering, (b) `mtlsTlsLine`
       branches on `certDir` for the bare managed-cert `tls { client_auth … }` form (§5)
 - [ ] `features/loki/catalog.nix` — `homelab.catalog.loki-push` entry (`subdomain = "loki-push"`,
-      `backend = { reverseProxy; 3100 }`, `tls.ca = null`, `tls.gate = "mtls"`,
-      `tls.mtlsTrustPoolFile = c.ca.rootCert`, `access.scope = "tailnet"`, `dns.enable = true`). **No
+      `backend.reverseProxy.port = 3100`, `tls.cert.shared = { }`, `tls.gate.mtls.trustPoolFile = c.ca.rootCert`,
+      `access.scope.tailnet = { }`, `dns.tailnet = { }`). **No
       `oidc`.**
 - [ ] `features/loki/service.nix` — `services.loki` runtime + `systemd.services.loki.serviceConfig` +
       `loki` user/group + `failure-notifs.attachServices = [ "loki" ]` (verbatim)

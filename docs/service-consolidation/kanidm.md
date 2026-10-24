@@ -373,7 +373,7 @@ features/kanidm/
 Rationale for the split:
 
 - **`catalog.nix`** holds the three cross-cutting surfaces: the manual-TLS main vhost (via the
-  escape hatch / bespoke transport — §2.1), the `security.acme.certs` request (via `tls.ca=internal`
+  escape hatch / bespoke transport — §2.1), the `security.acme.certs` request (via `tls.cert.own.ca = "internal"`
   - `acmePort` + `certGroup` + `reloadServices`), and the **secondary `ldap` challenge domain**
     (schema gap — §2.1 / §7).
 - **`service.nix`** keeps everything that is the service runtime: the entire `services.kanidm`
@@ -413,30 +413,29 @@ in
         host = "augustus";
 
         # The upstream is kanidm's OWN https listener, reached via a bespoke transport —
-        # NOT a plain reverse_proxy. Modeled via the extraCaddyConfig escape hatch (see §3.1
-        # for the backend-kind alternative and why escape hatch is recommended).
-        backend = {
-          kind = "reverseProxy";
-          # port is unused when the body is fully supplied via extraCaddyConfig; see §3.1 /
-          # §7 gap (A). The generated backend directive must be SUPPRESSED for kanidm.
-          port = 8443;   # documentary; the real target is https://localhost:8443 (below)
-        };
+        # NOT a plain reverse_proxy. Modeled via the extraCaddyConfig escape hatch with a
+        # raw backend (see §3.1 for the backend alternative and why escape hatch is recommended).
+        backend.raw = { };
+        # The generated backend/tls directives are SUPPRESSED for kanidm; the real target is
+        # https://localhost:8443 via the extraCaddyConfig below. See §3.1 / §7 gap (A).
 
         tls = {
-          ca = "internal";              # step-ca: server = c.ca.acmeDirectoryHttp
-          acmePort = svc.acmePort;      # 64073 loopback HTTP-01 listener
-          certGroup = "idm";            # per-service group (default would be "kanidm" — override!)
-          reloadServices = [ "kanidm.service" ];  # generator prepends "caddy.service"
-          challenge = {
-            via = "caddy80";            # loopback acmePort fronted by Caddy :80; no firewall opening
-            body = "bare";              # bare `reverse_proxy 127.0.0.1:<acmePort>`, not handle+redir
+          cert.own = {
+            ca = "internal"; # step-ca: server = c.ca.acmeDirectoryHttp
+            acmePort = svc.acmePort; # 64073 loopback HTTP-01 listener
+            certGroup = "idm"; # per-service group (default would be "kanidm" — override!)
+            reloadServices = [ "kanidm.service" ]; # generator prepends "caddy.service"
+            challenge = {
+              via = "caddy80"; # loopback acmePort fronted by Caddy :80; no firewall opening
+              body.bare = { }; # bare `reverse_proxy 127.0.0.1:<acmePort>`, not handle+redir
+            };
           };
-          gate = "none";                # no Caddy-level auth; kanidm handles its own auth
+          gate.none = { }; # no Caddy-level auth; kanidm handles its own auth
         };
 
-        access.scope = "tailnet";       # reachable over tailscale0; 443 already baseline-open
-        dns.enable = true;              # emit idm A/AAAA on aedilis (reproduces tailnetRewrites)
-        # dns.kind defaults to "tailnet" -> A/AAAA from constants.hosts.augustus.tailscale.
+        access.scope.tailnet = { }; # reachable over tailscale0; 443 already baseline-open
+        dns.tailnet = { }; # emit idm A/AAAA on aedilis (reproduces tailnetRewrites)
+        # dns.tailnet -> A/AAAA from constants.hosts.augustus.tailscale.
         # NOTE: no ldap entry anywhere — the ldap route + DNS record are REMOVED (approved, §2.1.1).
 
         # No oidc block -> kanidm registers no client for itself (§1.8).
@@ -520,7 +519,7 @@ tls_server_name … }` block **and** `header_up HOST {host}`. Two ways to carry 
   `plainTlsLine`, then appends `extraCaddyConfig`. For kanidm that would **double** the `tls`/
   `reverse_proxy` lines. So the renderer needs a way to **suppress** its auto-emitted backend/tls when
   the entry supplies a full bespoke body.
-- **Dedicated backend kind (`kind = "reverseProxyTls"` or `"kanidm"`).** Teach `backendBlock` a new
+- **Dedicated backend variant (`backend.reverseProxyTls` or `backend.kanidm`).** Teach `backendBlock` a new
   kind that renders `reverse_proxy <upstreamUrl> { header_up HOST {host}; transport http {
   tls_server_name <sni> } }` from typed fields (`upstreamUrl`, `tlsServerName`, `headerUpHost`), plus
   a `tls.explicitCert = true` flag so `plainTlsLine` fires with the cert files. This is more
@@ -533,7 +532,7 @@ one-off (the only HTTPS-upstream, SNI-pinned, explicit-cert proxy in the fleet);
 exactly this ("bespoke cases … without forcing every variant into typed options", keystone §3.1).
 The required renderer change is the **suppression flag** (§7 gap (A)):
 
-> **Schema gap (A): `backend.kind = "raw"` (or `tls.rawVhostBody = true`).** Add a backend kind (or a
+> **Schema gap (A): `backend.raw = { }` (or `tls.rawVhostBody = true`).** Add a backend variant (or a
 > boolean) that tells `renderVhostBody` to emit **only** `tracingBlock` + `extraCaddyConfig` and skip
 > both `backendBlock` and the auto `plainTlsLine`. kanidm sets it; the body comes entirely from
 > `extraCaddyConfig`. This keeps the tracing span generated (so its Tempo-gating still matches) while
@@ -563,12 +562,12 @@ body is verbatim, this is byte-exact. If Tempo-gating must stay dynamic, option 
 ### 3.2 The two challenge vhosts — modeling the `ldap` asymmetry
 
 - **`http://idm.plato-splunk.media`** — the cert's own challenge. The acme generator emits this for
-  `tls.ca != null` (keystone §3.4). **But** today's body is the bare `reverse_proxy localhost:64073\n`,
+  `tls.cert.own` set (keystone §3.4). **But** today's body is the bare `reverse_proxy localhost:64073\n`,
   while the keystone generator defaults to the `handle /.well-known/acme-challenge/* { reverse_proxy
   127.0.0.1:<acmePort> }` wrapper. The keystone explicitly calls out this kanidm difference
   (catalog-and-generators §3.4 note). **Resolution:** have the acme generator emit the **bare**
   `reverse_proxy 127.0.0.1:${acmePort}\n` body for the challenge vhost via the per-entry
-  `tls.challenge.body = "bare"` selector (schema gap #8). The upstream token is `127.0.0.1` per the
+  `tls.cert.own.challenge.body.bare = { }` selector (schema gap #8). The upstream token is `127.0.0.1` per the
   approved standardization (§7.8 #22) — the source's `localhost:64073` becomes `127.0.0.1:64073`,
   which is the one expected byte diff on this vhost.
 - **~~`http://ldap.plato-splunk.media`~~ — REMOVED (approved).** The secondary `ldap` challenge vhost
@@ -583,16 +582,16 @@ body is verbatim, this is byte-exact. If Tempo-gating must stay dynamic, option 
 
 ### 3.3 The ACME cert + per-service group
 
-The acme generator (keystone §3.4) renders, for `host == augustus && managedBy.acme && tls.ca !=
-null`:
+The acme generator (keystone §3.4) renders, for `host == augustus && managedBy.acme && tls.cert.own`
+set:
 
 ```nix
 security.acme.certs."idm.plato-splunk.media" = {
   domain = "idm.plato-splunk.media";              # = fqdn
-  listenHTTP = "127.0.0.1:64073";                 # = 127.0.0.1:${tls.acmePort}
+  listenHTTP = "127.0.0.1:64073";                 # = 127.0.0.1:${tls.cert.own.acmePort}
   server = "https://ca.plato-splunk.media/acme/http/directory";  # internal CA (c.ca.acmeDirectoryHttp)
-  group = "idm";                                  # = tls.certGroup (override; default would be "kanidm")
-  reloadServices = [ "caddy.service" "kanidm.service" ];  # ["caddy.service"] ++ tls.reloadServices
+  group = "idm";                                  # = tls.cert.own.certGroup (override; default would be "kanidm")
+  reloadServices = [ "caddy.service" "kanidm.service" ];  # ["caddy.service"] ++ tls.cert.own.reloadServices
 };
 ```
 
@@ -603,10 +602,10 @@ security.acme.certs."idm.plato-splunk.media" = {
   `svc.acmePort`)
 - `server` = `c.ca.acmeDirectoryHttp` (the generator's `certServer e` for `ca == "internal"` returns
   exactly `c.ca.acmeDirectoryHttp`) ✓
-- `group` = `tls.certGroup` = `"idm"` ✓ — **must override the default** (`certGroup` defaults to the
+- `group` = `tls.cert.own.certGroup` = `"idm"` ✓ — **must override the default** (`certGroup` defaults to the
   entry name `kanidm`; §2.1 sets it to `idm`). This is the per-service-cert-group decision #6 made
   concrete: the cert group is `idm`, scoped to kanidm's two readers.
-- `reloadServices` = `[ "caddy.service" ] ++ tls.reloadServices` = `[ "caddy.service"
+- `reloadServices` = `[ "caddy.service" ] ++ tls.cert.own.reloadServices` = `[ "caddy.service"
   "kanidm.service" ]` ✓ — the generator prepends `caddy.service`; the catalog supplies the
   service-specific `kanidm.service`.
 - **`users.groups.idm.members = [ "caddy" "kanidm" ]`** — stays in `service.nix` (the generator does
@@ -623,7 +622,7 @@ the same attribute at the same path.)
 
 ### 3.5 DNS (aedilis) — `idm` record (ldap removed)
 
-- **`idm`**: `dns.enable = true; dns.kind = "tailnet"; host = "augustus"` → the DNS generator emits
+- **`idm`**: `dns.tailnet = { }; host = "augustus"` → the DNS generator emits
   `idm.plato-splunk.media` A/AAAA from `constants.hosts.augustus.tailscale.{v4,v6}`, reproducing
   today's `tailnetRewrites.idm = "augustus"` record (verified in the dns-records migration).
 - **`ldap`**: **removed (approved).** `tailnetRewrites.ldap = "augustus"` exists today; it is
@@ -634,7 +633,7 @@ the same attribute at the same path.)
 
 ### 3.6 Firewall + OIDC — no change
 
-- **Firewall:** `access.scope = "tailnet"`, `challenge.via = "caddy80"` → the firewall generator adds
+- **Firewall:** `access.scope.tailnet = { }`, `challenge.via = "caddy80"` → the firewall generator adds
   nothing (443/80 baseline, loopback `64073`). `networking.firewall` byte-identical (§1.7).
 - **OIDC:** no `oidc` block → OIDC generator emits nothing for kanidm (§1.8). The _other_ services'
   `oauth2` clients are unaffected.
@@ -643,26 +642,26 @@ the same attribute at the same path.)
 
 ## 4. Operational-equivalence summary (per surface)
 
-| Surface                                                          | Today                                          | After (source)                                              | Equivalent?               |
-| ---------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- | ------------------------- |
-| Main vhost `https://idm…` key                                    | `https://${svc.domain}`                        | `https://${fqdn}` (= idm.plato-splunk.media)                | ✓ identical               |
-| Main vhost body (explicit tls+tracing+transport)                 | hand-written `extraConfig`                     | `extraCaddyConfig` verbatim + `raw` suppression (gap A)     | ✓ byte-exact              |
-| Challenge vhost `http://idm…`                                    | `reverse_proxy localhost:64073\n`              | acme generator, `tls.challenge.body="bare"`, `127.0.0.1`    | ≈ (localhost→127.0.0.1)   |
-| ~~Challenge vhost `http://ldap…`~~                               | `reverse_proxy localhost:64073\n`              | **REMOVED** (approved — ldap route deleted)                 | ✗ intentional removal     |
-| `security.acme.certs."idm…"`                                     | hand-written (group=idm, reloads caddy+kanidm) | acme generator (`tls.ca/acmePort/certGroup/reloadServices`) | ✓ identical               |
-| `users.groups.idm.members`                                       | `[ "caddy" "kanidm" ]`                         | unchanged in `service.nix`                                  | ✓ identical               |
-| Server `:8443` + tls_key/tls_chain                               | reads `security.acme.certs."idm…".directory`   | same cert name → same directory                             | ✓ identical               |
-| DNS `idm`                                                        | `tailnetRewrites.idm`                          | DNS generator `dns.enable` (augustus A/AAAA)                | ✓ (dns-records migration) |
-| ~~DNS `ldap`~~                                                   | `tailnetRewrites.ldap`                         | **REMOVED** (approved — ldap record deleted)                | ✗ intentional removal     |
-| Firewall                                                         | 80/443 baseline, loopback 64073                | firewall generator adds nothing                             | ✓ no change               |
-| OIDC (self)                                                      | none                                           | none                                                        | ✓ no change               |
-| `services.kanidm` server+provision, restic, OTEL, failure-notifs | in `services/kanidm.nix`                       | verbatim in `features/kanidm/service.nix`                   | ✓ identical               |
+| Surface                                                          | Today                                          | After (source)                                                         | Equivalent?               |
+| ---------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- | ------------------------- |
+| Main vhost `https://idm…` key                                    | `https://${svc.domain}`                        | `https://${fqdn}` (= idm.plato-splunk.media)                           | ✓ identical               |
+| Main vhost body (explicit tls+tracing+transport)                 | hand-written `extraConfig`                     | `extraCaddyConfig` verbatim + `raw` suppression (gap A)                | ✓ byte-exact              |
+| Challenge vhost `http://idm…`                                    | `reverse_proxy localhost:64073\n`              | acme generator, `tls.cert.own.challenge.body.bare = { }`, `127.0.0.1`  | ≈ (localhost→127.0.0.1)   |
+| ~~Challenge vhost `http://ldap…`~~                               | `reverse_proxy localhost:64073\n`              | **REMOVED** (approved — ldap route deleted)                            | ✗ intentional removal     |
+| `security.acme.certs."idm…"`                                     | hand-written (group=idm, reloads caddy+kanidm) | acme generator (`tls.cert.own.{ca,acmePort,certGroup,reloadServices}`) | ✓ identical               |
+| `users.groups.idm.members`                                       | `[ "caddy" "kanidm" ]`                         | unchanged in `service.nix`                                             | ✓ identical               |
+| Server `:8443` + tls_key/tls_chain                               | reads `security.acme.certs."idm…".directory`   | same cert name → same directory                                        | ✓ identical               |
+| DNS `idm`                                                        | `tailnetRewrites.idm`                          | DNS generator `dns.tailnet` (augustus A/AAAA)                          | ✓ (dns-records migration) |
+| ~~DNS `ldap`~~                                                   | `tailnetRewrites.ldap`                         | **REMOVED** (approved — ldap record deleted)                           | ✗ intentional removal     |
+| Firewall                                                         | 80/443 baseline, loopback 64073                | firewall generator adds nothing                                        | ✓ no change               |
+| OIDC (self)                                                      | none                                           | none                                                                   | ✓ no change               |
+| `services.kanidm` server+provision, restic, OTEL, failure-notifs | in `services/kanidm.nix`                       | verbatim in `features/kanidm/service.nix`                              | ✓ identical               |
 
 **Conclusion:** every realized attribute is identical before and after **except two
 operator-approved intentional removals** (the `http://ldap.plato-splunk.media` challenge vhost and the
 `ldap` DNS record) and one approved standardization (the `idm` challenge vhost's loopback token
 `localhost → 127.0.0.1`), **conditional on the schema additions** gap A (raw-body suppression) and gap
-#8 (`tls.challenge.body = "bare"`). Schema gap (B) is **dropped** (no secondary challenge domain
+#8 (`tls.cert.own.challenge.body.bare = { }`). Schema gap (B) is **dropped** (no secondary challenge domain
 needed). With those, the deploy is a theoretical no-op aside from the three documented LDAP/loopback
 deviations.
 
@@ -798,22 +797,22 @@ nixos-rebuild build --flake .#augustus
 
 > Depends on the catalog schema + generators ([./catalog-and-generators.md](./catalog-and-generators.md))
 > **including the schema additions this plan surfaces** (§7): gap (A) raw-body suppression and gap #8
-> (`tls.challenge.body = "bare"`). Schema gap (B) is **dropped** — the `ldap` route is removed, not
+> (`tls.cert.own.challenge.body.bare = { }`). Schema gap (B) is **dropped** — the `ldap` route is removed, not
 > modeled. Sequence kanidm in parent plan §3 step 4 (cert-terminating services), after the
 > schema/generators and the reference `it-tools` migration.
 
-1. **Land schema gaps first** (§7): add `backend.kind = "raw"` (or `tls.rawVhostBody`) renderer
-   suppression and the `tls.challenge.body = "bare"` selector to `features/homelab-service/`. Verify
+1. **Land schema gaps first** (§7): add `backend.raw = { }` (or `tls.rawVhostBody`) renderer
+   suppression and the `tls.cert.own.challenge.body.bare = { }` selector to `features/homelab-service/`. Verify
    the keystone's "introducing the module is a no-op" gate still holds (all `managedBy.*` false).
 2. **Capture baseline.** Run §5.1 (main vhost `--raw`), §5.2 (idm challenge vhost `--raw` + confirm
    ldap present before), §5.3 (cert `--json`), §5.4 (group/server/firewall/failure-notifs/oauth2),
    §5.5 (whole-vhosts + restic), → `/tmp/kanidm-*.before`.
 3. **Create `features/kanidm/`:**
    - `catalog.nix` — the `homelab.catalog.kanidm` entry (§2.1): `subdomain=idm`, `host=augustus`,
-     `tls.ca=internal`, `tls.acmePort=64073`, `tls.certGroup=idm`,
-     `tls.reloadServices=["kanidm.service"]`, `tls.challenge.via="caddy80"`,
-     `tls.challenge.body="bare"`, `access.scope="tailnet"`, `dns.enable=true`,
-     `backend.kind="raw"`, and the verbatim `extraCaddyConfig` main-vhost body. **No `oidc`, no
+     `tls.cert.own = { ca = "internal"; acmePort = 64073; certGroup = "idm";
+     reloadServices = ["kanidm.service"]; challenge = { via = "caddy80"; body.bare = { }; }; }`,
+     `access.scope.tailnet = { }`, `dns.tailnet = { }`,
+     `backend.raw = { }`, and the verbatim `extraCaddyConfig` main-vhost body. **No `oidc`, no
      `ldap`/`extraChallengeDomains`.**
    - `service.nix` — the full `services.kanidm` (server + provision groups/persons, incl. the
      unused-but-kept LDAP `bindaddress`), restic, OTEL env,
@@ -858,11 +857,11 @@ a **fully bespoke** body (explicit `tls`, `tracing`, HTTPS-upstream `transport` 
 `tls_server_name`, `header_up HOST`). Without suppression, the generator would **double** the
 `tls`/`reverse_proxy` directives.
 
-- **Add:** `backend.kind = "raw"` (preferred) — a new enum value meaning "emit **only**
+- **Add:** `backend.raw = { }` (preferred) — a new backend variant meaning "emit **only**
   `extraCaddyConfig`; skip `backendBlock` and the auto `plainTlsLine`." Equivalently a
   `tls.rawVhostBody = true` boolean. kanidm sets it and supplies the complete body via
   `extraCaddyConfig`.
-- **Why escape hatch, not a new backend kind:** kanidm is the only HTTPS-upstream, SNI-pinned,
+- **Why escape hatch, not a new backend variant:** kanidm is the only HTTPS-upstream, SNI-pinned,
   explicit-cert proxy in the fleet. A dedicated `backendBlock` kind (`reverseProxyTls` with
   `upstreamUrl`/`tlsServerName`/`headerUpHost`) would be dead weight for every other service, whereas
   `extraCaddyConfig` already exists for exactly this purpose (keystone §3.1). **Recommend the raw flag
@@ -889,7 +888,7 @@ The keystone acme generator defaults the challenge body to
 body is the bare `reverse_proxy <host>:<acmePort>` on the whole `http://` vhost. (This is shared gap
 #8 in catalog-and-generators §7.2.)
 
-- **Add:** a per-entry `tls.challenge.body = "bare"` selector so the generator emits the **bare**
+- **Add:** a per-entry `tls.cert.own.challenge.body.bare = { }` selector so the generator emits the **bare**
   `reverse_proxy 127.0.0.1:${acmePort}\n` body. The upstream token is `127.0.0.1` per the approved
   standardization (§7.8 #22) — so the body is `reverse_proxy 127.0.0.1:64073\n`, differing from
   today's `localhost:64073` only by that one approved substitution. Normalizing instead to the
@@ -900,7 +899,7 @@ body is the bare `reverse_proxy <host>:<acmePort>` on the whole `http://` vhost.
 ## 8. Notes for plans that mirror this one
 
 - **Manual-TLS services (postgres, radius, aedilis technitium) share the cert + per-service-group
-  shape** (`tls.ca`, `acmePort`, `certGroup`, `reloadServices`, `users.groups.<g>.members` in
+  shape** (`tls.cert.own` with `ca`, `acmePort`, `certGroup`, `reloadServices`, `users.groups.<g>.members` in
   `service.nix`), but kanidm is the only one with (a) an HTTPS upstream + pinned `tls_server_name`
   transport, (b) a tracing span in the vhost, and (c) a secondary (`ldap`) challenge domain. Those are
   the kanidm-specific deltas; the cert/group mechanics generalize.

@@ -18,7 +18,7 @@ _baseline_ (§3) — and the union is shown to equal the verbatim current set (�
 
 > **Scope.** `networking.firewall` is **inbound-only**. This plan covers the enforceable inbound
 > openings. The "which hosts may reach whom" egress/peer matrix is **not** a firewall concern — it is a
-> Tailscale/headscale ACL concern modeled as `access.fromHosts` _intent_ only (parent plan §2.7 / §5.2),
+> Tailscale/headscale ACL concern modeled as `access.scope.hostList.fromHosts` _intent_ only (parent plan §2.7 / §5.2),
 > never auto-applied, and out of scope for the per-host set-equality proof below. `mini` (darwin) keeps
 > its hand-written firewall and is out of scope (parent plan §5.1 #4).
 
@@ -151,7 +151,7 @@ On augustus/cicero/praeconinus, `443` is the Caddy vhost listen port (service-de
 `443` public is **DoH**, terminated **natively by Technitium** (not a Caddy vhost) — see the inline
 comment in aedilis's `security.nix`. So aedilis's public `443` is arguably a _DNS-resolver protocol
 listener_ (baseline), not a catalog-service vhost. This matters for the set-equality proof: the generator
-must **not** be the thing that opens aedilis public `443`, because no `access.scope = "public"` catalog
+must **not** be the thing that opens aedilis public `443`, because no `access.scope.public` catalog
 vhost runs on aedilis (its Technitium admin/metrics vhosts are `tailscale0`-only on `8443`/`9443`). See
 §3.2 — aedilis public `443`/`853`/`80` all stay baseline.
 
@@ -161,7 +161,7 @@ These are the `acmePort` values of aedilis's **internal step-ca** certs for **ta
 Unlike the caddy80 model, step-ca (on cicero) reaches the HTTP-01 challenge listener **directly over
 Tailscale** on that port, so the port must be **opened on `tailscale0`** (not fronted by `:80`). These
 two openings are exactly the `acmePort` constants hand-copied into `security.nix` today — the prime
-service-derived candidates for generation via `tls.challenge = { via = "direct"; iface = "tailscale0"; }`
+service-derived candidates for generation via `tls.cert.own.challenge = { via = "direct"; iface = "tailscale0"; }`
 (keystone §3.5).
 
 ---
@@ -176,10 +176,10 @@ residual hand-listed baseline — and the union is shown equal to §1.
 The generator's logic (keystone §3.5), recapped:
 
 - **listen-port openings:** for each local entry, open `listenPort` on the interface `access.scope`
-  selects — `public → allowedTCPPorts`, `tailnet`/`host-list → tailscale0`, `funnel`/`none → nothing`;
+  selects — `public → allowedTCPPorts`, `tailnet`/`hostList → tailscale0`, `funnel`/`none → nothing`;
   de-duplicated via `lib.unique`.
-- **direct-challenge acmePorts:** for each local entry with `tls.ca != null` and
-  `tls.challenge.via == "direct"`, open `tls.acmePort` on `tls.challenge.iface`.
+- **direct-challenge acmePorts:** for each local entry with `tls.cert ? own` and
+  `tls.cert.own.challenge.via == "direct"`, open `tls.cert.own.acmePort` on `tls.cert.own.challenge.iface`.
 
 ### 3.1 augustus
 
@@ -203,28 +203,28 @@ Union check (schema-as-today): generated `{ pub TCP 443 }` ∪ baseline
 
 ### 3.2 aedilis
 
-| Port                   | Column        | How derived / why baseline                                                            |
-| ---------------------- | ------------- | ------------------------------------------------------------------------------------- |
-| `8443` (ts0)           | **generated** | Technitium admin-UI catalog vhost, `access.scope = tailnet`, `listenPort = 8443`.     |
-| `9443` (ts0)           | **generated** | dns-metrics catalog vhost (mTLS), `scope = tailnet`/`host-list`, `listenPort = 9443`. |
-| `22481` (ts0)          | **generated** | internal-CA cert, `tls.challenge = { via = direct; iface = tailscale0 }` → acmePort.  |
-| `22483` (ts0)          | **generated** | second internal-CA cert, same direct-challenge mechanism.                             |
-| `80`/`443`/`853` (pub) | baseline      | Technitium-native DNS (LE challenge / DoH / DoT·DoQ) — **not** catalog vhosts (§2.2). |
-| `22` (ts0)             | baseline      | SSH.                                                                                  |
-| `53` (ts0 TCP/UDP)     | baseline      | Technitium plain DNS core.                                                            |
-| `5252` (ts0)           | baseline      | Tailscale metrics exporter.                                                           |
+| Port                   | Column        | How derived / why baseline                                                                    |
+| ---------------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| `8443` (ts0)           | **generated** | Technitium admin-UI catalog vhost, `access.scope.tailnet`, `listenPort = 8443`.               |
+| `9443` (ts0)           | **generated** | dns-metrics catalog vhost (mTLS), `scope.tailnet`/`scope.hostList`, `listenPort = 9443`.      |
+| `22481` (ts0)          | **generated** | internal-CA cert, `tls.cert.own.challenge = { via = direct; iface = tailscale0 }` → acmePort. |
+| `22483` (ts0)          | **generated** | second internal-CA cert, same direct-challenge mechanism.                                     |
+| `80`/`443`/`853` (pub) | baseline      | Technitium-native DNS (LE challenge / DoH / DoT·DoQ) — **not** catalog vhosts (§2.2).         |
+| `22` (ts0)             | baseline      | SSH.                                                                                          |
+| `53` (ts0 TCP/UDP)     | baseline      | Technitium plain DNS core.                                                                    |
+| `5252` (ts0)           | baseline      | Tailscale metrics exporter.                                                                   |
 
 Union check: generated `{ ts0 TCP 8443 9443 22481 22483 }` ∪ baseline
 `{ pub TCP 80 443 853; pub UDP 853; ts0 TCP 22 53 5252; ts0 UDP 53 }` =
 `{ pub TCP 80 443 853; pub UDP 853; ts0 TCP 22 53 5252 8443 9443 22481 22483; ts0 UDP 53 }` —
-**equals §1.2.** ✅ (The `host-list` scope for `9443` mTLS metrics maps the `access.fromHosts = [
+**equals §1.2.** ✅ (The `scope.hostList` for `9443` mTLS metrics maps the `access.scope.hostList.fromHosts = [
 "augustus" ]` intent — but only the _interface_ is enforced today; the peer restriction is intent-only.)
 
 ### 3.3 cicero
 
 | Port         | Column        | How derived / why baseline                                                    |
 | ------------ | ------------- | ----------------------------------------------------------------------------- |
-| `443` (ts0)  | **generated** | cicero-observability catalog vhost, `scope = tailnet`, `listenPort = 443`.    |
+| `443` (ts0)  | **generated** | cicero-observability catalog vhost, `scope.tailnet`, `listenPort = 443`.      |
 | `8443` (ts0) | **generated** | cicero metrics/observability vhost on non-standard port, `listenPort = 8443`. |
 | `80` (ts0)   | baseline      | Caddy `:80` HTTP-01 challenge front for cicero's internal certs (§2.1).       |
 | `22` (ts0)   | baseline      | SSH.                                                                          |
@@ -234,7 +234,7 @@ Union check: generated `{ ts0 TCP 443 8443 }` ∪ baseline `{ ts0 TCP 22 80 5252
 `{ ts0 TCP 22 80 443 5252 8443 }` — **equals §1.3.** ✅
 
 > cicero's `80`/`443`/`8443` are all `tailscale0`-scoped (it is tailnet-only). The generator picks
-> `tailscale0` from `access.scope = tailnet`, matching today. `80` stays baseline per §2.1.
+> `tailscale0` from `access.scope.tailnet`, matching today. `80` stays baseline per §2.1.
 
 ### 3.4 praeconinus
 
@@ -247,7 +247,7 @@ Union check: generated `{ ts0 TCP 443 8443 }` ∪ baseline `{ ts0 TCP 22 80 5252
 
 Generator output: **empty.** praeconinus's one catalog entry (if it had one — see
 [praeconinus.md](./praeconinus.md), which recommends it stays a bespoke override) uses
-`access.scope = "funnel"`, and funnel scope opens **nothing** (tailscaled owns `:443`; Caddy's `:8443`
+`access.scope.funnel`, and funnel scope opens **nothing** (tailscaled owns `:443`; Caddy's `:8443`
 is reached over loopback and is deliberately never firewalled). So **every** praeconinus port is
 baseline/hand-listed.
 
@@ -323,10 +323,10 @@ extraPorts = {
   tcp = [ 1812 1813 ];
   udp = [ 1812 1813 ];
 };
-# access.scope = "public"  -> opens on allowedTCPPorts/allowedUDPPorts
+# access.scope.public = { }  -> opens on allowedTCPPorts/allowedUDPPorts
 ```
 
-`access.scope = "public"` already selects the correct interface; the gap is purely **UDP + a
+`access.scope.public` already selects the correct interface; the gap is purely **UDP + a
 multi-port, non-443 list**. Radius is not an HTTP vhost at all (no Caddy vhost, no ACME cert of the
 challenge kind), so forcing it through `listenPort`/`backend` would misrepresent it.
 
@@ -377,7 +377,7 @@ aedilis's two direct-challenge acmePorts.
       **not** add `extraPorts` yet.
 - [ ] Generator owns per host: augustus `pub 443`; aedilis `ts0 8443/9443/22481/22483`; cicero
       `ts0 443/8443`; praeconinus **none** (funnel).
-- [ ] Set each migrated service's catalog `access.scope` (+ `tls.challenge = { via = "direct"; iface =
+- [ ] Set each migrated service's catalog `access.scope` (+ `tls.cert.own.challenge = { via = "direct"; iface =
       "tailscale0"; }` for aedilis's two internal certs) and flip `managedBy.firewall`.
 - [ ] Delete **only** the generated ports from each `security.nix`; leave baseline ports hand-listed.
 - [ ] `git add` the generator module, then run the §4 per-host **set-equality** diffs (sorted) across all

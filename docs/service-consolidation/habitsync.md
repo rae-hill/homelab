@@ -24,8 +24,8 @@ The module sets `extraConfig` to (note the source uses `127.0.0.1`, not `localho
 reverse_proxy 127.0.0.1:6842
 ```
 
-There is **no** `security.acme.certs` entry — the vhost shares Caddy's managed cert (`tls.ca =
-null`). No mTLS, no Caddy-level auth. (Byte note: the upstream token is `127.0.0.1` here — the
+There is **no** `security.acme.certs` entry — the vhost shares Caddy's managed cert
+(`tls.cert.shared = { }`). No mTLS, no Caddy-level auth. (Byte note: the upstream token is `127.0.0.1` here — the
 renderer standardizes on `127.0.0.1` globally, so this vhost is byte-identical with **no** deviation,
 unlike `it-tools`/`openwebui`/`planka`/`home-assistant` which get the approved `localhost → 127.0.0.1`
 substitution. See [catalog-and-generators §7.8 #22](./catalog-and-generators.md).)
@@ -89,17 +89,13 @@ homelab.catalog.habitsync = {
   subdomain = "habitsync";
   zone = "plato-splunk.media";
   host = "augustus";
-  backend = {
-    kind = "reverseProxy";
-    port = 6842; # renderer uses 127.0.0.1 globally — matches the source exactly
-  };
-  tls.ca = null; # shares Caddy's managed cert; no own cert
-  access.scope = "tailnet";
-  dns.enable = true;
+  backend.reverseProxy.port = 6842; # renderer uses 127.0.0.1 globally — matches the source exactly
+  tls.cert.shared = { }; # shares Caddy's managed cert; no own cert
+  access.scope.tailnet = { };
+  dns.tailnet = { };
   oidc = {
-    enable = true;
     clientId = "habitsync"; # = name; explicit for clarity
-    public = true;
+    client.public = { };
     # list of callbacks; the second is absolute (custom scheme) — see schema gap #14
     originUrl = [
       "https://habitsync.plato-splunk.media/auth-callback"
@@ -124,7 +120,7 @@ homelab.catalog.habitsync = {
   #12 — the generator must not force `/`), `displayName = "HabitSync"`, and `scopeMaps` order-preserved
   (gap #15). No `claimMaps`.
 - **DNS.** `habitsync.plato-splunk.media` A/AAAA (augustus tailnet IP) is produced by the dns
-  generator from `host = "augustus"` + `dns.enable`, reproducing the current `tailnetRewrites.habitsync
+  generator from `host = "augustus"` + `dns.tailnet`, reproducing the current `tailnetRewrites.habitsync
   = "augustus"` record. See [dns-records.md](./dns-records.md).
 - **Firewall.** No change — `443` on `tailscale0` is already open and shared by all augustus vhosts.
 - **Container / db / backups / failure-notifs.** Moved verbatim into `service.nix`; unchanged.
@@ -152,7 +148,7 @@ each be a (disallowed) behavior change.
 
 - [ ] Create `features/habitsync/{catalog.nix,service.nix,oidc.nix,complete.nix}`.
 - [ ] Move the container/db/user/sops/restic/failure-notifs blocks verbatim into `service.nix`.
-- [ ] Write the `homelab.catalog.habitsync` entry (§2); set `public = true`, the list `originUrl`,
+- [ ] Write the `homelab.catalog.habitsync` entry (§2); set `client.public = { }`, the list `originUrl`,
       `landingPath = ""`. (Upstream is `127.0.0.1` via the renderer — no per-entry field.)
 - [ ] Register `nixos.habitsync` in `complete.nix`; keep it imported by `hosts/augustus.nix`.
 - [ ] Confirm generator support for schema gaps #12 (empty landingPath), #14 (absolute list
