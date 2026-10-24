@@ -26,11 +26,15 @@
 
     allowedTCPPorts = [
       80
-      443
 
       # radius
       1812
       1813
+
+      # NOTE: 443 (the shared Caddy vhost listen port) is now emitted by the
+      # homelab-service-firewall generator from the public-scope catalog entries
+      # (scope.public, listenPort 443). Baseline keeps the non-443 / non-service
+      # infra ports below.
     ];
 
     allowedUDPPorts = [

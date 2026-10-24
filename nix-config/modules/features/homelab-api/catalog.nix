@@ -29,11 +29,14 @@ in
         insecureHttp = true; # ALSO emit http://homelab-api.plato-splunk.media with the SAME body
         tracing.enable = true; # `tracing { span homelab-api }` on BOTH vhosts when Tempo is on
 
-        access.scope.tailnet = { }; # 443/80 are baseline openings
+        access.scope.public = { }; # augustus serves this vhost on the public :443 interface
         dns.tailnet = { }; # emit homelab-api A/AAAA on aedilis (reproduces tailnetRewrites)
 
-        managedBy.caddy = true;
-        managedBy.oidc = true;
+        managedBy = {
+          caddy = true;
+          oidc = true;
+          firewall = true;
+        };
       };
     };
 }

@@ -24,11 +24,14 @@ in
 
         tls.cert.shared = { }; # shares Caddy's managed cert; no ACME cert / challenge vhost
         tracing.enable = true; # `tracing { span homelab-ui }` when the host runs Tempo
-        access.scope.tailnet = { }; # reachable over tailscale0; 443 is a baseline opening
+        access.scope.public = { }; # augustus serves this vhost on the public :443 interface
         dns.tailnet = { }; # emit homelab A/AAAA on aedilis (reproduces tailnetRewrites.homelab)
 
         # No oidc (static SPA). The caddy generator owns the vhost now.
-        managedBy.caddy = true;
+        managedBy = {
+          caddy = true;
+          firewall = true;
+        };
       };
     };
 }

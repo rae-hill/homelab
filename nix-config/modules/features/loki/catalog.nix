@@ -38,13 +38,16 @@ in
         tracing.enable = true;
 
         # Reachable over the tailnet; opens nothing new (443 is a baseline host opening).
-        access.scope.tailnet = { };
+        access.scope.public = { }; # augustus serves this vhost on the public :443 interface
 
         # Emit the loki-push A/AAAA on aedilis (reproduces tailnetRewrites.loki-push).
         dns.tailnet = { };
 
         # The caddy generator owns the vhost now. DNS deferred to the DNS cutover.
-        managedBy.caddy = true;
+        managedBy = {
+          caddy = true;
+          firewall = true;
+        };
       };
     };
 }

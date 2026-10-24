@@ -12,7 +12,7 @@ in
         host = "augustus";
         backend.reverseProxy.port = svc.port; # 1337
         tls.cert.shared = { };
-        access.scope.tailnet = { };
+        access.scope.public = { }; # augustus serves vhosts on the public :443 interface
         dns.tailnet = { };
 
         oidc = {
@@ -39,8 +39,11 @@ in
           };
         };
 
-        managedBy.caddy = true;
-        managedBy.oidc = true;
+        managedBy = {
+          caddy = true;
+          oidc = true;
+          firewall = true;
+        };
       };
     };
 }

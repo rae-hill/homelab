@@ -35,10 +35,13 @@ in
         };
         tracing.enable = true; # `tracing { span prometheus }` when Tempo is on
 
-        access.scope.tailnet = { };
+        access.scope.public = { }; # augustus serves this vhost on the public :443 interface
         dns.tailnet = { };
 
-        managedBy.caddy = true;
+        managedBy = {
+          caddy = true;
+          firewall = true;
+        };
       };
 
       # 2. The client cert consumed outbound by the scrape tls_config — no https vhost.

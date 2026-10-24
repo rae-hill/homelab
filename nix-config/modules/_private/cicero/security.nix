@@ -30,7 +30,10 @@
           80
           443
           5252
-          8443
+          # NOTE: 8443 (Caddy https for the cicero-metrics / ca-monitoring mTLS vhosts) is
+          # now emitted by the homelab-service-firewall generator from those catalog entries
+          # (scope.tailnet, listenPort 8443). 443 here is step-ca's (not a Caddy vhost);
+          # 80 is the Caddy :80 challenge front — both stay baseline.
         ];
       };
     };

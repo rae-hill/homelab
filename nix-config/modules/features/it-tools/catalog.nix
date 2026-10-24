@@ -15,12 +15,14 @@ in
         host = "augustus";
         backend.reverseProxy.port = svc.port; # 47309 (renderer emits 127.0.0.1 upstream)
         tls.cert.shared = { }; # shares Caddy's managed cert; no security.acme.certs entry
-        access.scope.tailnet = { };
+        access.scope.public = { }; # augustus serves vhosts on the public :443 interface
         dns.tailnet = { };
 
-        # Migration opt-in: caddy generator owns the vhost now. DNS/firewall deferred to
-        # their cross-cutting migration steps.
-        managedBy.caddy = true;
+        # Migration opt-in: caddy generator owns the vhost now. DNS deferred to the DNS cutover.
+        managedBy = {
+          caddy = true;
+          firewall = true;
+        };
       };
     };
 }

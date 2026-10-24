@@ -81,6 +81,7 @@ in
           managedBy = {
             caddy = true;
             acme = true;
+            firewall = true;
           };
         };
 
@@ -149,6 +150,7 @@ in
           managedBy = {
             caddy = true;
             acme = true;
+            firewall = true;
           };
         };
       };

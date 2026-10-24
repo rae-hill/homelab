@@ -36,7 +36,7 @@ in
             body.bare = { }; # today's http://idm vhost is a bare reverse_proxy
           };
         };
-        access.scope.tailnet = { };
+        access.scope.public = { }; # augustus serves this vhost on the public :443 interface
         dns.tailnet = { };
 
         # Bespoke vhost body — reproduces today's kanidm.nix verbatim (explicit cert, tracing
@@ -54,8 +54,11 @@ in
           }
         '';
 
-        managedBy.caddy = true;
-        managedBy.acme = true;
+        managedBy = {
+          caddy = true;
+          acme = true;
+          firewall = true;
+        };
       };
     };
 }

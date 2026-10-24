@@ -41,11 +41,12 @@
       allowedTCPPorts = [
         22 # SSH
         53 # plain DNS over Tailscale (personal recursive resolver; TCP fallback)
-        8443 # admin UI vhost (Caddy, OIDC-gated, no mTLS)
-        9443 # dns-metrics endpoint (Caddy, mTLS); see service-registry dns-metrics.port
         5252 # Tailscale metrics exporter
         22481 # acme http challenge
         22483 # acme http challenge
+        # NOTE: 8443 (admin UI vhost) + 9443 (dns-metrics mTLS vhost) are now emitted by
+        # the homelab-service-firewall generator from the dns-admin / dns-metrics catalog
+        # entries (scope.tailnet, listenPort 8443/9443).
       ];
       allowedUDPPorts = [
         53 # plain DNS over Tailscale (personal recursive resolver)

@@ -54,6 +54,7 @@ in
           managedBy = {
             caddy = true;
             acme = true;
+            firewall = true;
           };
         };
 
@@ -75,7 +76,10 @@ in
 
           access.scope.tailnet = { };
           dns = null; # ca-monitoring A/AAAA stays in tailnetRewrites until the DNS cutover
-          managedBy.caddy = true;
+          managedBy = {
+            caddy = true;
+            firewall = true;
+          };
         };
       };
     };
