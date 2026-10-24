@@ -24,8 +24,8 @@ in
       mkClient =
         name: e:
         let
-          base = catLib.url e;
           o = e.oidc;
+          base = if o.originBase != null then o.originBase else catLib.url e;
           clientId = if o.clientId != null then o.clientId else name;
           callbacks = lib.toList o.callbackPath; # str or list -> list
           mkOrigin = p: if lib.hasInfix "://" p then p else "${base}${p}";

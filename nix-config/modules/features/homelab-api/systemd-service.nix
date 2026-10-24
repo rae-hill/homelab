@@ -18,7 +18,9 @@ in
       pubJwk = "${homeDir}/jwk.pub.json";
       privJwk = "${homeDir}/jwk.priv.json";
       pkg = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.homelab-api;
-      commitHash = inputs.self.rev or (throw "Cannot deploy homelab-api from a dirty tree: HOMELAB_COMMIT_HASH requires a clean git commit");
+      commitHash =
+        inputs.self.rev
+          or (throw "Cannot deploy homelab-api from a dirty tree: HOMELAB_COMMIT_HASH requires a clean git commit");
     in
     {
       options.services.homelab-api = {
@@ -186,7 +188,12 @@ in
             ACME_KEY_TYPE=ECSECPrimeRandom
             ACME_KEY_SIZE=256
             ${if cfg.serialNumbersFile != null then "SERIAL_NUMBERS_FILE=${cfg.serialNumbersFile}" else ""}
-            ${if config.services.tempo.enable then "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}" else ""}
+            ${
+              if config.services.tempo.enable then
+                "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}"
+              else
+                ""
+            }
             HOMELAB_COMMIT_HASH=${commitHash}
           '';
         };

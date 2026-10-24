@@ -417,6 +417,16 @@ let
               type = oidcClientType;
               description = "Public (PKCE) vs basic (secret) client (attrTag).";
             };
+            originBase = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = ''
+                Base origin that relative callbackPath/landingPath are appended to. Defaults
+                to the entry's own url (https://<fqdn>). Override when the OIDC callbacks hang
+                off a DIFFERENT origin than the service's own vhost (homelab-api: its callbacks
+                target the frontend origin https://homelab.<zone>, not the api origin).
+              '';
+            };
             callbackPath = mkOption {
               type = types.either types.str (types.listOf types.str);
               description = ''

@@ -44,7 +44,6 @@ in
       nixos.grafana
       nixos.unpoller
       nixos.homelab-api
-      nixos.homelab-kanidm
       nixos.homelab-ui
       nixos.technitium-kanidm
 
