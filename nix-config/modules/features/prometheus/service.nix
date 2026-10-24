@@ -1,10 +1,18 @@
+# prometheus — runtime (everything except the two catalog-owned surfaces).
+#
+# The `prometheus` mTLS server vhost and the `prometheus-client` cert + its challenge vhost have
+# moved to catalog.nix. This file keeps the prometheus runtime: scrapeConfigs (which still
+# REFERENCE the prometheus-client cert dir), exporters, postgres monitoring wiring, the
+# Technitium metrics-token oneshot/timer, and failure-notifs. No behavioral change.
+#
+# See docs/service-consolidation/prometheus.md §3.
 { config, ... }:
 let
   c = config.constants;
   svc = c.services.prometheus;
 in
 {
-  flake.modules.nixos.prometheus =
+  flake.modules.nixos.prometheus-service =
     {
       config,
       lib,
@@ -272,39 +280,6 @@ in
 
       services.peesequel.grantRoles = {
         prometheus_exporter = [ "pg_monitor" ];
-      };
-
-      # Client certificate for Prometheus to scrape mTLS-guarded remote targets
-      security.acme.certs."${c.services.prometheus-client.domain}" = {
-        domain = c.services.prometheus-client.domain;
-        listenHTTP = "127.0.0.1:${builtins.toString c.services.prometheus-client.acmePort}";
-        server = c.ca.acmeDirectoryHttp;
-        group = "prometheus";
-        reloadServices = [ "prometheus.service" ];
-      };
-
-      services.caddy.virtualHosts."http://${c.services.prometheus-client.domain}" = {
-        extraConfig = ''
-          reverse_proxy localhost:${builtins.toString c.services.prometheus-client.acmePort}
-        '';
-      };
-
-      # Caddy reverse proxy with mTLS (Prometheus has no OIDC)
-      services.caddy.virtualHosts."${svc.url}" = {
-        extraConfig = ''
-          tls {
-            client_auth {
-              mode require_and_verify
-              trust_pool file {
-                pem_file ${c.ca.rootCert}
-              }
-            }
-          }
-          tracing {
-            span prometheus
-          }
-          reverse_proxy 127.0.0.1:${builtins.toString svc.port}
-        '';
       };
 
       services.failure-notifs.attachServices = [
