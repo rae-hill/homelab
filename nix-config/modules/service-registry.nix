@@ -110,6 +110,7 @@ let
       ++ (mkTailnetApex "cicero" "cicero")
       ++ (mkTailnetApex "nixos" "nixos")
       ++ (mkTailnetApex "praeconinus" "praeconinus")
+      ++ (mkTailnetApex "mini" "mini")
       # tailnet names with no catalog entry
       ++ (mkTailnetApex "ca" "cicero")
       ++ (mkTailnetApex "ollama" "mini")
