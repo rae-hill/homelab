@@ -224,7 +224,7 @@ in
                 };
               }
               {
-                targets = [ "aedilis.plato-splunk.media:${toString c.services.tailscale-metrics.port}" ];
+                targets = [ "aedilis.neko-bicolor.ts.net:${toString c.services.tailscale-metrics.port}" ];
                 labels = {
                   instance = "aedilis";
                 };
