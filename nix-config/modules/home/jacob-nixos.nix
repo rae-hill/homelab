@@ -15,6 +15,7 @@ in
     modules = [
       inputs.catppuccin.homeModules.catppuccin
       inputs.nixvim.homeModules.nixvim
+      inputs.sops-nix.homeManagerModules.sops
 
       hm.git
       hm.nixvim-complete
@@ -52,6 +53,13 @@ in
           home = {
             username = "jacob";
             homeDirectory = "/home/jacob";
+          };
+
+          sops = {
+            defaultSopsFile = inputs.self + "/nix-config/secrets/nixos.yaml";
+            age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
+
+            secrets.qwen_openai_key = { };
           };
 
           home.packages = with pkgs; [

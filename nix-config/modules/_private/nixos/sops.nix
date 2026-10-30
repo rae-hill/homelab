@@ -36,8 +36,4 @@
   sops.secrets.step_jwk_provisioner_password = {
     owner = "root";
   };
-
-  sops.secrets.qwen_openai_key = {
-    owner = "jacob";
-  };
 }
