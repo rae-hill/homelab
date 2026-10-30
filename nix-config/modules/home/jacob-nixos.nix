@@ -121,6 +121,171 @@ in
             };
           };
 
+          programs.opencode = {
+            enable = true;
+            settings = {
+              provider = {
+                "qwencloud-token-plan-personal" = {
+                  npm = "@ai-sdk/anthropic";
+                  name = "QwenCloud";
+                  options = {
+                    baseURL = "https://token-plan.maas.qwencloudapi.com/apps/anthropic/v1";
+                    apiKey = "{file:${config.sops.secrets.qwen_openai_key.path}}";
+                  };
+
+                  models = {
+                    auto = {
+                      name = "Auto";
+                      modalities = {
+                        input = [ "text" ];
+                        output = [ "text" ];
+                      };
+                    };
+
+                    "qwen3.8-max" = {
+                      name = "Qwen3.8 Max";
+                      reasoning = true;
+                      limit = {
+                        context = 983616;
+                        output = 131072;
+                      };
+                      modalities = {
+                        input = [
+                          "text"
+                          "image"
+                        ];
+                        output = [ "text" ];
+                      };
+                      options = {
+                        effort = "xhigh";
+                      };
+                    };
+
+                    "qwen3.8-flash" = {
+                      name = "Qwen3.8 Flash";
+                      reasoning = true;
+                      limit = {
+                        context = 983616;
+                        output = 131072;
+                      };
+                      modalities = {
+                        input = [
+                          "text"
+                          "image"
+                        ];
+                        output = [ "text" ];
+                      };
+                      options = {
+                        effort = "xhigh";
+                      };
+                    };
+
+                    "qwen3.7-max" = {
+                      name = "Qwen3.7 Max";
+                      options = {
+                        thinking = {
+                          type = "enabled";
+                          budgetTokens = 8192;
+                        };
+                      };
+                    };
+
+                    "qwen3.7-plus" = {
+                      name = "Qwen3.7 Plus";
+                      modalities = {
+                        input = [
+                          "text"
+                          "image"
+                        ];
+                        output = [ "text" ];
+                      };
+                      options = {
+                        thinking = {
+                          type = "enabled";
+                          budgetTokens = 8192;
+                        };
+                      };
+                    };
+
+                    "qwen3.6-plus" = {
+                      name = "Qwen3.6 Plus";
+                      modalities = {
+                        input = [
+                          "text"
+                          "image"
+                        ];
+                        output = [ "text" ];
+                      };
+                      options = {
+                        thinking = {
+                          type = "enabled";
+                          budgetTokens = 8192;
+                        };
+                      };
+                    };
+
+                    "qwen3.6-flash" = {
+                      name = "Qwen3.6 Flash";
+                      modalities = {
+                        input = [
+                          "text"
+                          "image"
+                        ];
+                        output = [ "text" ];
+                      };
+                      options = {
+                        thinking = {
+                          type = "enabled";
+                          budgetTokens = 8192;
+                        };
+                      };
+                    };
+
+                    "glm-5.3" = {
+                      name = "GLM-5.3";
+                      options = {
+                        thinking = {
+                          type = "enabled";
+                          budgetTokens = 8192;
+                        };
+                      };
+                    };
+
+                    "glm-5.2" = {
+                      name = "GLM-5.2";
+                      options = {
+                        thinking = {
+                          type = "enabled";
+                          budgetTokens = 8192;
+                        };
+                      };
+                    };
+
+                    "deepseek-v4-pro" = {
+                      name = "DeepSeek V4 Pro";
+                    };
+
+                    "deepseek-v4-pro-0813" = {
+                      name = "DeepSeek V4 Pro 0813";
+                    };
+
+                    "deepseek-v4-flash-0731" = {
+                      name = "DeepSeek V4 Flash 0731";
+                    };
+
+                    "deepseek-v4.1-flash" = {
+                      name = "DeepSeek V4.1 Flash";
+                    };
+
+                    "deepseek-v4.1-flash-1017" = {
+                      name = "DeepSeek V4.1 Flash 1017";
+                    };
+                  };
+                };
+              };
+            };
+          };
+
           programs.home-manager.enable = true;
 
           programs.ssh = {
@@ -232,7 +397,7 @@ in
             enableZshIntegration = true;
             # Catppuccin Frappé palette inlined instead of using
             # `catppuccin.starship.enable`. The catppuccin starship module injects
-            # the palette via `lib.importTOML "${sources.starship}/frappe.toml"`,
+            # the palette via `lib.importTOML "${sources.starship}/frappe.toml"`;
             # which is Import-From-Derivation: it must BUILD the catppuccin-starship
             # source at eval time. That breaks `nix flake check --no-build` (used by
             # the lint-staged pre-commit hook) with "path ... is not valid". Inlining

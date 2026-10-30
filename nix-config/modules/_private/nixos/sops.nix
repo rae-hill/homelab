@@ -1,4 +1,10 @@
-{ inputs, lib, config, pkgs, ... }:
+{
+  inputs,
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 {
   sops.defaultSopsFile = inputs.self + "/nix-config/secrets/nixos.yaml";
   sops.age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
@@ -29,5 +35,9 @@
 
   sops.secrets.step_jwk_provisioner_password = {
     owner = "root";
+  };
+
+  sops.secrets.qwen_openai_key = {
+    owner = "jacob";
   };
 }

@@ -22,6 +22,7 @@
         ghostty.enable = true;
         vivaldi.enable = true;
         mangohud.enable = true;
+        opencode.enable = true;
       };
     };
 }
