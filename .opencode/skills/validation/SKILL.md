@@ -36,14 +36,15 @@ see edits, but newly created files **always** do.
 Run these commands from the repo root in order:
 
 ```sh
-dprint fmt fmt .
-nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 yarn lint --fix
 yarn lint
 yarn typecheck
 yarn test
 nix build .#checks.x86_64-linux.shellcheck    # ShellCheck gate for shell scripts
 ```
+
+Formatting is **not** in this list — the opencode harness auto-formats every file it
+writes or edits (see Format below).
 
 ## Commands
 
@@ -86,32 +87,28 @@ helpers and the registry option, and `docs/shellcheck-nix-test-plan.md` for the 
 
 ### Format
 
+**Agents do not run formatters.** The opencode harness automatically formats every file it
+writes or edits, via the formatter configured in `nix-config/modules/home/jacob-nixos.nix` →
+`programs.opencode.settings.formatter`:
+
+- **dprint** with store-pinned wasm plugins (same set/versions as the devshell `fmt` command and
+  `dprint.json`) for TypeScript/JavaScript, JSON, Markdown, TOML, CSS, HTML/XML/Vue/Svelte/Astro,
+  and YAML. Per-language settings (Markdown `lineWidth` 100 + `textWrap` maintain, ASI
+  TypeScript, etc.) come from `dprint.json`, which dprint auto-discovers in the project root.
+  The prettier/oxfmt/biome builtins are disabled so dprint always wins for those languages.
+- **Pinned nixfmt** (RFC style, `packages.<system>.nixfmt` from `flake.nix`) for `.nix` — the
+  same version used by the pre-commit hook, devshell, and nixvim conform config, so formatting
+  is deterministic everywhere.
+
+Never reformat the vendored `repos/` subtrees (read-only upstream sources; excluded via
+`dprint.json` and the hook's `repos/` filter).
+
+Manual/bulk fallback for files the harness did not touch (e.g. repo-wide reformat, human runs):
+
 ```sh
-dprint fmt fmt .
+fmt [paths]                                            # devshell dprint + Nix-store plugins
 nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 ```
-
-`dprint` formats everything except Nix (TypeScript, JSON, Markdown, TOML, YAML, CSS, HTML). Its
-plugins and per-language settings (including Markdown: `lineWidth` 100, `textWrap` maintain) live in
-`dprint.json`, so `dprint fmt <path>` auto-discovers the config — no need to pass `--plugins`
-manually when formatting a single file.
-`nixfmt` (RFC style) formats `.nix` files, **excluding the vendored `repos/` subtrees** (read-only
-upstream sources — never reformat them). Invoke it via `nix run .#nixfmt` so you always use the
-flake-pinned `nixfmt` (exposed as `packages.<system>.nixfmt`) rather than whatever is on `PATH` —
-this keeps the version identical across the hook, the devshell, and the editor. These are separate
-engines:
-
-- **CLI / pre-commit:** `dprint` runs via the `fmt` devshell command (which excludes `repos/*`);
-  `nix run .#nixfmt` is wired into `lint-staged.config.js` with a `repos/` filter so staged `.nix`
-  files are formatted on commit, then `nix flake check` runs. Using `nix run .#nixfmt` (not a bare
-  `nixfmt`) is important: git hooks run in a minimal shell that does not inherit the devshell PATH.
-- **Editor (nixvim):** `conform.nvim` formats `.nix` with the same pinned `nixfmt`, and falls back
-  to the dprint LSP for other filetypes. The `<C-f>` keymap (`_G.format_with_dprint_priority`)
-  routes through conform first, so editor output matches the CLI.
-
-The pinned `nixfmt` is defined once as `packages.<system>.nixfmt = pkgs.nixfmt` in `flake.nix`; the
-devshell, the hook (`.#nixfmt`), and the nixvim config (`features/nixvim/plugins/conform.nix`) all
-resolve to that same version so formatting is deterministic everywhere.
 
 ### Lint
 

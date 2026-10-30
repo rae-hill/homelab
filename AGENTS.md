@@ -106,11 +106,15 @@ Full details in the `validation` skill. Summary:
 reports a "missing attribute / file" for something that exists on disk, check `git status`
 before re-editing.
 
+**Formatting is automatic.** The opencode harness formats every file it writes or edits —
+dprint for TS/JS/JSON/Markdown/TOML/CSS/HTML/YAML/Astro, pinned nixfmt for `.nix`
+(`nix-config/modules/home/jacob-nixos.nix` → `programs.opencode.settings.formatter`).
+Do not run formatters manually. Bulk/non-harness fallback: `fmt [paths]` (devshell) and
+`nix run .#nixfmt -- <file>` — never against `repos/`.
+
 Run from the repo root after making changes:
 
 ```sh
-dprint fmt fmt .
-nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 yarn lint --fix
 yarn lint
 yarn typecheck
@@ -121,6 +125,21 @@ nix build .#checks.x86_64-linux.shellcheck    # ShellCheck gate for shell script
 Do NOT run e2e tests (`homelab-e2e-tests`) — they require the backend to be running.
 To target a specific package or test: `yarn workspace <package-name> <command> <args>`
 (do NOT use `--` to separate args).
+
+## Harness (opencode)
+
+Global opencode config lives in home-manager: `nix-config/modules/home/jacob-nixos.nix` →
+`programs.opencode` (V2 schema; opencode from `pkgs-unstable`; theme via `cli.json`).
+Permission policy (ordered rules, last match wins):
+
+- `edit` allowed in the project; external directories ask, except `~/git/*` (allowed)
+- `shell` asks by default; the allowlist covers read-only inspection, `cp`/`mv`/`mkdir`/
+  `touch`/`ln`, git inspection + `git add` + `git commit --no-verify`, and nix/yarn/dprint
+  tooling
+- `sops`/`sudo` shell commands are denied; `webfetch` asks; plain `git commit`/`git push`,
+  `rm`, and anything else not allowlisted asks
+
+If an action is asked/denied, surface it to the user — do not try to route around it.
 
 ## Commits
 

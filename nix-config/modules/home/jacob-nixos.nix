@@ -40,6 +40,29 @@ in
             ];
             enableWidevine = true;
           };
+
+          # Same plugin set and versions as the flake devshell / dprint.json, so
+          # opencode's auto-formatter produces identical output to `fmt`.
+          dprintPlugins = with pkgs.dprint-plugins; [
+            dprint-plugin-typescript
+            dprint-plugin-json
+            dprint-plugin-markdown
+            dprint-plugin-toml
+            g-plane-malva
+            g-plane-markup_fmt
+            g-plane-pretty_yaml
+          ];
+          dprintPluginPaths = map (p: "${p}/plugin.wasm") dprintPlugins;
+
+          # V2 shell rules match the whole command string; a trailing " *" also
+          # matches the bare command with no arguments.
+          allowShell =
+            cmds:
+            map (cmd: {
+              action = "shell";
+              resource = "${cmd} *";
+              effect = "allow";
+            }) cmds;
         in
         {
           nixpkgs = {
@@ -131,12 +154,204 @@ in
 
           programs.opencode = {
             enable = true;
+            # V2 (2.x). Stable nixpkgs pins 1.x, whose config schema is
+            # incompatible (permission/bash vs permissions/shell).
+            package = pkgs-unstable.opencode;
             settings = {
-              provider = {
+              # Ordered rules; LAST match wins. See https://opencode.ai/v2/docs/permissions
+              permissions = [
+                # Edits within the project are unrestricted; external paths are
+                # gated by external_directory below.
+                {
+                  action = "edit";
+                  resource = "*";
+                  effect = "allow";
+                }
+                # Outside the project: ask, except repos under ~/git.
+                {
+                  action = "external_directory";
+                  resource = "*";
+                  effect = "ask";
+                }
+                {
+                  action = "external_directory";
+                  resource = "~/git/*";
+                  effect = "allow";
+                }
+                # Web fetches always ask.
+                {
+                  action = "webfetch";
+                  resource = "*";
+                  effect = "ask";
+                }
+                # Shell: ask by default, allowlist below, hard denies last.
+                {
+                  action = "shell";
+                  resource = "*";
+                  effect = "ask";
+                }
+              ]
+              ++ allowShell [
+                # read-only inspection
+                "cat"
+                "cut"
+                "date"
+                "df"
+                "diff"
+                "du"
+                "echo"
+                "fd"
+                "file"
+                "find"
+                "grep"
+                "head"
+                "hostname"
+                "jq"
+                "ls"
+                "ps"
+                "pwd"
+                "rg"
+                "sort"
+                "stat"
+                "tail"
+                "tr"
+                "tree"
+                "uname"
+                "uniq"
+                "wc"
+                "which"
+                # non-destructive file ops (rm/chmod/chown still ask)
+                "cp"
+                "ln"
+                "mkdir"
+                "mv"
+                "touch"
+                # git inspection + the repo's agent commit convention
+                # (plain `git commit`/`git push` still ask)
+                "git add"
+                "git branch"
+                "git commit --no-verify"
+                "git diff"
+                "git fetch"
+                "git log"
+                "git show"
+                "git stash list"
+                "git status"
+                # nix / node / devshell project tooling
+                "dprint check"
+                "dprint fmt"
+                "nix build"
+                "nix develop"
+                "nix eval"
+                "nix flake check"
+                "nix flake metadata"
+                "nix fmt"
+                "nix run"
+                "nixos-rebuild"
+                "update-missing-hashes"
+                "yarn"
+              ]
+              ++ [
+                # secrets management and privilege escalation are never autonomous
+                {
+                  action = "shell";
+                  resource = "sops *";
+                  effect = "deny";
+                }
+                {
+                  action = "shell";
+                  resource = "sudo *";
+                  effect = "deny";
+                }
+              ];
+
+              formatter = {
+                # One dprint formatter covering every language configured in
+                # flake.nix/dprint.json. `--allow-no-files` before `--plugins`
+                # (flags after `--` are treated as file patterns), store-pinned
+                # wasm plugins, `--` so $FILE is not swallowed by --plugins.
+                # Runs from the project dir so dprint.json supplies the
+                # per-language settings; DPRINT_CACHE_DIR mirrors the devshell.
+                dprint = {
+                  command = [
+                    "${pkgs.dprint}/bin/dprint"
+                    "fmt"
+                    "--allow-no-files"
+                    "--plugins"
+                  ]
+                  ++ dprintPluginPaths
+                  ++ [
+                    "--"
+                    "$FILE"
+                  ];
+                  extensions = [
+                    # dprint-plugin-typescript (js + ts)
+                    ".ts"
+                    ".tsx"
+                    ".mts"
+                    ".cts"
+                    ".js"
+                    ".jsx"
+                    ".mjs"
+                    ".cjs"
+                    # dprint-plugin-json
+                    ".json"
+                    ".jsonc"
+                    # dprint-plugin-markdown
+                    ".md"
+                    # dprint-plugin-toml
+                    ".toml"
+                    # malva (CSS)
+                    ".css"
+                    ".scss"
+                    ".less"
+                    # markup_fmt (HTML/XML/Vue/Svelte/Astro)
+                    ".html"
+                    ".htm"
+                    ".xml"
+                    ".vue"
+                    ".svelte"
+                    ".astro"
+                    # pretty_yaml
+                    ".yaml"
+                    ".yml"
+                  ];
+                  environment = {
+                    DPRINT_CACHE_DIR = "/home/jacob/.cache/dprint";
+                  };
+                };
+
+                # Built-ins are registered before custom entries, so disable the
+                # ones that overlap the dprint languages; otherwise e.g. a
+                # project-local prettier would win over dprint.
+                prettier.disabled = true;
+                oxfmt.disabled = true;
+                biome.disabled = true;
+
+                # .nix: pinned nixfmt (RFC style) via store path so it does not
+                # depend on PATH — same version as `nix run .#nixfmt`.
+                nixfmt.command = [
+                  "${pkgs.nixfmt}/bin/nixfmt"
+                  "$FILE"
+                ];
+              };
+
+              # Default model for new sessions; without it V2 falls back to the
+              # "newest available supported model" in the whole catalog, which
+              # may point at an unconnected provider.
+              model = "qwencloud-token-plan-personal/qwen3.8-max";
+
+              # V2 providers schema (https://opencode.ai/v2/docs/providers):
+              # `provider` → `providers`, `npm` → `package` (the runtime package,
+              # not the raw ai-sdk one), `options` → `settings`, model
+              # `modalities`/`reasoning` → `capabilities`, and request-specific
+              # model options go to raw `body` merges (wire format, so Anthropic
+              # `budget_tokens` stays snake_case).
+              providers = {
                 "qwencloud-token-plan-personal" = {
-                  npm = "@ai-sdk/anthropic";
                   name = "QwenCloud";
-                  options = {
+                  package = "@opencode/ai/providers/anthropic-compatible";
+                  settings = {
                     baseURL = "https://token-plan.maas.qwencloudapi.com/apps/anthropic/v1";
                     apiKey = "{file:${config.sops.secrets.qwen_openai_key.path}}";
                   };
@@ -144,7 +359,7 @@ in
                   models = {
                     auto = {
                       name = "Auto";
-                      modalities = {
+                      capabilities = {
                         input = [ "text" ];
                         output = [ "text" ];
                       };
@@ -152,120 +367,111 @@ in
 
                     "qwen3.8-max" = {
                       name = "Qwen3.8 Max";
-                      reasoning = true;
                       limit = {
                         context = 983616;
                         output = 131072;
                       };
-                      modalities = {
+                      capabilities = {
                         input = [
                           "text"
                           "image"
                         ];
                         output = [ "text" ];
+                        reasoning.supported = true;
                       };
-                      options = {
-                        effort = "xhigh";
-                      };
+                      # was V1 `options.effort = "xhigh"`
+                      body.effort = "xhigh";
                     };
 
                     "qwen3.8-flash" = {
                       name = "Qwen3.8 Flash";
-                      reasoning = true;
                       limit = {
                         context = 983616;
                         output = 131072;
                       };
-                      modalities = {
+                      capabilities = {
                         input = [
                           "text"
                           "image"
                         ];
                         output = [ "text" ];
+                        reasoning.supported = true;
                       };
-                      options = {
-                        effort = "xhigh";
-                      };
+                      body.effort = "xhigh";
                     };
 
                     "qwen3.7-max" = {
                       name = "Qwen3.7 Max";
-                      options = {
-                        thinking = {
-                          type = "enabled";
-                          budgetTokens = 8192;
-                        };
+                      capabilities.reasoning.supported = true;
+                      body.thinking = {
+                        type = "enabled";
+                        budget_tokens = 8192;
                       };
                     };
 
                     "qwen3.7-plus" = {
                       name = "Qwen3.7 Plus";
-                      modalities = {
+                      capabilities = {
                         input = [
                           "text"
                           "image"
                         ];
                         output = [ "text" ];
+                        reasoning.supported = true;
                       };
-                      options = {
-                        thinking = {
-                          type = "enabled";
-                          budgetTokens = 8192;
-                        };
+                      body.thinking = {
+                        type = "enabled";
+                        budget_tokens = 8192;
                       };
                     };
 
                     "qwen3.6-plus" = {
                       name = "Qwen3.6 Plus";
-                      modalities = {
+                      capabilities = {
                         input = [
                           "text"
                           "image"
                         ];
                         output = [ "text" ];
+                        reasoning.supported = true;
                       };
-                      options = {
-                        thinking = {
-                          type = "enabled";
-                          budgetTokens = 8192;
-                        };
+                      body.thinking = {
+                        type = "enabled";
+                        budget_tokens = 8192;
                       };
                     };
 
                     "qwen3.6-flash" = {
                       name = "Qwen3.6 Flash";
-                      modalities = {
+                      capabilities = {
                         input = [
                           "text"
                           "image"
                         ];
                         output = [ "text" ];
+                        reasoning.supported = true;
                       };
-                      options = {
-                        thinking = {
-                          type = "enabled";
-                          budgetTokens = 8192;
-                        };
+                      body.thinking = {
+                        type = "enabled";
+                        budget_tokens = 8192;
                       };
                     };
 
                     "glm-5.3" = {
                       name = "GLM-5.3";
-                      options = {
-                        thinking = {
-                          type = "enabled";
-                          budgetTokens = 8192;
-                        };
+                      capabilities.reasoning.supported = true;
+                      body.thinking = {
+                        type = "enabled";
+                        budget_tokens = 8192;
                       };
                     };
 
                     "glm-5.2" = {
                       name = "GLM-5.2";
-                      options = {
-                        thinking = {
-                          type = "enabled";
-                          budgetTokens = 8192;
-                        };
+                      capabilities.reasoning.supported = true;
+                      body.thinking = {
+                        type = "enabled";
+                        budget_tokens = 8192;
                       };
                     };
 
@@ -291,6 +497,17 @@ in
                   };
                 };
               };
+            };
+          };
+
+          # OpenCode V2 keeps terminal-client settings (theme, ...) in cli.json;
+          # the catppuccin home-manager module (release-26.05) still writes the
+          # V1-era tui.json, which V2 ignores. Mirror the theme here so
+          # catppuccin-frappe keeps applying.
+          xdg.configFile."opencode/cli.json".text = builtins.toJSON {
+            theme = {
+              name = "catppuccin-frappe";
+              mode = "dark";
             };
           };
 

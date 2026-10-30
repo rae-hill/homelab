@@ -123,7 +123,10 @@
                 {
                   name = "fmt";
                   help = "Format code with dprint using Nix store plugins";
-                  command = "${pkgs.dprint}/bin/dprint fmt --plugins ${pluginArgs}";
+                  # `--` is required: dprint's `--plugins` takes multiple values and
+                  # greedily swallows trailing file args (e.g. `fmt .`) as plugin
+                  # paths without it.
+                  command = "${pkgs.dprint}/bin/dprint fmt --plugins ${pluginArgs} --";
                 }
                 {
                   name = "update-missing-hashes";
