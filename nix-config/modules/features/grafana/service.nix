@@ -334,7 +334,7 @@ in
                       refId = "A";
                       datasourceUid = "prometheus";
                       model = {
-                        expr = ''node_systemd_unit_state{state="failed"} == 1'';
+                        expr = ''node_systemd_unit_state{state="failed", type!="oneshot"} == 1'';
                         intervalMs = 15000;
                         maxDataPoints = 43200;
                       };
