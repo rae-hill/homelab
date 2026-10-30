@@ -130,7 +130,7 @@ in
                   name = "QwenCloud";
                   options = {
                     baseURL = "https://token-plan.maas.qwencloudapi.com/apps/anthropic/v1";
-                    apiKey = "{file:${config.sops.secrets.qwen_openai_key.path}}";
+                    apiKey = "{file:/home/jacob/.config/opencode/qwencloud-key}";
                   };
 
                   models = {

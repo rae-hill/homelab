@@ -39,5 +39,6 @@
 
   sops.secrets.qwen_openai_key = {
     owner = "jacob";
+    path = "/home/jacob/.config/opencode/qwencloud-key";
   };
 }
