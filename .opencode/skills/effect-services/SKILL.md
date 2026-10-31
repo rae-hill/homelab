@@ -1,6 +1,6 @@
 ---
 name: effect-services
-description: Effect-TS service and code patterns plus the vendored reference repos under ./repos/ (effect, kobalte, astro, nanostores, nixpkgs, kanidm, crypto, technitium, nix-darwin). Use when writing Effect services/layers/code, looking up upstream source for reference, adding a new git subtree, or updating vendored subtrees.
+description: Effect-TS service and code patterns plus the vendored reference repos under ./repos/ (effect, kobalte, astro, nanostores, nixpkgs, home-manager, kanidm, crypto, technitium, nix-darwin). Use when writing Effect services/layers/code, looking up upstream source for reference, adding a new git subtree, or updating vendored subtrees.
 ---
 
 # Effect Services & Code Patterns
@@ -9,25 +9,27 @@ description: Effect-TS service and code patterns plus the vendored reference rep
 
 Upstream monorepos are vendored at `./repos/` as read-only reference material via git subtrees.
 
-| Directory                     | Source                                              | Purpose                                        |
-| ----------------------------- | --------------------------------------------------- | ---------------------------------------------- |
-| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform                      |
-| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library                   |
-| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                                |
-| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management                    |
-| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05)        |
-| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)            |
-| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source                 |
-| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool           |
-| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | step-ca / smallstep crypto library             |
-| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                   |
-| `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`) |
+| Directory                     | Source                                              | Purpose                                                         |
+| ----------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform                                       |
+| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library                                    |
+| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                                                 |
+| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management                                     |
+| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05)                         |
+| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)                             |
+| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source                                  |
+| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool                            |
+| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | step-ca / smallstep crypto library                              |
+| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                                    |
+| `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`)                  |
+| `repos/home-manager/`         | https://github.com/nix-community/home-manager.git   | home-manager modules (`release-26.05`, matches the flake input) |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`
 - Do NOT import from `./repos/` — application code imports from normal package dependencies (e.g. `effect`, `@effect/platform`, `@kobalte/core`, `nanostores`)
 - Key reference packages: `repos/effect/packages/effect/`, `repos/effect/packages/platform/`, `repos/effect/packages/platform-node/`, `repos/kobalte/packages/core/`, `repos/nanostores/`
 - Key NixOS reference paths: `repos/nixpkgs-26.05/nixos/modules/services/`, `repos/nixpkgs-unstable/nixos/modules/services/`, `repos/nixpkgs-26.05/pkgs/`
+- Key home-manager reference paths: `repos/home-manager/modules/programs/`, `repos/home-manager/modules/services/`, `repos/home-manager/modules/targets/` — prefer these over reading `/nix/store/*-home-manager-source`
 
 ### Adding a New Vendored Subtree
 

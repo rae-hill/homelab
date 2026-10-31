@@ -70,12 +70,16 @@ Vendored nixpkgs subtrees provide browsable NixOS module source for determining 
 | NixOS module for `services.X` (unstable/master) | `./repos/nixpkgs-unstable/nixos/modules/services/...`                  |
 | Nix package derivation for X (stable)           | `./repos/nixpkgs-26.05/pkgs/by-name/<two-letter-prefix>/<name>/...`    |
 | Nix package derivation for X (unstable)         | `./repos/nixpkgs-unstable/pkgs/by-name/<two-letter-prefix>/<name>/...` |
+| home-manager module for `programs.X`            | `./repos/home-manager/modules/programs/<name>.nix`                     |
 
 To find available NixOS service options, read the module source directly from the vendored repos:
 
 - **Service modules:** `repos/nixpkgs-26.05/nixos/modules/services/<category>/<service>.nix`
 - **Prometheus exporters:** `repos/nixpkgs-26.05/nixos/modules/services/monitoring/prometheus/exporters/<name>.nix`
 - **Package derivations:** `repos/nixpkgs-26.05/pkgs/by-name/<prefix>/<name>/package.nix`
+- **home-manager modules:** `repos/home-manager/modules/programs/<name>.nix` (subtree tracks
+  `release-26.05`, matching the flake's home-manager input; prefer it over reading
+  `/nix/store/*-home-manager-source`)
 
 When options differ between branches, prefer the branch matching the host's nixpkgs input:
 

@@ -2,7 +2,7 @@
 
 This document tracks all port assignments across homelab hosts to prevent conflicts.
 
-Last updated: 2026-10-13
+Last updated: 2026-10-31
 
 ---
 
@@ -76,17 +76,20 @@ Last updated: 2026-10-13
 
 ## Nixos (Workstation)
 
-| Port  | Service               | Protocol | Bind Address    | Notes                             |
-| ----- | --------------------- | -------- | --------------- | --------------------------------- |
-| 22    | OpenSSH               | TCP      | tailscale0 only | SSH access                        |
-| 5252  | Tailscale metrics     | TCP      | tailscale0 only | Prometheus scrape target          |
-| 5353  | Avahi (mDNS)          | UDP      | 0.0.0.0         | AirPlay/UxPlay discovery          |
-| 10200 | Wyoming Piper (TTS)   | TCP      | 0.0.0.0         | Text-to-speech for Home Assistant |
-| 10300 | Wyoming Whisper (STT) | TCP      | 0.0.0.0         | Speech-to-text for Home Assistant |
-| 11434 | Ollama                | TCP      | 0.0.0.0         | LLM inference (openFirewall)      |
-| 49545 | UxPlay                | TCP/UDP  | 0.0.0.0         | AirPlay mirroring                 |
-| 56503 | UxPlay                | TCP/UDP  | 0.0.0.0         | AirPlay mirroring                 |
-| 58042 | UxPlay                | TCP/UDP  | 0.0.0.0         | AirPlay mirroring                 |
+| Port  | Service               | Protocol | Bind Address    | Notes                                        |
+| ----- | --------------------- | -------- | --------------- | -------------------------------------------- |
+| 22    | OpenSSH               | TCP      | tailscale0 only | SSH access                                   |
+| 80    | Caddy (ACME HTTP-01)  | TCP      | tailscale0 only | step-ca challenge for opencode cert          |
+| 443   | Caddy (HTTPS)         | TCP      | tailscale0 only | opencode mTLS vhost (firewall generator)     |
+| 5252  | Tailscale metrics     | TCP      | tailscale0 only | Prometheus scrape target                     |
+| 5353  | Avahi (mDNS)          | UDP      | 0.0.0.0         | AirPlay/UxPlay discovery                     |
+| 10200 | Wyoming Piper (TTS)   | TCP      | 0.0.0.0         | Text-to-speech for Home Assistant            |
+| 10300 | Wyoming Whisper (STT) | TCP      | 0.0.0.0         | Speech-to-text for Home Assistant            |
+| 11434 | Ollama                | TCP      | 0.0.0.0         | LLM inference (openFirewall)                 |
+| 49375 | OpenCode web          | TCP      | 127.0.0.1       | `opencode serve` user service (behind Caddy) |
+| 49545 | UxPlay                | TCP/UDP  | 0.0.0.0         | AirPlay mirroring                            |
+| 56503 | UxPlay                | TCP/UDP  | 0.0.0.0         | AirPlay mirroring                            |
+| 58042 | UxPlay                | TCP/UDP  | 0.0.0.0         | AirPlay mirroring                            |
 
 ---
 

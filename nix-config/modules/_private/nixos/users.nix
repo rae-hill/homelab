@@ -4,6 +4,9 @@
     jacob = {
       isNormalUser = true;
       description = "Jacob Alford";
+      # Start user@1000 at boot (no graphical login needed) so the opencode-web
+      # home-manager user service is reachable from other devices after a reboot.
+      linger = true;
       openssh.authorizedPrincipals = [
         "rae@plato-splunk.media"
       ];

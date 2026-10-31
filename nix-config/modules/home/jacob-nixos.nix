@@ -1,6 +1,9 @@
 { inputs, config, ... }:
 let
   hm = inputs.self.modules.homeManager;
+  # Port/URL facts for the opencode web vhost, shared with the NixOS side
+  # (features/opencode + service-registry.nix).
+  opencodeSvc = config.constants.services.opencode;
 in
 {
   flake.homeConfigurations."jacob@nixos" = inputs.home-manager.lib.homeManagerConfiguration {
@@ -157,6 +160,30 @@ in
             # V2 (2.x). Stable nixpkgs pins 1.x, whose config schema is
             # incompatible (permission/bash vs permissions/shell).
             package = pkgs-unstable.opencode;
+            # Web UI server: the `opencode-web` systemd USER service runs
+            # `opencode serve` on LOOPBACK only — fronted by the NixOS Caddy
+            # mTLS vhost https://opencode.plato-splunk.media (features/opencode;
+            # tailscale0-only :443, never LAN/public). The port comes from
+            # constants.services.opencode.port and is deliberately NOT
+            # opencode's 49374 channel default, so the standalone web server
+            # never fights the shared background service the local TUI spawns.
+            web = {
+              enable = true;
+              extraArgs = [
+                "--hostname"
+                "127.0.0.1"
+                "--port"
+                (toString opencodeSvc.port)
+              ];
+              # Basic-auth password for the web UI (username is always
+              # "opencode"). A deliberate throwaway: the Caddy mTLS gate means
+              # no request reaches this server without a step-ca client cert.
+              # NOTE: opencode v2 reads OPENCODE_PASSWORD (the home-manager
+              # module docs still say OPENCODE_SERVER_PASSWORD — stale).
+              environmentFile = pkgs.writeText "opencode-web.env" ''
+                OPENCODE_PASSWORD=hackme
+              '';
+            };
             settings = {
               # Ordered rules; LAST match wins. See https://opencode.ai/v2/docs/permissions
               permissions = [

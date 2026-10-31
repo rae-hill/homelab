@@ -157,6 +157,8 @@ let
     # mini services
     mini-caddy-metrics = mkCatalogDns "mini-caddy-metrics" "mini-caddy-metrics" "mini";
     mini-jellyfin-metrics = mkCatalogDns "mini-jellyfin-metrics" "mini-jellyfin-metrics" "mini";
+    # nixos services
+    opencode = mkCatalogDns "opencode" "opencode" "nixos";
     # aedilis services
     dns-admin = mkCatalogDns "dns-admin" "dns-admin" "aedilis";
     dns-metrics = mkCatalogDns "dns-metrics" "dns-metrics" "aedilis";
@@ -382,6 +384,18 @@ in
 
       ollama = {
         port = 11434;
+      };
+
+      # opencode web UI (nixos workstation) — a loopback `opencode serve`
+      # home-manager user service, reverse-proxied by Caddy (mTLS vhost,
+      # tailscale0-only :443). Deliberately NOT opencode's default port 49374:
+      # that's the channel default the shared background service (local TUI)
+      # uses, and the standalone web server must not fight it.
+      opencode = {
+        subdomain = "opencode";
+        domain = mkDomain "opencode";
+        url = mkUrl "opencode";
+        port = 49375;
       };
 
       unpoller = {

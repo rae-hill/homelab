@@ -26,6 +26,8 @@ in
       nixos.restic
       nixos.uxplay
       nixos.kanidm-client
+      nixos.homelab-service-apphost
+      nixos.opencode
 
       ./../_private/nixos/hardware.nix
       ./../_private/nixos/filesystems.nix

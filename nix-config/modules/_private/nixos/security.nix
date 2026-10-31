@@ -35,6 +35,13 @@
         allowedTCPPorts = [
           22
           5252
+          # Caddy ACME HTTP-01: the internal step-ca (cicero) validates the
+          # opencode vhost's managed cert over the tailnet (mirrors cicero's
+          # tailscale0-only :80). Never opened on the LAN/public interfaces.
+          80
+          # NOTE: 443 (the opencode mTLS vhost) is emitted by the
+          # homelab-service-firewall generator from the opencode catalog entry
+          # (access.scope.tailnet) — deliberately tailscale0-only.
         ];
         allowedUDPPorts = [ 5252 ];
       };

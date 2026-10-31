@@ -7,6 +7,7 @@
 #   aedilis     -> homelab-service-dns-host     (caddy + acme + firewall + dns)
 #   cicero      -> homelab-service-apphost      (caddy + acme + firewall)
 #   praeconinus -> homelab-service-apphost      (caddy + acme + firewall; no dns/oidc)
+#   nixos       -> homelab-service-apphost      (caddy + acme + firewall; opencode mTLS vhost)
 #   mini        -> homelab-service-apphost      (darwin: Caddyfile backend only)
 #
 # lib.nix contributes config.constants.catalogLib at the flake-parts level (auto-applied by
