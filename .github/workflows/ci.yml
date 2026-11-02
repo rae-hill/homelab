@@ -52,6 +52,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/setup
+      # The test suite reads generated fixtures from packages/homelab-services-node/private/
+      # (gitignored; real ones are sops-managed). Stage fresh random ones for the runner.
+      - name: Stage test secrets
+        run: node scripts/stage-test-secrets.mjs
       - run: yarn test
         env:
           NODE_OPTIONS: --max_old_space_size=8192

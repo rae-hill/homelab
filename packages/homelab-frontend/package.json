@@ -11,7 +11,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "lint": "eslint src",
-    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "typecheck": "astro sync && tsc -b tsconfig.json --noEmit",
     "test:staged": "echo 'No tests for homelab-frontend'"
   },
   "dependencies": {
