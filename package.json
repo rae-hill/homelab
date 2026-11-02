@@ -16,7 +16,7 @@
     "changeset-version": "changeset version && node scripts/version.mjs",
     "changeset-publish": "bun run build && TEST_DIST= vitest && changeset publish",
     "prepare": "husky",
-    "postinstall": "yarn-berry-fetcher missing-hashes yarn.lock 2>/dev/null | grep -v '^CacheKey\\|^Success\\|^$' > missing-hashes.json"
+    "postinstall": "if command -v yarn-berry-fetcher >/dev/null 2>&1; then yarn-berry-fetcher missing-hashes yarn.lock 2>/dev/null | { grep -v '^CacheKey\\|^Success\\|^$' || true; } > missing-hashes.json; fi"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.6",
