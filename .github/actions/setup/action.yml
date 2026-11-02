@@ -16,4 +16,7 @@ runs:
         cache: "yarn"
     - name: Install dependencies
       shell: bash
-      run: yarn
+      # skip-build: CI runners lack the Nix tooling (yarn-berry-fetcher) that the root
+      # postinstall needs to regenerate missing-hashes.json (which is committed anyway),
+      # and dependency build scripts are blocked by Yarn 4 defaults regardless.
+      run: yarn install --mode=skip-build
