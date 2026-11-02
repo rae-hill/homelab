@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background: avatar green, rounded "squircle"-style corners -->
+  <rect x="0" y="0" width="512" height="512" rx="72" ry="72" fill="rgb(187,247,208)"/>
+  <!-- "RH" in dark ink to match the avatar's dark text on green -->
+  <text
+    x="256"
+    y="256"
+    fill="rgba(0,0,0,0.9)"
+    font-family="'DejaVu Sans','Liberation Sans','Noto Sans',sans-serif"
+    font-size="300"
+    font-weight="700"
+    text-anchor="middle"
+    dominant-baseline="central"
+    letter-spacing="-8"
+  >RH</text>
+</svg>
