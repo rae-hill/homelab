@@ -66,8 +66,11 @@ in
               redir https://mini-jellyfin-metrics.plato-splunk.media
             }
           '';
-          dns = null;
-          managedBy.caddy = true;
+          dns.tailnet = { };
+          managedBy = {
+            caddy = true;
+            dns = true;
+          };
         };
       };
     };

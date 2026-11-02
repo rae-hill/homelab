@@ -155,8 +155,9 @@ let
     cicero-metrics = mkCatalogDns "cicero-metrics" "cicero-metrics" "cicero";
     ca-monitoring = mkCatalogDns "ca-monitoring" "ca-monitoring" "cicero";
     # mini services
-    mini-caddy-metrics = mkCatalogDns "mini-caddy-metrics" "mini-caddy-metrics" "mini";
+    mini-jellyfin = mkCatalogDns "mini-jellyfin" "jellyfin" "mini";
     mini-jellyfin-metrics = mkCatalogDns "mini-jellyfin-metrics" "mini-jellyfin-metrics" "mini";
+    mini-caddy-metrics = mkCatalogDns "mini-caddy-metrics" "mini-caddy-metrics" "mini";
     # nixos services
     opencode = mkCatalogDns "opencode" "opencode" "nixos";
     # aedilis services
