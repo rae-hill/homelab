@@ -35,10 +35,6 @@ const (
 	// The below is documented in this Microsoft whitepaper:
 	// https://github.com/Microsoft/TSS.MSR/blob/master/PCPTool.v11/Using%20the%20Windows%208%20Platform%20Crypto%20Provider%20and%20Associated%20TPM%20Functionality.pdf
 	ncryptOverwriteKeyFlag = 0x80
-	// ncryptMachineKeyFlag instructs NCrypt to create or open the key in the
-	// local machine key store rather than the current user key store. Defined
-	// in ncrypt.h as NCRYPT_MACHINE_KEY_FLAG.
-	ncryptMachineKeyFlag uint32 = 0x00000020
 	// Key usage value for generic keys
 	nCryptPropertyPCPKeyUsagePolicyGeneric = 0x3
 	// Key usage value for AKs.
@@ -294,7 +290,7 @@ func (h *winPCP) Close() error {
 	return closeNCryptObject(h.hProv)
 }
 
-func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32, machineKey bool) (uintptr, []byte, []byte, error) {
+func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (uintptr, []byte, []byte, error) {
 	var kh uintptr
 	utf16Name, err := windows.UTF16FromString(name)
 	if err != nil {
@@ -305,13 +301,8 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32, m
 		return 0, nil, nil, err
 	}
 
-	var flags uint32
-	if machineKey {
-		flags = ncryptMachineKeyFlag
-	}
-
 	// Create a persistent RSA key of the specified name.
-	r, _, msg := nCryptCreatePersistedKey.Call(h.hProv, uintptr(unsafe.Pointer(&kh)), uintptr(unsafe.Pointer(&utf16RSA[0])), uintptr(unsafe.Pointer(&utf16Name[0])), 0, uintptr(flags))
+	r, _, msg := nCryptCreatePersistedKey.Call(h.hProv, uintptr(unsafe.Pointer(&kh)), uintptr(unsafe.Pointer(&utf16RSA[0])), uintptr(unsafe.Pointer(&utf16Name[0])), 0, 0)
 	if r != 0 {
 		if tpmErr := maybeWinErr(r); tpmErr != nil {
 			msg = tpmErr
@@ -391,15 +382,15 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32, m
 // NewKey creates a persistent application key of the specified name.
 func (h *winPCP) NewKey(name string, config *KeyConfig) (uintptr, []byte, []byte, error) {
 	if config.Algorithm == RSA {
-		return h.newKey(name, "RSA", uint32(config.Size), 0, config.MachineKey)
+		return h.newKey(name, "RSA", uint32(config.Size), 0)
 	} else if config.Algorithm == ECDSA {
 		switch config.Size {
 		case 256:
-			return h.newKey(name, "ECDSA_P256", 0, 0, config.MachineKey)
+			return h.newKey(name, "ECDSA_P256", 0, 0)
 		case 384:
-			return h.newKey(name, "ECDSA_P384", 0, 0, config.MachineKey)
+			return h.newKey(name, "ECDSA_P384", 0, 0)
 		case 521:
-			return h.newKey(name, "ECDSA_P521", 0, 0, config.MachineKey)
+			return h.newKey(name, "ECDSA_P521", 0, 0)
 		default:
 			return 0, nil, nil, fmt.Errorf("unsupported ECDSA key size: %v", config.Size)
 		}

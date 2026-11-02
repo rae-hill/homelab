@@ -11,8 +11,8 @@ on:
       - reopened
 
 permissions:
-  issues: write
   pull-requests: write
+  issues: write
 
 jobs:
   triage:

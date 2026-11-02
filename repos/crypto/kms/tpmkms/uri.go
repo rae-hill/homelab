@@ -18,8 +18,6 @@ type objectProperties struct {
 	path                      string
 	storeLocation             string
 	store                     string
-	friendlyName              string
-	description               string
 	intermediateStoreLocation string
 	intermediateStore         string
 	skipFindCertificateKey    bool
@@ -27,25 +25,6 @@ type objectProperties struct {
 	sha1                      string
 	serial                    string
 	issuer                    string
-	// deleteKey, when true on a CleanupCredentials URI, requests that the
-	// private key paired with each expired certificate is removed along with
-	// the certificate.
-	deleteKey bool
-	// keyScope, if set, is one of "machine" or "user". It controls
-	// whether the underlying private key lives in the local machine key
-	// store or in the current user's key store, and is independent of
-	// where the certificate is stored. When unset, [parseNameURI] derives
-	// it from storeLocation for backwards compatibility (machine cert
-	// store implies machine key scope).
-	keyScope string
-}
-
-// isMachineKey returns true if the resolved key scope is "machine".
-// When keyScope is unset on the object, the value is derived from
-// storeLocation: "machine" → true, anything else → false.
-func (o objectProperties) isMachineKey() bool {
-	return o.keyScope == "machine" ||
-		(o.keyScope == "" && o.storeLocation == "machine")
 }
 
 func parseNameURI(nameURI string) (o objectProperties, err error) {
@@ -80,12 +59,8 @@ func parseNameURI(nameURI string) (o objectProperties, err error) {
 
 		// store location and store options are used on Windows to override
 		// which store(s) are used for storing and loading (intermediate) certificates
-		// friendly-name and description are used on Windows to populate additional certificate
-		// context properties to aid in retrieval
 		o.storeLocation = u.Get("store-location")
 		o.store = u.Get("store")
-		o.friendlyName = u.Get("friendly-name")
-		o.description = u.Get("description")
 		o.intermediateStoreLocation = u.Get("intermediate-store-location")
 		o.intermediateStore = u.Get("intermediate-store")
 		o.skipFindCertificateKey = u.GetBool("skip-find-certificate-key")
@@ -93,21 +68,10 @@ func parseNameURI(nameURI string) (o objectProperties, err error) {
 		o.sha1 = u.Get("sha1")
 		o.serial = u.Get("serial")
 		o.issuer = u.Get("issuer")
-		o.deleteKey = u.GetBool("delete-key")
-
-		// key-scope is independent of store-location: cert location and
-		// key ownership are orthogonal Windows concepts. See [machineKey]
-		// for the back-compat default when this is unset.
-		o.keyScope = u.Get("key-scope")
 
 		// validation
 		if o.ak && o.attestBy != "" {
 			return o, errors.New(`"ak" and "attest-by" are mutually exclusive`)
-		}
-		switch o.keyScope {
-		case "", "machine", "user":
-		default:
-			return o, fmt.Errorf(`"key-scope" must be "machine" or "user", got %q`, o.keyScope)
 		}
 
 		return

@@ -14,11 +14,7 @@ func create(_ io.ReadWriteCloser, keyName string, config CreateConfig) ([]byte, 
 	}
 	defer pcp.Close()
 
-	_, pub, _, err := pcp.NewKey(keyName, &KeyConfig{
-		Algorithm:  Algorithm(config.Algorithm),
-		Size:       config.Size,
-		MachineKey: config.MachineKey,
-	})
+	_, pub, _, err := pcp.NewKey(keyName, &KeyConfig{Algorithm: Algorithm(config.Algorithm), Size: config.Size})
 	if err != nil {
 		return nil, fmt.Errorf("pcp failed to mint application key: %w", err)
 	}

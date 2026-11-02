@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"syscall"
 
 	"go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/kms/softkms"
@@ -56,11 +54,7 @@ func (k *softKMS) DeleteKey(req *apiv1.DeleteKeyRequest) error {
 		return fmt.Errorf("deleteKeyRequest 'name' cannot be empty")
 	}
 
-	if err := os.Remove(req.Name); err != nil {
-		return toKMSError(err, "key not found")
-	}
-
-	return nil
+	return os.Remove(req.Name)
 }
 
 func (k *softKMS) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
@@ -103,11 +97,7 @@ func (k *softKMS) DeleteCertificate(req *apiv1.DeleteCertificateRequest) error {
 		return fmt.Errorf("deleteCertificateRequest 'name' cannot be empty")
 	}
 
-	if err := os.Remove(req.Name); err != nil {
-		return toKMSError(err, "certificate not found")
-	}
-
-	return nil
+	return os.Remove(req.Name)
 }
 
 func transformToSoftKMS(rawuri string) (string, error) {
@@ -140,15 +130,4 @@ func transformFromSoftKMS(path string) (string, error) {
 		uv.Set(nameKey, path)
 	}
 	return uri.New(Scheme, uv).String(), nil
-}
-
-func toKMSError(err error, message string) error {
-	switch {
-	case errors.Is(err, os.ErrNotExist), errors.Is(err, syscall.ENOENT):
-		return apiv1.NotFoundError{
-			Message: message,
-		}
-	default:
-		return err
-	}
 }

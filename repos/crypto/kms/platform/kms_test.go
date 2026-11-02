@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,14 +101,8 @@ func mustReadSigner(t *testing.T, path string) crypto.Signer {
 	return signer
 }
 
-func mustCertificate(t *testing.T, path string, opts ...createFuncOption) []*x509.Certificate {
+func mustCertificate(t *testing.T, path string) []*x509.Certificate {
 	t.Helper()
-
-	o := new(createOptions)
-	o.templateModifier = func(c *x509.Certificate) *x509.Certificate { return c }
-	for _, fn := range opts {
-		fn(o)
-	}
 
 	ca, err := minica.New()
 	require.NoError(t, err)
@@ -117,12 +110,12 @@ func mustCertificate(t *testing.T, path string, opts ...createFuncOption) []*x50
 	signer, err := keyutil.GenerateDefaultSigner()
 	require.NoError(t, err)
 
-	cert, err := ca.Sign(o.templateModifier(&x509.Certificate{
+	cert, err := ca.Sign(&x509.Certificate{
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		PublicKey:   signer.Public(),
 		DNSNames:    []string{"example.com"},
-	}))
+	})
 	require.NoError(t, err)
 
 	if path != "" {
@@ -175,25 +168,10 @@ func mustSuffix(t *testing.T) string {
 	return suffix
 }
 
-func mustEqualPrivateKey(t *testing.T, x, y crypto.PrivateKey) {
-	t.Helper()
-	xx, ok := x.(interface{ Equal(crypto.PrivateKey) bool })
-	require.True(t, ok)
-	require.True(t, xx.Equal(y))
-}
-
-func assertNotFoundError(t assert.TestingT, err error, msgAndArgs ...any) bool {
-	if h, ok := t.(interface{ Helper() }); ok {
-		h.Helper()
-	}
-	return assert.ErrorIs(t, err, apiv1.NotFoundError{}, msgAndArgs...)
-}
-
 type createOptions struct {
 	name                 string
 	noCleanup            bool
 	noCleanupCertificate bool
-	templateModifier     func(*x509.Certificate) *x509.Certificate
 }
 
 type createFuncOption func(*createOptions)
@@ -214,12 +192,6 @@ func withNoCleanup() createFuncOption {
 func withNoCleanupCertificate() createFuncOption {
 	return func(co *createOptions) {
 		co.noCleanupCertificate = true
-	}
-}
-
-func withTemplateModifier(fn func(*x509.Certificate) *x509.Certificate) createFuncOption {
-	return func(co *createOptions) {
-		co.templateModifier = fn
 	}
 }
 
@@ -256,7 +228,6 @@ func mustCreatePlatformCertificate(t *testing.T, km *KMS, opts ...createFuncOpti
 	t.Helper()
 
 	o := new(createOptions)
-	o.templateModifier = func(c *x509.Certificate) *x509.Certificate { return c }
 	o.name = platformCertName
 	for _, fn := range opts {
 		fn(o)
@@ -272,12 +243,12 @@ func mustCreatePlatformCertificate(t *testing.T, km *KMS, opts ...createFuncOpti
 	}
 
 	key := mustCreatePlatformKey(t, km, opts...)
-	cert, err := ca.Sign(o.templateModifier(&x509.Certificate{
+	cert, err := ca.Sign(&x509.Certificate{
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		PublicKey:   key.PublicKey,
 		DNSNames:    []string{"example.com"},
-	}))
+	})
 	require.NoError(t, err)
 
 	require.NoError(t, km.StoreCertificateChain(&apiv1.StoreCertificateChainRequest{
@@ -562,15 +533,14 @@ func TestKMS_CreateKey(t *testing.T) {
 			Name: "kms:name=" + privateKeyPath,
 		}}, func(t *testing.T, got *apiv1.CreateKeyResponse) {
 			signer := mustReadSigner(t, privateKeyPath)
-			mustEqualPrivateKey(t, signer, got.PrivateKey)
-			mustEqualPrivateKey(t, signer, got.CreateSignerRequest.Signer)
+			assert.IsType(t, &ecdsa.PrivateKey{}, signer)
 			name := "kms:name=" + url.QueryEscape(privateKeyPath)
 			assert.Equal(t, got, &apiv1.CreateKeyResponse{
 				Name:       name,
-				PublicKey:  got.PublicKey,
-				PrivateKey: got.PrivateKey,
+				PublicKey:  signer.Public(),
+				PrivateKey: signer,
 				CreateSignerRequest: apiv1.CreateSignerRequest{
-					Signer:     got.CreateSignerRequest.Signer,
+					Signer:     signer,
 					SigningKey: name,
 				},
 			})
@@ -580,15 +550,16 @@ func TestKMS_CreateKey(t *testing.T) {
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 		}}, func(t *testing.T, got *apiv1.CreateKeyResponse) {
 			signer := mustReadSigner(t, privateKeyPath)
-			mustEqualPrivateKey(t, signer, got.PrivateKey)
-			mustEqualPrivateKey(t, signer, got.CreateSignerRequest.Signer)
+			if assert.IsType(t, &rsa.PrivateKey{}, signer) {
+				assert.Equal(t, 3072/8, signer.(*rsa.PrivateKey).Size())
+			}
 			name := "kms:name=" + url.QueryEscape(privateKeyPath)
 			assert.Equal(t, got, &apiv1.CreateKeyResponse{
 				Name:       name,
-				PublicKey:  got.PublicKey,
-				PrivateKey: got.PrivateKey,
+				PublicKey:  signer.Public(),
+				PrivateKey: signer,
 				CreateSignerRequest: apiv1.CreateSignerRequest{
-					Signer:     got.CreateSignerRequest.Signer,
+					Signer:     signer,
 					SigningKey: name,
 				},
 			})
@@ -599,15 +570,16 @@ func TestKMS_CreateKey(t *testing.T) {
 			Bits:               2048,
 		}}, func(t *testing.T, got *apiv1.CreateKeyResponse) {
 			signer := mustReadSigner(t, privateKeyPath)
-			mustEqualPrivateKey(t, signer, got.PrivateKey)
-			mustEqualPrivateKey(t, signer, got.CreateSignerRequest.Signer)
 			name := "kms:name=" + url.QueryEscape(privateKeyPath)
+			if assert.IsType(t, &rsa.PrivateKey{}, signer) {
+				assert.Equal(t, 2048/8, signer.(*rsa.PrivateKey).Size())
+			}
 			assert.Equal(t, got, &apiv1.CreateKeyResponse{
 				Name:       name,
-				PublicKey:  got.PublicKey,
-				PrivateKey: got.PrivateKey,
+				PublicKey:  signer.Public(),
+				PrivateKey: signer,
 				CreateSignerRequest: apiv1.CreateSignerRequest{
-					Signer:     got.CreateSignerRequest.Signer,
+					Signer:     signer,
 					SigningKey: name,
 				},
 			})
@@ -708,7 +680,7 @@ func TestKMS_CreateSigner(t *testing.T) {
 		}, assert.NoError},
 		{"fail missing", softKMS, args{&apiv1.CreateSignerRequest{
 			SigningKey: "kms:name=" + url.QueryEscape(filepath.Join(dir, "missing.key")),
-		}}, assertNil, assertNotFoundError},
+		}}, assertNil, assert.Error},
 		{"fail parseURI", softKMS, args{&apiv1.CreateSignerRequest{
 			SigningKey: privateKeyPath,
 		}}, assertNil, assert.Error},
@@ -771,7 +743,7 @@ func TestKMS_DeleteKey(t *testing.T) {
 		}}, assert.Error},
 		{"fail platform missing", platformKMS, args{&apiv1.DeleteKeyRequest{
 			Name: platformMissingName,
-		}}, assertNotFoundError},
+		}}, assert.Error},
 
 		// SoftKMS
 		{"ok softKMS", softKMS, args{&apiv1.DeleteKeyRequest{
@@ -782,7 +754,7 @@ func TestKMS_DeleteKey(t *testing.T) {
 		}},
 		{"fail missing", softKMS, args{&apiv1.DeleteKeyRequest{
 			Name: "kms:name=" + url.QueryEscape(filepath.Join(dir, "missing.key")),
-		}}, assertNotFoundError},
+		}}, assert.Error},
 		{"fail parseURI", softKMS, args{&apiv1.DeleteKeyRequest{
 			Name: keyPath2,
 		}}, func(tt assert.TestingT, err error, i ...interface{}) bool {
@@ -837,7 +809,7 @@ func TestKMS_LoadCertificate(t *testing.T) {
 		}}, platformChain[0], assert.NoError},
 		{"fail platform missing", platformKMS, args{&apiv1.LoadCertificateRequest{
 			Name: platformMissingName,
-		}}, nil, assertNotFoundError},
+		}}, nil, assert.Error},
 
 		// SoftKMS
 		{"ok softKMS", softKMS, args{&apiv1.LoadCertificateRequest{
@@ -848,7 +820,7 @@ func TestKMS_LoadCertificate(t *testing.T) {
 		}}, chain[0], assert.NoError},
 		{"fail missing", softKMS, args{&apiv1.LoadCertificateRequest{
 			Name: "kms:name=" + filepath.Join(dir, "missing.crt"),
-		}}, nil, assertNotFoundError},
+		}}, nil, assert.Error},
 		{"fail parseURI", softKMS, args{&apiv1.LoadCertificateRequest{
 			Name: "foo:name=" + certPath,
 		}}, nil, assert.Error},
@@ -995,7 +967,7 @@ func TestKMS_LoadCertificateChain(t *testing.T) {
 		}}, nil, assert.Error},
 		{"fail missing", softKMS, args{&apiv1.LoadCertificateChainRequest{
 			Name: "kms:name=" + filepath.Join(dir, "missing.crt"),
-		}}, nil, assertNotFoundError},
+		}}, nil, assert.Error},
 		{"fail parseuri", softKMS, args{&apiv1.LoadCertificateChainRequest{
 			Name: "softkms:name=" + chainPath,
 		}}, nil, assert.Error},
@@ -1133,7 +1105,7 @@ func TestKMS_DeleteCertificate(t *testing.T) {
 		}},
 		{"fail platform missing", platformKMS, args{&apiv1.DeleteCertificateRequest{
 			Name: platformMissingName,
-		}}, assertNotFoundError},
+		}}, assert.Error},
 
 		// SoftKMS
 		{"ok softKMS", softKMS, args{&apiv1.DeleteCertificateRequest{
@@ -1144,7 +1116,7 @@ func TestKMS_DeleteCertificate(t *testing.T) {
 		}},
 		{"fail missing", softKMS, args{&apiv1.DeleteCertificateRequest{
 			Name: "kms:name=" + url.QueryEscape(filepath.Join(dir, "chain.crt")),
-		}}, assertNotFoundError},
+		}}, assert.Error},
 		{"fail parseURI", softKMS, args{&apiv1.DeleteCertificateRequest{
 			Name: "foo",
 		}}, assert.Error},
@@ -1208,7 +1180,7 @@ func TestKMS_CreateAttestation(t *testing.T) {
 		{"fail missing key", softKMS, args{&apiv1.CreateAttestationRequest{
 			Name:              "kms:" + platformMissingName,
 			AttestationClient: okClient,
-		}}, nil, assertNotFoundError},
+		}}, nil, assert.Error},
 		{"fail custom attestation", softKMS, args{&apiv1.CreateAttestationRequest{
 			Name:              "kms:" + privateKeyPath,
 			AttestationClient: failClient,
@@ -1300,41 +1272,6 @@ func TestKMS_SearchKeys(t *testing.T) {
 			got, err := tt.kms.SearchKeys(tt.args.req)
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestKMS_CleanupCredentials(t *testing.T) {
-	dir := t.TempDir()
-	softKMS := mustKMS(t, "kms:backend=softkms")
-	// Create an expired certificate
-	chain := mustCertificate(t, filepath.Join(dir, "chain.crt"), withTemplateModifier(func(c *x509.Certificate) *x509.Certificate {
-		c.NotBefore = time.Now().Add(-time.Minute).Truncate(time.Second)
-		c.NotAfter = time.Now().Add(-time.Second).Truncate(time.Second)
-		return c
-	}))
-
-	type args struct {
-		req *apiv1.CleanupCredentialsRequest
-	}
-	tests := []struct {
-		name      string
-		kms       *KMS
-		args      args
-		assertion assert.ErrorAssertionFunc
-	}{
-		{"not implemented", softKMS, args{&apiv1.CleanupCredentialsRequest{
-			Name: uri.New("kms", url.Values{
-				"issuer": []string{chain[0].Issuer.CommonName},
-			}).String(),
-			RawSubject: chain[0].RawSubject,
-		}}, func(tt assert.TestingT, err error, i ...interface{}) bool {
-			return assert.ErrorIs(tt, err, apiv1.NotImplementedError{})
-		}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.assertion(t, tt.kms.CleanupCredentials(tt.args.req))
 		})
 	}
 }
