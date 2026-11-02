@@ -16,12 +16,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"go.step.sm/crypto/kms/apiv1"
@@ -229,23 +227,8 @@ func ParseOptions(u *uri.URI) []Option {
 // TPMKMS is a KMS implementation backed by a TPM.
 type TPMKMS struct {
 	tpm                       *tpm.TPM
-	windowsCertificateManager capiCertificateManager
+	windowsCertificateManager apiv1.CertificateChainManager
 	opts                      *options
-
-	// searchKeysFn, when set, replaces [TPMKMS.SearchKeys] for internal
-	// callers. It exists so the key-enumeration dependent code paths (such as
-	// CleanupCredentials) can be exercised in tests without a live TPM. It
-	// defaults to [TPMKMS.SearchKeys] via [TPMKMS.searchKeys].
-	searchKeysFn func(*apiv1.SearchKeysRequest) (*apiv1.SearchKeysResponse, error)
-}
-
-// searchKeys runs a key search through the testable seam, falling back to the
-// real [TPMKMS.SearchKeys] implementation when no override is configured.
-func (k *TPMKMS) searchKeys(req *apiv1.SearchKeysRequest) (*apiv1.SearchKeysResponse, error) {
-	if k.searchKeysFn != nil {
-		return k.searchKeysFn(req)
-	}
-	return k.SearchKeys(req)
 }
 
 type algorithmAttributes struct {
@@ -421,7 +404,7 @@ func NewWithTPM(ctx context.Context, t *tpm.TPM, opts ...Option) (*TPMKMS, error
 		}
 	}
 
-	var cm capiCertificateManager
+	var cm apiv1.CertificateChainManager
 
 	// TODO(hs): support a mode in which the TPM storage doesn't rely on JSON on Windows
 	// at all, but directly feeds into OS native storage? Some operations can be NOOPs, such
@@ -442,9 +425,9 @@ func NewWithTPM(ctx context.Context, t *tpm.TPM, opts ...Option) (*TPMKMS, error
 			return nil, fmt.Errorf("failed creating CAPIKMS instance: %w", err)
 		}
 
-		cm, ok = km.(capiCertificateManager)
+		cm, ok = km.(apiv1.CertificateChainManager)
 		if !ok {
-			return nil, fmt.Errorf("unexpected type %T; expected capiCertificateManager", km)
+			return nil, fmt.Errorf("unexpected type %T; expected apiv1.CertificateManager", km)
 		}
 	}
 
@@ -548,17 +531,9 @@ func (k *TPMKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 		size = v.Curve
 	}
 
-	machineKey := properties.isMachineKey()
-
 	var privateKey any
 	if properties.ak {
-		// NOTE: size is never passed for AKs; it's hardcoded to 2048 in lower
-		// levels. The AK must honor the requested key-scope: an attested key
-		// inherits its AK's scope (AttestKey enforces this symmetrically), so
-		// a machine-scoped attested key requires a machine-scoped AK. Creating
-		// the AK with the plain (user-default) CreateAK here would make every
-		// machine-scoped attestation fail with a scope mismatch.
-		ak, err := k.tpm.CreateAKWithConfig(ctx, properties.name, tpm.CreateAKConfig{MachineKey: machineKey})
+		ak, err := k.tpm.CreateAK(ctx, properties.name) // NOTE: size is never passed for AKs; it's hardcoded to 2048 in lower levels.
 		if err != nil {
 			if errors.Is(err, tpm.ErrExists) {
 				return nil, apiv1.AlreadyExistsError{Message: err.Error()}
@@ -574,12 +549,7 @@ func (k *TPMKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 			privateKey = tpmKey
 		}
 
-		// Preserve key-scope in the returned URI so re-opens use the matching
-		// scope (mirrors the non-AK path below).
 		createdAKURI := fmt.Sprintf("tpmkms:name=%s;ak=true", ak.Name())
-		if machineKey {
-			createdAKURI = fmt.Sprintf("%s;key-scope=machine", createdAKURI)
-		}
 		return &apiv1.CreateKeyResponse{
 			Name:       createdAKURI,
 			PublicKey:  ak.Public(),
@@ -593,7 +563,6 @@ func (k *TPMKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 			Algorithm:      v.Type,
 			Size:           size,
 			QualifyingData: properties.qualifyingData,
-			MachineKey:     machineKey,
 		}
 		key, err = k.tpm.AttestKey(ctx, properties.attestBy, properties.name, config)
 		if err != nil {
@@ -604,9 +573,8 @@ func (k *TPMKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 		}
 	} else {
 		config := tpm.CreateKeyConfig{
-			Algorithm:  v.Type,
-			Size:       size,
-			MachineKey: machineKey,
+			Algorithm: v.Type,
+			Size:      size,
 		}
 		key, err = k.tpm.CreateKey(ctx, properties.name, config)
 		if err != nil {
@@ -630,16 +598,9 @@ func (k *TPMKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 		return nil, fmt.Errorf("failed getting signer for key: %w", err)
 	}
 
-	// Preserve key-scope in the returned URI so subsequent CreateSigner /
-	// DeleteKey calls land in the right scope. The bug we hit before was
-	// exactly this: the returned URI had only "name=", so re-opens
-	// defaulted to user scope and failed to find machine-stored keys.
 	createdKeyURI := fmt.Sprintf("tpmkms:name=%s", key.Name())
 	if properties.attestBy != "" {
 		createdKeyURI = fmt.Sprintf("%s;attest-by=%s", createdKeyURI, key.AttestedBy())
-	}
-	if machineKey {
-		createdKeyURI = fmt.Sprintf("%s;key-scope=machine", createdKeyURI)
 	}
 
 	return &apiv1.CreateKeyResponse{
@@ -909,9 +870,6 @@ func (k *TPMKMS) loadCertificateChainFromWindowsCertificateStore(req *apiv1.Load
 			"store":                       []string{store},
 			"intermediate-store-location": []string{intermediateCAStoreLocation},
 			"intermediate-store":          []string{intermediateCAStore},
-			"issuer":                      []string{o.issuer},
-			"friendly-name":               []string{o.friendlyName},
-			"description":                 []string{o.description},
 		}).String(),
 	})
 }
@@ -992,7 +950,6 @@ func (k *TPMKMS) storeCertificateChainToWindowsCertificateStore(req *apiv1.Store
 	if o.store != "" {
 		store = o.store
 	}
-
 	skipFindCertificateKey := "false"
 	if o.skipFindCertificateKey {
 		skipFindCertificateKey = "true"
@@ -1006,243 +963,16 @@ func (k *TPMKMS) storeCertificateChainToWindowsCertificateStore(req *apiv1.Store
 		intermediateCAStore = o.intermediateStore
 	}
 
-	// Associate the stored certificate with the TPM key explicitly. The agent
-	// stores certificates with skip-find-certificate-key set (to avoid a smart
-	// card prompt during discovery), and CryptFindCertificateKeyProvInfo cannot
-	// discover machine-scoped Platform Crypto Provider keys anyway, so we hand
-	// the CAPI layer the exact key: its CNG container name, the TPM provider,
-	// and its key scope (machine vs user). The container name is the key name
-	// prefixed with "app-" (see prefixKey / go-attestation), which is how the
-	// key was persisted in the PCP KSP. CAPI resolves the keyset from key-scope,
-	// falling back to store-location when key-scope is unset.
-	v := url.Values{
-		"store-location":              []string{location},
-		"store":                       []string{store},
-		"friendly-name":               []string{o.friendlyName},
-		"description":                 []string{o.description},
-		"skip-find-certificate-key":   []string{skipFindCertificateKey},
-		"intermediate-store-location": []string{intermediateCAStoreLocation},
-		"intermediate-store":          []string{intermediateCAStore},
-	}
-	if o.name != "" {
-		v.Set("key", tpm.ApplicationKeyName(o.name))
-		v.Set("provider", microsoftPCP)
-		if o.keyScope != "" {
-			v.Set("key-scope", o.keyScope)
-		}
-	}
-
 	return k.windowsCertificateManager.StoreCertificateChain(&apiv1.StoreCertificateChainRequest{
-		Name:             uri.New("capi", v).String(),
+		Name: uri.New("capi", url.Values{
+			"store-location":              []string{location},
+			"store":                       []string{store},
+			"skip-find-certificate-key":   []string{skipFindCertificateKey},
+			"intermediate-store-location": []string{intermediateCAStoreLocation},
+			"intermediate-store":          []string{intermediateCAStore},
+		}).String(),
 		CertificateChain: req.CertificateChain,
 	})
-}
-
-// CleanupCredentials implements [apiv1.CredentialsCleaner]. On Windows it finds
-// all certificates in the configured certificate store issued by the "issuer"
-// in req.Name (optionally restricted to req.RawSubject) and deletes any that
-// have already expired. The "store-location" and "store" fields of req.Name
-// override the store configured on the TPMKMS instance.
-//
-// When req.Name carries "delete-key=true", the private key paired with each
-// expired certificate is removed as well: it first attempts a full teardown
-// through [TPMKMS.DeleteKey], which removes both the TPM storage entry and the
-// CNG/NCrypt key container. When DeleteKey cannot act on the key at all — the
-// TPM storage can't be loaded, the key isn't present in storage, or the TPM
-// can't be opened — it falls back to deleting the CNG key container directly
-// while removing the certificate. Without "delete-key=true" only the expired
-// certificates are removed and their keys are left in place.
-func (k *TPMKMS) CleanupCredentials(req *apiv1.CleanupCredentialsRequest) error {
-	if req == nil {
-		return errors.New("cleanupCredentialsRequest cannot be nil")
-	}
-
-	if !k.usesWindowsCertificateStore() {
-		// CleanupCredentials is only supported when the TPMKMS is configured to
-		// use the Windows certificate store. Signal that explicitly instead of
-		// silently succeeding, consistent with how the platform KMS reports
-		// unsupported operations.
-		return apiv1.NotImplementedError{}
-	}
-
-	o, err := parseNameURI(req.Name)
-	if err != nil {
-		return fmt.Errorf("failed parsing %q: %w", req.Name, err)
-	}
-	if o.issuer == "" {
-		return errors.New(`"issuer" is required`)
-	}
-
-	location := k.opts.windowsCertificateStoreLocation
-	if o.storeLocation != "" {
-		location = o.storeLocation
-	}
-	store := k.opts.windowsCertificateStore
-	if o.store != "" {
-		store = o.store
-	}
-
-	loadURI := uri.New("capi", url.Values{
-		"store-location": []string{location},
-		"store":          []string{store},
-		"issuer":         []string{o.issuer},
-	}).String()
-	certs, err := k.windowsCertificateManager.FindCertificatesByIssuer(&apiv1.LoadCertificateRequest{Name: loadURI}, req.RawSubject)
-	if err != nil {
-		return fmt.Errorf("failed loading certificates by issuer %q: %w", o.issuer, err)
-	}
-
-	var deleteErrors []error
-
-	// Map every managed key's Subject Key Identifier to its TPMKMS URI so an
-	// expired certificate can be traced back to the key that needs deleting.
-	// Only required when the request asks for the keys to be deleted.
-	var keysBySKI map[string]string
-	if o.deleteKey {
-		// keyNamesBySubjectKeyID is best-effort: it returns whatever keys it
-		// could load (possibly none) plus an error for the ones it couldn't.
-		// Don't abort on that error — certificates whose key is missing from
-		// the map fall through to the direct CNG deletion path below — but do
-		// record it so the failure is surfaced rather than swallowed.
-		keysBySKI, err = k.keyNamesBySubjectKeyID()
-		if err != nil {
-			deleteErrors = append(deleteErrors, fmt.Errorf("failed enumerating some keys; affected certificates fall back to direct key deletion: %w", err))
-		}
-	}
-
-	now := time.Now()
-	for _, cert := range certs {
-		if !cert.NotAfter.Before(now) {
-			continue
-		}
-
-		// deleteKey indicates whether the CNG key container should be removed
-		// together with the certificate. It's only ever true when the request
-		// asked for it, and then only when the key can't be torn down through
-		// the regular DeleteKey path.
-		deleteKey := false
-		if o.deleteKey {
-			result, err := k.deleteKeyForCertificate(cert, keysBySKI)
-			if err != nil {
-				deleteErrors = append(deleteErrors, err)
-			}
-			deleteKey = result
-		}
-
-		if err := k.deleteCertificateBySerial(location, store, o.issuer, cert.SerialNumber, deleteKey); err != nil {
-			deleteErrors = append(deleteErrors, fmt.Errorf("failed deleting expired certificate (serial %s): %w", cert.SerialNumber.Text(16), err))
-		}
-	}
-
-	return errors.Join(deleteErrors...)
-}
-
-// deleteKeyForCertificate tears down the key paired with cert. It returns
-// whether the caller must still remove the CNG key container directly when
-// deleting the certificate (fallback path), and any error encountered.
-//
-// When cert maps to a managed key it tries a full teardown via
-// [TPMKMS.DeleteKey]; on success the container is already gone (returns false),
-// and only when DeleteKey couldn't touch the container at all does it ask for a
-// direct deletion (returns true). When cert maps to no managed key — an orphan
-// certificate — it also asks for a direct deletion.
-func (k *TPMKMS) deleteKeyForCertificate(cert *x509.Certificate, keysBySKI map[string]string) (bool, error) {
-	ski, err := x509util.GenerateSubjectKeyID(cert.PublicKey)
-	if err != nil {
-		return false, fmt.Errorf("failed generating key identifier for expired certificate (serial %s): %w", cert.SerialNumber.Text(16), err)
-	}
-
-	name, ok := keysBySKI[hex.EncodeToString(ski)]
-	if !ok {
-		// Orphan certificate: no managed key maps to it, so the container (if
-		// any) must be deleted directly.
-		return true, nil
-	}
-
-	switch err := k.DeleteKey(&apiv1.DeleteKeyRequest{Name: name}); {
-	case err == nil:
-		// DeleteKey removed both the TPM storage entry and the CNG key
-		// container, so only the certificate itself is left to delete.
-		return false, nil
-	case shouldFallbackToDirectKeyDelete(err):
-		// DeleteKey never reached the key container; delete it directly
-		// alongside the certificate.
-		return true, nil
-	default:
-		// DeleteKey acted but failed in some other way; surface the error, but
-		// still remove the certificate without re-deleting the key.
-		return false, fmt.Errorf("failed deleting key for expired certificate (serial %s): %w", cert.SerialNumber.Text(16), err)
-	}
-}
-
-// keyNamesBySubjectKeyID returns a map from the hex-encoded Subject Key
-// Identifier of every non-AK key managed by the TPMKMS to its TPMKMS URI. It is
-// used to trace a certificate back to the key that produced it.
-//
-// The key search is best-effort: it may fail to load some keys and still return
-// the ones it could. The map is built from whatever keys were returned, and any
-// load failures are joined into the returned error so the caller can record
-// them. Certificates whose key could not be loaded simply won't appear in the
-// map and are handled by the caller's orphan/direct-delete path. A hard failure
-// that yields no response at all is returned as-is.
-func (k *TPMKMS) keyNamesBySubjectKeyID() (map[string]string, error) {
-	resp, err := k.searchKeys(&apiv1.SearchKeysRequest{
-		Query: uri.New(Scheme, url.Values{"ak": []string{"false"}}).String(),
-	})
-	if resp == nil {
-		return nil, err
-	}
-
-	var errs []error
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	keysBySKI := make(map[string]string, len(resp.Results))
-	for _, result := range resp.Results {
-		ski, err := x509util.GenerateSubjectKeyID(result.PublicKey)
-		if err != nil {
-			// Don't drop the rest of the map over one bad public key; record
-			// it and carry on, the same way SearchKeys treats unloadable keys.
-			errs = append(errs, fmt.Errorf("failed generating subject key id for %q: %w", result.Name, err))
-			continue
-		}
-		keysBySKI[hex.EncodeToString(ski)] = result.Name
-	}
-
-	return keysBySKI, errors.Join(errs...)
-}
-
-// deleteCertificateBySerial removes the certificate identified by issuer and
-// serial from the configured Windows certificate store, backed by the CAPIKMS
-// instance. When deleteKey is true the paired CNG key container is removed too.
-func (k *TPMKMS) deleteCertificateBySerial(location, store, issuer string, serial *big.Int, deleteKey bool) error {
-	uv := url.Values{}
-	uv.Set("store-location", location)
-	uv.Set("store", store)
-	uv.Set("issuer", issuer)
-	uv.Set("serial", "0x"+serial.Text(16))
-	if deleteKey {
-		uv.Set("delete-key", "true")
-	}
-
-	return k.windowsCertificateManager.DeleteCertificate(&apiv1.DeleteCertificateRequest{
-		Name: uri.New("capi", uv).String(),
-	})
-}
-
-// shouldFallbackToDirectKeyDelete reports whether a [TPMKMS.DeleteKey] error
-// means the CNG key container was never touched — the TPM storage couldn't be
-// loaded, the key wasn't present in storage, or the TPM couldn't be opened — so
-// the caller must fall back to deleting the key container directly.
-func shouldFallbackToDirectKeyDelete(err error) bool {
-	if errors.Is(err, apiv1.NotFoundError{}) || errors.Is(err, tpm.ErrNotFound) {
-		return true
-	}
-
-	msg := err.Error()
-	return strings.Contains(msg, "failed loading from TPM storage") ||
-		strings.Contains(msg, "failed opening TPM")
 }
 
 // DeleteCertificate deletes a certificate for the key identified by name from the
@@ -1252,11 +982,6 @@ func shouldFallbackToDirectKeyDelete(err error) bool {
 // It's possible to delete a specific certificate for a key by specifying it's SHA1
 // or serial. This is only supported if the instance is configured to use the Windows
 // certificate store.
-//
-// By default only the certificate is removed; the paired CNG private key is left
-// in place, since a key may legitimately outlive a certificate (e.g. reused
-// across renewals). Set "delete-key=true" on the request URI to remove the key
-// along with the certificate.
 //
 // # Experimental
 //
@@ -1326,14 +1051,6 @@ func (k *TPMKMS) deleteCertificateFromWindowsCertificateStore(req *apiv1.DeleteC
 	uv := url.Values{}
 	uv.Set("store-location", location)
 	uv.Set("store", store)
-	// Only remove the CNG private key paired with the certificate when the
-	// caller explicitly asked for it via "delete-key=true". Deleting the key by
-	// default would be surprising: a key may legitimately outlive a certificate
-	// (e.g. reused across renewals), and the non-Windows certificate store path
-	// keeps the key on disk regardless.
-	if o.deleteKey {
-		uv.Set("delete-key", "true")
-	}
 
 	switch {
 	case o.serial != "":
@@ -1353,7 +1070,12 @@ func (k *TPMKMS) deleteCertificateFromWindowsCertificateStore(req *apiv1.DeleteC
 		return errors.New(`at least one of "serial", "key-id", "sha1" or "name" is expected to be set`)
 	}
 
-	if err := k.windowsCertificateManager.DeleteCertificate(&apiv1.DeleteCertificateRequest{
+	dk, ok := k.windowsCertificateManager.(deletingCertificateManager)
+	if !ok {
+		return fmt.Errorf("expected Windows certificate manager to implement DeleteCertificate")
+	}
+
+	if err := dk.DeleteCertificate(&apiv1.DeleteCertificateRequest{
 		Name: uri.New("capi", uv).String(),
 	}); err != nil {
 		return fmt.Errorf("failed deleting certificate using Windows platform cryptography provider: %w", err)
@@ -1581,16 +1303,6 @@ func (k *TPMKMS) CreateAttestation(req *apiv1.CreateAttestationRequest) (*apiv1.
 //   - "tpmkms:name=my-name;ak=true" will only return the AK with the selected name
 //   - "tpmkms:name=my-name;ak=false" will only return the application key with the selected name
 //
-// SearchKeys is best-effort. Enumerating the keys (ListKeys/ListAKs) or loading
-// an individual key's signer can fail when the TPM can't be opened, its backing
-// storage can't be read, or a key's material is corrupt or no longer present —
-// for example a Windows PCP/CNG keyset reporting NTE_BAD_KEYSET, or a CNG key
-// container removed out of band. Rather than failing the whole search over one
-// bad key, it returns the keys it could load together with a joined error
-// describing the ones it could not. Callers that need every key should treat a
-// non-nil error as fatal; callers that can work with a subset (e.g. credential
-// cleanup) can use the returned results regardless.
-//
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later
@@ -1606,122 +1318,70 @@ func (k *TPMKMS) SearchKeys(req *apiv1.SearchKeysRequest) (*apiv1.SearchKeysResp
 	}
 
 	var (
-		name        = u.Get("name")
-		ak          = u.GetBool("ak")
-		hasAK       = u.Has("ak")
-		includeAKs  = !hasAK || ak
-		includeKeys = !hasAK || !ak
-		aks         []searchableAK
-		keys        []searchableKey
-		errs        []error
+		name  = u.Get("name")
+		ak    = u.GetBool("ak")
+		hasAK = u.Has("ak")
+		aks   []*tpm.AK
+		keys  []*tpm.Key
 	)
 
-	// List AKs. A failure to enumerate the AKs is collected as a partial error
-	// rather than aborting: the application keys may still be searchable, and
-	// callers can decide whether the missing AKs matter.
-	if includeAKs {
-		listed, err := k.tpm.ListAKs(context.Background())
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed listing attestation keys: %w", err))
-		} else {
-			aks = make([]searchableAK, len(listed))
-			for i := range listed {
-				aks[i] = listed[i]
+	var results []apiv1.SearchKeyResult
+
+	// List AKs
+	if !hasAK || (hasAK && ak) {
+		if aks, err = k.tpm.ListAKs(context.Background()); err != nil {
+			return nil, fmt.Errorf("searchKeysRequest failed: %w", err)
+		}
+
+		for _, key := range aks {
+			if name != "" && name != key.Name() {
+				continue
 			}
+
+			results = append(results, apiv1.SearchKeyResult{
+				Name: uri.New(Scheme, url.Values{
+					"name": []string{key.Name()},
+					"ak":   []string{"true"},
+				}).String(),
+				PublicKey: key.Public(),
+			})
 		}
 	}
 
-	// List Keys, same best-effort handling as the AKs above.
-	if includeKeys {
-		listed, err := k.tpm.ListKeys(context.Background())
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed listing keys: %w", err))
-		} else {
-			keys = make([]searchableKey, len(listed))
-			for i := range listed {
-				keys[i] = listed[i]
+	// List Keys
+	if !hasAK || (hasAK && !ak) {
+		if keys, err = k.tpm.ListKeys(context.Background()); err != nil {
+			return nil, fmt.Errorf("searchKeysRequest failed: %w", err)
+		}
+
+		for _, key := range keys {
+			if name != "" && name != key.Name() {
+				continue
 			}
+
+			values := url.Values{"name": []string{key.Name()}}
+			if attestedBy := key.AttestedBy(); attestedBy != "" {
+				values.Set("attest-by", attestedBy)
+			}
+			signer, err := key.Signer(context.Background())
+			if err != nil {
+				return nil, fmt.Errorf("searchKeysRequest failed: %w", err)
+			}
+
+			keyURI := uri.New(Scheme, values).String()
+			results = append(results, apiv1.SearchKeyResult{
+				Name:      keyURI,
+				PublicKey: signer.Public(),
+				CreateSignerRequest: apiv1.CreateSignerRequest{
+					SigningKey: keyURI,
+				},
+			})
 		}
 	}
 
-	results, buildErrs := buildSearchKeysResults(aks, keys, name)
-	errs = append(errs, buildErrs...)
-
-	// Best-effort contract: the successfully loaded keys are always returned in
-	// resp, alongside a joined error describing any keys (or key lists) that
-	// could not be loaded. Callers that require completeness can treat a
-	// non-nil error as fatal; callers that can make progress with a subset
-	// (such as CleanupCredentials) keep using resp regardless. errors.Join
-	// returns nil when errs is empty.
-	return &apiv1.SearchKeysResponse{Results: results}, errors.Join(errs...)
-}
-
-// searchableAK and searchableKey are the minimal views of [tpm.AK] and
-// [tpm.Key] needed to build search results. They exist so the best-effort
-// result-building logic can be unit tested with fakes that, for example, fail
-// to produce a signer.
-type searchableAK interface {
-	Name() string
-	Public() crypto.PublicKey
-}
-
-type searchableKey interface {
-	Name() string
-	AttestedBy() string
-	Signer(context.Context) (crypto.Signer, error)
-}
-
-// buildSearchKeysResults converts the listed AKs and keys into search results,
-// filtering by name when set. AKs always yield a result. A key whose signer
-// cannot be loaded (e.g. a corrupt keyset) does not abort the whole search:
-// instead the failure is recorded and the remaining keys are still returned.
-// The returned error slice is empty when everything loaded.
-func buildSearchKeysResults(aks []searchableAK, keys []searchableKey, name string) ([]apiv1.SearchKeyResult, []error) {
-	var (
-		results []apiv1.SearchKeyResult
-		errs    []error
-	)
-
-	for _, ak := range aks {
-		if name != "" && name != ak.Name() {
-			continue
-		}
-		results = append(results, apiv1.SearchKeyResult{
-			Name: uri.New(Scheme, url.Values{
-				"name": []string{ak.Name()},
-				"ak":   []string{"true"},
-			}).String(),
-			PublicKey: ak.Public(),
-		})
-	}
-
-	for _, key := range keys {
-		if name != "" && name != key.Name() {
-			continue
-		}
-
-		values := url.Values{"name": []string{key.Name()}}
-		if attestedBy := key.AttestedBy(); attestedBy != "" {
-			values.Set("attest-by", attestedBy)
-		}
-		keyURI := uri.New(Scheme, values).String()
-
-		signer, err := key.Signer(context.Background())
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to create a signer for %q: %w", keyURI, err))
-			continue
-		}
-
-		results = append(results, apiv1.SearchKeyResult{
-			Name:      keyURI,
-			PublicKey: signer.Public(),
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyURI,
-			},
-		})
-	}
-
-	return results, errs
+	return &apiv1.SearchKeysResponse{
+		Results: results,
+	}, nil
 }
 
 // Close releases the connection to the TPM.
@@ -1874,19 +1534,19 @@ func generateWindowsSubjectKeyID(pub crypto.PublicKey) (string, error) {
 	return hex.EncodeToString(hash[:]), nil
 }
 
-type capiCertificateManager interface {
-	apiv1.CertificateChainManager
-	apiv1.CertificateDeleter
-	apiv1.CredentialsCleaner
-	FindCertificatesByIssuer(req *apiv1.LoadCertificateRequest, rawSubject []byte) ([]*x509.Certificate, error)
+type deletingCertificateManager interface {
+	apiv1.CertificateManager
+	DeleteCertificate(req *apiv1.DeleteCertificateRequest) error
 }
 
-var (
-	_ apiv1.KeyManager              = (*TPMKMS)(nil)
-	_ apiv1.Attester                = (*TPMKMS)(nil)
-	_ apiv1.CertificateManager      = (*TPMKMS)(nil)
-	_ apiv1.CertificateChainManager = (*TPMKMS)(nil)
-	_ apiv1.CredentialsCleaner      = (*TPMKMS)(nil)
-	_ apiv1.CertificateDeleter      = (*TPMKMS)(nil)
-	_ apiv1.AttestationClient       = (*attestationClient)(nil)
-)
+type deletingCertificateChainManager interface {
+	apiv1.CertificateChainManager
+	DeleteCertificate(req *apiv1.DeleteCertificateRequest) error
+}
+
+var _ apiv1.KeyManager = (*TPMKMS)(nil)
+var _ apiv1.Attester = (*TPMKMS)(nil)
+var _ apiv1.CertificateManager = (*TPMKMS)(nil)
+var _ apiv1.CertificateChainManager = (*TPMKMS)(nil)
+var _ deletingCertificateChainManager = (*TPMKMS)(nil)
+var _ apiv1.AttestationClient = (*attestationClient)(nil)

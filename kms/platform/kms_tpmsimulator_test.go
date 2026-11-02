@@ -377,10 +377,10 @@ func TestKMS_DeleteKey_tpm(t *testing.T) {
 		}},
 		{"fail missing key", km, args{&apiv1.DeleteKeyRequest{
 			Name: "kms:name=key-2",
-		}}, assertNotFoundError},
+		}}, assert.Error},
 		{"fail missing ak", km, args{&apiv1.DeleteKeyRequest{
 			Name: "kms:name=ak-2;ak=true",
-		}}, assertNotFoundError},
+		}}, assert.Error},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -443,7 +443,7 @@ func TestKMS_LoadCertificate_tpm(t *testing.T) {
 		}}, nil, assert.Error},
 		{"fail missing", km, args{&apiv1.LoadCertificateRequest{
 			Name: "kms:name=missing-key",
-		}}, nil, assertNotFoundError},
+		}}, nil, assert.Error},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -589,7 +589,7 @@ func TestKMS_LoadCertificateChain_tpm(t *testing.T) {
 		}}, nil, assert.Error},
 		{"fail missing", km, args{&apiv1.LoadCertificateChainRequest{
 			Name: "kms:name=missing-key",
-		}}, nil, assertNotFoundError},
+		}}, nil, assert.Error},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

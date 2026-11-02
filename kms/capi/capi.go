@@ -13,7 +13,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -21,8 +20,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 	"unsafe"
+
+	"github.com/pkg/errors"
 
 	"golang.org/x/crypto/cryptobyte"
 	"golang.org/x/crypto/cryptobyte/asn1"
@@ -44,8 +44,6 @@ const (
 	HashArg                      = "sha1"
 	StoreLocationArg             = "store-location" // 'machine', 'user', etc
 	StoreNameArg                 = "store"          // 'MY', 'CA', 'ROOT', etc
-	FriendlyNameArg              = "friendly-name"
-	DescriptionArg               = "description"
 	IntermediateStoreLocationArg = "intermediate-store-location"
 	IntermediateStoreNameArg     = "intermediate-store"
 	KeyIDArg                     = "key-id"
@@ -54,8 +52,6 @@ const (
 	IssuerNameArg                = "issuer"
 	KeySpec                      = "key-spec"                  // 0, 1, 2; none/NONE, at_keyexchange/AT_KEYEXCHANGE, at_signature/AT_SIGNATURE
 	SkipFindCertificateKey       = "skip-find-certificate-key" // skips looking up certificate private key when storing a certificate
-	DeleteKeyArg                 = "delete-key"                // when "true" on a DeleteCertificate URI, also deletes the CNG key associated with the certificate
-	KeyScopeArg                  = "key-scope"                 // "machine" or "user"; the keyset that holds the certificate's private key (defaults to store-location)
 )
 
 const (
@@ -85,8 +81,7 @@ var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]string{
 }
 
 type uriAttributes struct {
-	keyContainerName          string
-	providerName              string
+	containerName             string
 	hash                      []byte
 	storeLocation             string
 	storeName                 string
@@ -96,32 +91,9 @@ type uriAttributes struct {
 	subjectCN                 string
 	serialNumber              *big.Int
 	issuerName                string
-	friendlyName              string
-	description               string
 	keySpec                   string
 	skipFindCertificateKey    bool
-	deleteKey                 bool
-	keyScope                  string
 	pin                       string
-}
-
-// isMachineKeyset reports whether the certificate's private key lives in the
-// local machine keyset rather than the current user's. The key scope is taken
-// from the "key-scope" argument; when unset it falls back to the certificate
-// store location ("machine" → machine keyset), since cert and key are usually
-// provisioned in the same scope. This mirrors the tpmkms key-scope resolution.
-func (u *uriAttributes) isMachineKeyset() bool {
-	return u.keyScope == MachineStoreLocation ||
-		(u.keyScope == "" && u.storeLocation == MachineStoreLocation)
-}
-
-// isUserKeyset reports whether the certificate's private key is explicitly
-// scoped to the current user's keyset. Unlike isMachineKeyset it deliberately
-// does not fall back to the store location: when "key-scope" is unset the keyset
-// is left unspecified so key discovery can search both containers, matching
-// CryptFindCertificateKeyProvInfo's historical default.
-func (u *uriAttributes) isUserKeyset() bool {
-	return u.keyScope == UserStoreLocation
 }
 
 func parseURI(rawuri string) (*uriAttributes, error) {
@@ -150,8 +122,7 @@ func parseURI(rawuri string) (*uriAttributes, error) {
 	}
 
 	return &uriAttributes{
-		keyContainerName:          u.Get(ContainerNameArg),
-		providerName:              u.Get(ProviderNameArg),
+		containerName:             u.Get(ContainerNameArg),
 		hash:                      hashValue,
 		storeLocation:             cmp.Or(u.Get(StoreLocationArg), UserStoreLocation),
 		storeName:                 cmp.Or(u.Get(StoreNameArg), MyStore),
@@ -161,12 +132,8 @@ func parseURI(rawuri string) (*uriAttributes, error) {
 		subjectCN:                 u.Get(SubjectCNArg),
 		serialNumber:              serialNumber,
 		issuerName:                u.Get(IssuerNameArg),
-		friendlyName:              u.Get(FriendlyNameArg),
-		description:               u.Get(DescriptionArg),
 		keySpec:                   u.Get(KeySpec),
 		skipFindCertificateKey:    u.GetBool(SkipFindCertificateKey),
-		deleteKey:                 u.GetBool(DeleteKeyArg),
-		keyScope:                  u.Get(KeyScopeArg),
 		pin:                       u.Pin(),
 	}, nil
 }
@@ -425,15 +392,11 @@ func (k *CAPIKMS) getCertContext(u *uriAttributes) (*windows.CertContext, error)
 		0,
 		0,
 		certStoreLocation,
-		uintptr(unsafe.Pointer(wide(u.storeName))),
-	)
+		uintptr(unsafe.Pointer(wide(u.storeName))))
 	if err != nil {
 		return nil, fmt.Errorf("CertOpenStore for the %q store %q returned: %w", u.storeLocation, u.storeName, err)
 	}
 
-	// if issuer + any of the other fields in the list below is provided, then attempt a second certificate lookup when
-	// lookup by KeyID fails (not found).
-	canLookupByIssuer := u.issuerName != "" && (u.serialNumber != nil || u.subjectCN != "" || u.friendlyName != "" || u.description != "")
 	var handle *windows.CertContext
 
 	switch {
@@ -458,14 +421,49 @@ func (k *CAPIKMS) getCertContext(u *uriAttributes) (*windows.CertContext, error)
 		}
 	case len(u.keyID) > 0:
 		if handle, err = findCertificateBySubjectKeyID(st, u.keyID); err != nil {
-			if !errors.Is(err, apiv1.NotFoundError{}) || !canLookupByIssuer {
-				return nil, err
-			}
+			return nil, err
 		}
-	case u.keyContainerName != "":
+	case u.issuerName != "" && (u.serialNumber != nil || u.subjectCN != ""):
+		var prevCert *windows.CertContext
+		for {
+			handle, err = findCertificateInStore(st,
+				encodingX509ASN|encodingPKCS7,
+				0,
+				findIssuerStr,
+				uintptr(unsafe.Pointer(wide(u.issuerName))), prevCert)
+			if err != nil {
+				return nil, fmt.Errorf("findCertificateInStore failed: %w", err)
+			}
+
+			if handle == nil {
+				return nil, apiv1.NotFoundError{Message: fmt.Sprintf("certificate with %s=%q not found", IssuerNameArg, u.issuerName)}
+			}
+
+			x509Cert, err := certContextToX509(handle)
+			if err != nil {
+				return nil, fmt.Errorf("could not unmarshal certificate to DER: %w", err)
+			}
+
+			switch {
+			case u.serialNumber != nil:
+				// TODO: Replace this search with a CERT_ID + CERT_ISSUER_SERIAL_NUMBER search instead
+				// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_id
+				// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_issuer_serial_number
+				if x509Cert.SerialNumber.Cmp(u.serialNumber) == 0 {
+					return handle, nil
+				}
+			case len(u.subjectCN) > 0:
+				if x509Cert.Subject.CommonName == u.subjectCN {
+					return handle, nil
+				}
+			}
+
+			prevCert = handle
+		}
+	case u.containerName != "":
 		key, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
 			Name: uri.New(Scheme, url.Values{
-				ContainerNameArg: []string{u.keyContainerName},
+				ContainerNameArg: []string{u.containerName},
 			}).String(),
 		})
 		if err != nil {
@@ -476,75 +474,13 @@ func (k *CAPIKMS) getCertContext(u *uriAttributes) (*windows.CertContext, error)
 			return nil, fmt.Errorf("error generating SubjectKeyID: %w", err)
 		}
 		if handle, err = findCertificateBySubjectKeyID(st, keyID); err != nil {
-			if !errors.Is(err, apiv1.NotFoundError{}) || !canLookupByIssuer {
-				return nil, err
-			}
+			return nil, err
 		}
-	}
-
-	if handle != nil {
-		return handle, err
-	}
-
-	if !canLookupByIssuer {
+	default:
 		return nil, fmt.Errorf("%q, %q, or %q and one of %q or %q is required to find a certificate", HashArg, KeyIDArg, IssuerNameArg, SerialNumberArg, SubjectCNArg)
 	}
 
-	// lookup certificate by issuer + another field (serial, CN, friendlyName, description)
-	var prevCert *windows.CertContext
-	for {
-		handle, err = findCertificateInStore(st,
-			encodingX509ASN|encodingPKCS7,
-			0,
-			findIssuerStr,
-			uintptr(unsafe.Pointer(wide(u.issuerName))), prevCert)
-		if err != nil {
-			return nil, fmt.Errorf("findCertificateInStore failed: %w", err)
-		}
-
-		if handle == nil {
-			return nil, apiv1.NotFoundError{Message: fmt.Sprintf("certificate with %s=%q not found", IssuerNameArg, u.issuerName)}
-		}
-
-		x509Cert, err := certContextToX509(handle)
-		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal certificate to DER: %w", err)
-		}
-
-		switch {
-		case u.serialNumber != nil:
-			// TODO: Replace this search with a CERT_ID + CERT_ISSUER_SERIAL_NUMBER search instead
-			// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_id
-			// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_issuer_serial_number
-			if x509Cert.SerialNumber.Cmp(u.serialNumber) == 0 {
-				return handle, nil
-			}
-		case len(u.subjectCN) > 0:
-			if x509Cert.Subject.CommonName == u.subjectCN {
-				return handle, nil
-			}
-		case len(u.friendlyName) > 0:
-			val, err := cryptFindCertificateFriendlyName(handle)
-			if err != nil {
-				return nil, fmt.Errorf("cryptFindCertificateFriendlyName failed: %w", err)
-			}
-
-			if val == u.friendlyName {
-				return handle, nil
-			}
-		case len(u.description) > 0:
-			val, err := cryptFindCertificateDescription(handle)
-			if err != nil {
-				return nil, fmt.Errorf("cryptFindCertificateDescription failed: %w", err)
-			}
-
-			if val == u.description {
-				return handle, nil
-			}
-		}
-
-		prevCert = handle
-	}
+	return handle, err
 }
 
 // CreateSigner returns a crypto.Signer that will sign using the key passed in via the URI.
@@ -559,15 +495,15 @@ func (k *CAPIKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, e
 		certHandle *windows.CertContext
 	)
 
-	if u.keyContainerName != "" {
+	if u.containerName != "" {
 		keyFlags, err := k.getKeyFlags(u)
 		if err != nil {
 			return nil, err
 		}
 
-		kh, err = nCryptOpenKey(k.providerHandle, u.keyContainerName, 0, keyFlags)
+		kh, err = nCryptOpenKey(k.providerHandle, u.containerName, 0, keyFlags)
 		if err != nil {
-			return nil, fmt.Errorf("unable to open key using %q=%q: %w", ContainerNameArg, u.keyContainerName, err)
+			return nil, fmt.Errorf("unable to open key using %q=%q: %w", ContainerNameArg, u.containerName, err)
 		}
 	} else {
 		// check if a certificate can be located using the URI
@@ -603,7 +539,7 @@ func (k *CAPIKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, e
 		}
 	}
 
-	return newCAPISigner(kh, u.keyContainerName, u.pin)
+	return newCAPISigner(kh, u.containerName, u.pin)
 }
 
 func setKeySpec(u *uriAttributes) (uint32, error) {
@@ -642,8 +578,8 @@ func (k *CAPIKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 	}
 
 	// generate a random uuid for the container name if it is not present
-	if u.keyContainerName == "" {
-		u.keyContainerName, err = randutil.UUIDv4()
+	if u.containerName == "" {
+		u.containerName, err = randutil.UUIDv4()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate uuid: %w", err)
 		}
@@ -665,7 +601,7 @@ func (k *CAPIKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 	}
 
 	// TODO: check whether RSA keys require legacyKeySpec set to AT_KEYEXCHANGE
-	kh, err := nCryptCreatePersistedKey(k.providerHandle, u.keyContainerName, alg, keySpec, keyFlags)
+	kh, err := nCryptCreatePersistedKey(k.providerHandle, u.containerName, alg, keySpec, keyFlags)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create persisted key: %w", err)
 	}
@@ -735,7 +671,7 @@ func (k *CAPIKMS) DeleteKey(req *apiv1.DeleteKeyRequest) error {
 		return err
 	}
 
-	if u.keyContainerName == "" {
+	if u.containerName == "" {
 		return fmt.Errorf("%v not specified", ContainerNameArg)
 	}
 
@@ -744,7 +680,7 @@ func (k *CAPIKMS) DeleteKey(req *apiv1.DeleteKeyRequest) error {
 		return err
 	}
 
-	kh, err := nCryptOpenKey(k.providerHandle, u.keyContainerName, 0, keyFlags)
+	kh, err := nCryptOpenKey(k.providerHandle, u.containerName, 0, keyFlags)
 	if err != nil {
 		return fmt.Errorf("unable to open key: %w", err)
 	}
@@ -761,7 +697,7 @@ func (k *CAPIKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey
 		return nil, err
 	}
 
-	if u.keyContainerName == "" {
+	if u.containerName == "" {
 		return nil, fmt.Errorf("%v not specified", ContainerNameArg)
 	}
 
@@ -770,7 +706,7 @@ func (k *CAPIKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey
 		return nil, err
 	}
 
-	kh, err := nCryptOpenKey(k.providerHandle, u.keyContainerName, 0, keyFlags)
+	kh, err := nCryptOpenKey(k.providerHandle, u.containerName, 0, keyFlags)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open key: %w", err)
 	}
@@ -848,74 +784,6 @@ func (k *CAPIKMS) LoadCertificateChain(req *apiv1.LoadCertificateChainRequest) (
 	return chain, nil
 }
 
-// FindCertificatesByIssuer returns all certificates in the Windows certificate
-// store that were issued by the given issuer. The URI must contain the "issuer"
-// field; "store-location" and "store" are optional (defaulting to "user" and "My").
-// When rawSubject is non-empty, only certificates whose raw DER-encoded Subject
-// matches are included.
-func (k *CAPIKMS) FindCertificatesByIssuer(req *apiv1.LoadCertificateRequest, rawSubject []byte) ([]*x509.Certificate, error) {
-	u, err := parseURI(req.Name)
-	if err != nil {
-		return nil, err
-	}
-	if u.issuerName == "" {
-		return nil, fmt.Errorf("%q is required", IssuerNameArg)
-	}
-
-	var certStoreLocation uint32
-	switch u.storeLocation {
-	case UserStoreLocation:
-		certStoreLocation = certStoreCurrentUser
-	case MachineStoreLocation:
-		certStoreLocation = certStoreLocalMachine
-	default:
-		return nil, fmt.Errorf("invalid cert store location %q", u.storeLocation)
-	}
-
-	st, err := windows.CertOpenStore(
-		certStoreProvSystem,
-		0,
-		0,
-		certStoreLocation,
-		uintptr(unsafe.Pointer(wide(u.storeName))),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("CertOpenStore for the %q store %q returned: %w", u.storeLocation, u.storeName, err)
-	}
-
-	var (
-		certs    []*x509.Certificate
-		prevCert *windows.CertContext
-	)
-	for {
-		certHandle, err := findCertificateInStore(st,
-			encodingX509ASN|encodingPKCS7,
-			0,
-			findIssuerStr,
-			uintptr(unsafe.Pointer(wide(u.issuerName))), prevCert)
-		if err != nil {
-			return nil, fmt.Errorf("findCertificateInStore failed: %w", err)
-		}
-		if certHandle == nil {
-			// prevCert was freed by the last findCertificateInStore call per Windows API contract.
-			break
-		}
-
-		x509Cert, err := certContextToX509(certHandle)
-		if err != nil {
-			windows.CertFreeCertificateContext(certHandle)
-			return nil, fmt.Errorf("could not unmarshal certificate: %w", err)
-		}
-
-		if len(rawSubject) == 0 || bytes.Equal(x509Cert.RawSubject, rawSubject) {
-			certs = append(certs, x509Cert)
-		}
-		prevCert = certHandle // freed on next findCertificateInStore call
-	}
-
-	return certs, nil
-}
-
 func (k *CAPIKMS) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 	u, err := parseURI(req.Name)
 	if err != nil {
@@ -941,48 +809,13 @@ func (k *CAPIKMS) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 	}
 	defer windows.CertFreeCertificateContext(certContext)
 
-	// Associate the certificate with its private key.
-	switch {
-	case u.keyContainerName != "":
-		// The exact key is known (the caller supplied its container name, and
-		// usually its provider). Associate it explicitly rather than by
-		// discovery. This is required for machine-scoped Microsoft Platform
-		// Crypto Provider (TPM) keys: CryptFindCertificateKeyProvInfo does not
-		// search the local machine keyset and so cannot find them. Explicit
-		// association does not enumerate containers and never prompts for a
-		// smart card, so it runs even when skip-find-certificate-key is set.
-		var flags uint32
-		if u.isMachineKeyset() {
-			flags |= CRYPT_MACHINE_KEYSET
-		}
-		if err := setCertificateKeyProvInfo(certContext, u.keyContainerName, u.providerName, flags, LEGACY_KEY_SPEC_NONE); err != nil {
-			return fmt.Errorf("failed associating certificate with key %q: %w", u.keyContainerName, err)
-		}
-	case !u.skipFindCertificateKey:
-		// No specific key was named, so fall back to discovery. Looking up the
-		// private key can prompt the user to insert/select a smart card, which
-		// is why it is skipped for e.g. intermediate certificates. With no
-		// keyset flag CryptFindCertificateKeyProvInfo searches both the user and
-		// machine containers (its documented default); restrict the search only
-		// when the key scope is known, so a machine-scoped key is found while
-		// the legacy both-containers behavior is preserved otherwise.
-		var keysetFlags uint32
-		switch {
-		case u.isUserKeyset():
-			keysetFlags = CRYPT_FIND_USER_KEYSET_FLAG
-		case u.isMachineKeyset():
-			keysetFlags = CRYPT_FIND_MACHINE_KEYSET_FLAG
-		}
+	// looking up the certificate private key is performed by default, but is made optional,
+	// so that looking up the private key for e.g. intermediate certificates can be skipped.
+	// If not skipped, looking up a private key can prompt the user to insert/select a smart
+	// card, which is usually not what we want to happen.
+	if !u.skipFindCertificateKey {
 		// TODO: not finding the associated private key is not a dealbreaker, but maybe a warning should be issued
-		cryptFindCertificateKeyProvInfo(certContext, keysetFlags)
-	}
-
-	if u.friendlyName != "" {
-		cryptSetCertificateFriendlyName(certContext, u.friendlyName)
-	}
-
-	if u.description != "" {
-		cryptSetCertificateDescription(certContext, u.description)
+		cryptFindCertificateKeyProvInfo(certContext)
 	}
 
 	st, err := windows.CertOpenStore(
@@ -1020,15 +853,7 @@ func (k *CAPIKMS) StoreCertificateChain(req *apiv1.StoreCertificateChainRequest)
 			HashArg:                []string{fp},
 			StoreLocationArg:       []string{u.storeLocation},
 			StoreNameArg:           []string{u.storeName},
-			FriendlyNameArg:        []string{u.friendlyName},
-			DescriptionArg:         []string{u.description},
 			SkipFindCertificateKey: []string{strconv.FormatBool(u.skipFindCertificateKey)},
-			// Forward the key association hints so the leaf certificate is
-			// linked to its private key (see StoreCertificate). Intermediates
-			// below have no associated key and intentionally omit these.
-			ContainerNameArg: []string{u.keyContainerName},
-			ProviderNameArg:  []string{u.providerName},
-			KeyScopeArg:      []string{u.keyScope},
 		}).String(),
 		Certificate: leaf,
 	}); err != nil {
@@ -1125,13 +950,19 @@ func (k *CAPIKMS) DeleteCertificate(req *apiv1.DeleteCertificateRequest) error {
 			return nil
 		}
 
-		return deleteCertContextAndMaybeKey(certHandle, u.deleteKey)
+		if err := windows.CertDeleteCertificateFromStore(certHandle); err != nil {
+			return fmt.Errorf("failed removing certificate: %w", err)
+		}
+		return nil
 	case len(u.keyID) > 0:
 		certHandle, err = findCertificateBySubjectKeyID(st, u.keyID)
 		if err != nil {
 			return err
 		}
-		return deleteCertContextAndMaybeKey(certHandle, u.deleteKey)
+		if err := windows.CertDeleteCertificateFromStore(certHandle); err != nil {
+			return fmt.Errorf("failed removing certificate: %w", err)
+		}
+		return nil
 	case u.issuerName != "" && u.serialNumber != nil:
 		// TODO: Replace this search with a CERT_ID + CERT_ISSUER_SERIAL_NUMBER search instead
 		// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_id
@@ -1160,14 +991,18 @@ func (k *CAPIKMS) DeleteCertificate(req *apiv1.DeleteCertificateRequest) error {
 			}
 
 			if bytes.Equal(x509Cert.SerialNumber.Bytes(), serialBytes) {
-				return deleteCertContextAndMaybeKey(certHandle, u.deleteKey)
+				if err := windows.CertDeleteCertificateFromStore(certHandle); err != nil {
+					return fmt.Errorf("failed removing certificate: %w", err)
+				}
+
+				return nil
 			}
 			prevCert = certHandle
 		}
-	case u.keyContainerName != "":
+	case u.containerName != "":
 		key, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
 			Name: uri.New(Scheme, url.Values{
-				ContainerNameArg: []string{u.keyContainerName},
+				ContainerNameArg: []string{u.containerName},
 			}).String(),
 		})
 		if err != nil {
@@ -1181,147 +1016,12 @@ func (k *CAPIKMS) DeleteCertificate(req *apiv1.DeleteCertificateRequest) error {
 		if err != nil {
 			return err
 		}
-		return deleteCertContextAndMaybeKey(certHandle, u.deleteKey)
+		if err := windows.CertDeleteCertificateFromStore(certHandle); err != nil {
+			return fmt.Errorf("failed removing certificate: %w", err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("%q, %q, or %q and %q is required to find a certificate", HashArg, KeyIDArg, IssuerNameArg, SerialNumberArg)
-	}
-}
-
-// deleteCertContextAndMaybeKey removes the certificate referenced by certHandle
-// from its store, and when deleteKey is true also removes the CNG private key
-// associated with it. The key is removed first so that, if either step fails,
-// the certificate remains and a subsequent pass can retry the cleanup; deleting
-// the cert first risks orphaning the key once the cert is no longer reachable
-// to look up its CRYPT_KEY_PROV_INFO.
-//
-// certHandle is consumed: CertDeleteCertificateFromStore always frees the
-// context (per Microsoft docs); on the bail-out path before the cert delete we
-// free it explicitly.
-func deleteCertContextAndMaybeKey(certHandle *windows.CertContext, deleteKey bool) error {
-	if deleteKey {
-		// best effort: a cert without a CNG-backed key shouldn't fail the call.
-		if kh, err := cryptFindCertificatePrivateKey(certHandle); err == nil {
-			if err := nCryptDeleteKey(kh); err != nil {
-				windows.CertFreeCertificateContext(certHandle)
-				return fmt.Errorf("failed removing CNG private key: %w", err)
-			}
-		}
-	}
-
-	if err := windows.CertDeleteCertificateFromStore(certHandle); err != nil {
-		return fmt.Errorf("failed removing certificate: %w", err)
-	}
-	return nil
-}
-
-// CleanupCredentials implements [apiv1.CredentialsCleaner]. It scans the Windows
-// certificate store identified by req.Name for certificates issued by its
-// "issuer" and removes any that have expired. When req.Name carries
-// "delete-key=true", the CNG private key paired with each expired certificate is
-// removed as well. When req.RawSubject is non-empty, only certificates whose
-// DER-encoded Subject matches are considered.
-func (k *CAPIKMS) CleanupCredentials(req *apiv1.CleanupCredentialsRequest) error {
-	if req == nil {
-		return errors.New("cleanupCredentialsRequest cannot be nil")
-	}
-
-	u, err := parseURI(req.Name)
-	if err != nil {
-		return err
-	}
-	if u.issuerName == "" {
-		return fmt.Errorf("%q is required", IssuerNameArg)
-	}
-
-	var certStoreLocation uint32
-	switch u.storeLocation {
-	case UserStoreLocation:
-		certStoreLocation = certStoreCurrentUser
-	case MachineStoreLocation:
-		certStoreLocation = certStoreLocalMachine
-	default:
-		return fmt.Errorf("invalid cert store location %q", u.storeLocation)
-	}
-
-	st, err := windows.CertOpenStore(
-		certStoreProvSystem,
-		0,
-		0,
-		certStoreLocation,
-		uintptr(unsafe.Pointer(wide(u.storeName))),
-	)
-	if err != nil {
-		return fmt.Errorf("CertOpenStore for the %q store %q returned: %w", u.storeLocation, u.storeName, err)
-	}
-
-	now := time.Now()
-	var errs []error
-
-	// Restart the enumeration after each deletion to avoid juggling cert-context
-	// lifetimes across a delete: CertDeleteCertificateFromStore frees the context
-	// it was given, which would invalidate the "previous" pointer that the next
-	// CertFindCertificateInStore call expects.
-	for {
-		deleted, err := k.cleanupOnePass(st, u.issuerName, req.RawSubject, u.deleteKey, now)
-		if err != nil {
-			errs = append(errs, err)
-		}
-		if !deleted {
-			break
-		}
-	}
-
-	return errors.Join(errs...)
-}
-
-// cleanupOnePass walks the store looking for the first expired certificate
-// matching issuer (and rawSubject, if set), deletes it (together with its CNG
-// key when deleteKey is true), and returns deleted=true. When no matching
-// expired certificate is found it returns deleted=false and the caller stops
-// iterating. Errors encountered while inspecting individual certificates are
-// returned with deleted=false so the caller can record them and exit (a
-// persistent inspection error would otherwise spin the outer loop forever).
-func (k *CAPIKMS) cleanupOnePass(st windows.Handle, issuer string, rawSubject []byte, deleteKey bool, now time.Time) (bool, error) {
-	// CertFindCertificateInStore frees the context passed as prevCert on each
-	// call, so the previous iteration's handle must not be freed here; only a
-	// handle we stop walking from (an early return below) needs an explicit
-	// free.
-	var prevCert *windows.CertContext
-	for {
-		certHandle, err := findCertificateInStore(st,
-			encodingX509ASN|encodingPKCS7,
-			0,
-			findIssuerStr,
-			uintptr(unsafe.Pointer(wide(issuer))), prevCert)
-		if err != nil {
-			return false, fmt.Errorf("findCertificateInStore failed: %w", err)
-		}
-		if certHandle == nil {
-			// findCertificateInStore returns (nil, nil) when no (further)
-			// certificate matches the issuer: there's nothing left to clean up
-			// and prevCert was already freed by this last call, so just stop.
-			return false, nil
-		}
-
-		x509Cert, err := certContextToX509(certHandle)
-		if err != nil {
-			// We're bailing out without chaining certHandle into another
-			// findCertificateInStore call, so free it explicitly here.
-			windows.CertFreeCertificateContext(certHandle)
-			return false, fmt.Errorf("could not unmarshal certificate: %w", err)
-		}
-
-		matchesSubject := len(rawSubject) == 0 || bytes.Equal(x509Cert.RawSubject, rawSubject)
-		if matchesSubject && x509Cert.NotAfter.Before(now) {
-			// deleteCertContextAndMaybeKey consumes certHandle (the cert delete
-			// frees it), so no explicit free is needed on this path.
-			if err := deleteCertContextAndMaybeKey(certHandle, deleteKey); err != nil {
-				return false, fmt.Errorf("failed deleting expired certificate (serial %s): %w", x509Cert.SerialNumber.Text(16), err)
-			}
-			return true, nil
-		}
-		// Carry certHandle forward; the next findCertificateInStore call frees it.
-		prevCert = certHandle
 	}
 }
 
@@ -1450,7 +1150,4 @@ func validateIntermediateCertificate(c *x509.Certificate) error {
 	return nil
 }
 
-var (
-	_ apiv1.CertificateManager = (*CAPIKMS)(nil)
-	_ apiv1.CredentialsCleaner = (*CAPIKMS)(nil)
-)
+var _ apiv1.CertificateManager = (*CAPIKMS)(nil)

@@ -13,11 +13,6 @@ type AK struct {
 	Data      []byte
 	Chain     []*x509.Certificate
 	CreatedAt time.Time
-	// MachineKey records whether the AK was created in the local machine
-	// key store (Windows: NCRYPT_MACHINE_KEY_FLAG). Persisted so that
-	// reload uses the matching key scope. Defaults to false for AKs
-	// created before this field was introduced.
-	MachineKey bool
 }
 
 // MarshalJSON marshals the AK into JSON.
@@ -28,11 +23,10 @@ func (ak *AK) MarshalJSON() ([]byte, error) {
 	}
 
 	sak := serializedAK{
-		Name:       ak.Name,
-		Type:       typeAK,
-		Data:       ak.Data,
-		CreatedAt:  ak.CreatedAt,
-		MachineKey: ak.MachineKey,
+		Name:      ak.Name,
+		Type:      typeAK,
+		Data:      ak.Data,
+		CreatedAt: ak.CreatedAt,
 	}
 
 	if len(chain) > 0 {
@@ -56,7 +50,6 @@ func (ak *AK) UnmarshalJSON(data []byte) error {
 	ak.Name = sak.Name
 	ak.Data = sak.Data
 	ak.CreatedAt = sak.CreatedAt
-	ak.MachineKey = sak.MachineKey
 
 	if len(sak.Chain) > 0 {
 		chain := make([]*x509.Certificate, len(sak.Chain))
@@ -80,11 +73,6 @@ type Key struct {
 	AttestedBy string
 	Chain      []*x509.Certificate
 	CreatedAt  time.Time
-	// MachineKey records whether the Key was created in the local machine
-	// key store (Windows: NCRYPT_MACHINE_KEY_FLAG). Persisted so that
-	// reload uses the matching key scope. Defaults to false for Keys
-	// created before this field was introduced.
-	MachineKey bool
 }
 
 // MarshalJSON marshals the Key into JSON.
@@ -100,7 +88,6 @@ func (key *Key) MarshalJSON() ([]byte, error) {
 		Data:       key.Data,
 		AttestedBy: key.AttestedBy,
 		CreatedAt:  key.CreatedAt,
-		MachineKey: key.MachineKey,
 	}
 
 	if len(chain) > 0 {
@@ -125,7 +112,6 @@ func (key *Key) UnmarshalJSON(data []byte) error {
 	key.Data = sk.Data
 	key.AttestedBy = sk.AttestedBy
 	key.CreatedAt = sk.CreatedAt
-	key.MachineKey = sk.MachineKey
 
 	if len(sk.Chain) > 0 {
 		chain := make([]*x509.Certificate, len(sk.Chain))
@@ -157,12 +143,11 @@ const (
 // serializedAK is the struct used when marshaling
 // a storage AK to JSON.
 type serializedAK struct {
-	Name       string        `json:"name"`
-	Type       tpmObjectType `json:"type"`
-	Data       []byte        `json:"data"`
-	Chain      [][]byte      `json:"chain"`
-	CreatedAt  time.Time     `json:"createdAt"`
-	MachineKey bool          `json:"machineKey,omitempty"`
+	Name      string        `json:"name"`
+	Type      tpmObjectType `json:"type"`
+	Data      []byte        `json:"data"`
+	Chain     [][]byte      `json:"chain"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // serializedKey is the struct used when marshaling
@@ -174,7 +159,6 @@ type serializedKey struct {
 	AttestedBy string        `json:"attestedBy"`
 	Chain      [][]byte      `json:"chain"`
 	CreatedAt  time.Time     `json:"createdAt"`
-	MachineKey bool          `json:"machineKey,omitempty"`
 }
 
 // keyForAK returns the key to use when storing an AK.

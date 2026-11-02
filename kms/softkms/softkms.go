@@ -8,8 +8,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"os"
-	"syscall"
 
 	"github.com/pkg/errors"
 
@@ -97,7 +95,7 @@ func (k *SoftKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, e
 	case req.SigningKey != "":
 		v, err := pemutil.Read(filename(req.SigningKey), opts...)
 		if err != nil {
-			return nil, toKMSError(err, "key not found")
+			return nil, err
 		}
 		sig, ok := v.(crypto.Signer)
 		if !ok {
@@ -142,7 +140,7 @@ func (k *SoftKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 func (k *SoftKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
 	v, err := pemutil.Read(filename(req.Name))
 	if err != nil {
-		return nil, toKMSError(err, "key not found")
+		return nil, err
 	}
 
 	switch vv := v.(type) {
@@ -182,7 +180,7 @@ func (k *SoftKMS) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Dec
 	case req.DecryptionKey != "":
 		v, err := pemutil.Read(filename(req.DecryptionKey), opts...)
 		if err != nil {
-			return nil, toKMSError(err, "key not found")
+			return nil, err
 		}
 		decrypter, ok := v.(crypto.Decrypter)
 		if !ok {
@@ -203,7 +201,7 @@ func (k *SoftKMS) LoadCertificate(req *apiv1.LoadCertificateRequest) (*x509.Cert
 
 	bundle, err := pemutil.ReadCertificateBundle(filename(req.Name))
 	if err != nil {
-		return nil, toKMSError(err, "certificate not found")
+		return nil, err
 	}
 
 	return bundle[0], nil
@@ -216,12 +214,7 @@ func (k *SoftKMS) LoadCertificateChain(req *apiv1.LoadCertificateChainRequest) (
 		return nil, fmt.Errorf("loadCertificateChainRequest 'name' cannot be empty")
 	}
 
-	chain, err := pemutil.ReadCertificateBundle(filename(req.Name))
-	if err != nil {
-		return nil, toKMSError(err, "certificate not found")
-	}
-
-	return chain, nil
+	return pemutil.ReadCertificateBundle(filename(req.Name))
 }
 
 func filename(s string) string {
@@ -237,15 +230,4 @@ func filename(s string) string {
 		}
 	}
 	return s
-}
-
-func toKMSError(err error, message string) error {
-	switch {
-	case errors.Is(err, os.ErrNotExist), errors.Is(err, syscall.ENOENT):
-		return apiv1.NotFoundError{
-			Message: message,
-		}
-	default:
-		return err
-	}
 }

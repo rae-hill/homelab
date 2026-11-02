@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -497,66 +496,6 @@ func TestKMS_SearchKeys_capi(t *testing.T) {
 			got, err := tt.kms.SearchKeys(tt.args.req)
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestKMS_CleanupCredentials_capi(t *testing.T) {
-	capiKMS := mustCAPIKMS(t)
-	// Use an expired certificate. withNoCleanup disables the t.Cleanup hooks
-	// that would otherwise call DeleteKey / DeleteCertificate on the test's
-	// behalf; CleanupCredentials is expected to remove both the certificate
-	// and its CNG private key, so a follow-up DeleteKey would fail with
-	// "not found". The test instead asserts that both have been removed.
-	chain := mustCreatePlatformCertificate(t, capiKMS,
-		withNoCleanup(),
-		withTemplateModifier(func(c *x509.Certificate) *x509.Certificate {
-			c.NotBefore = time.Now().Add(-time.Minute).Truncate(time.Second)
-			c.NotAfter = time.Now().Add(-time.Second).Truncate(time.Second)
-			return c
-		}))
-
-	// Sanity-check the precondition: both the certificate and the CNG key
-	// exist before CleanupCredentials runs.
-	_, err := capiKMS.LoadCertificate(&apiv1.LoadCertificateRequest{
-		Name: platformCertName,
-	})
-	require.NoError(t, err)
-	_, err = capiKMS.GetPublicKey(&apiv1.GetPublicKeyRequest{
-		Name: platformKeyName,
-	})
-	require.NoError(t, err)
-
-	type args struct {
-		req *apiv1.CleanupCredentialsRequest
-	}
-	tests := []struct {
-		name      string
-		kms       *KMS
-		args      args
-		assertion assert.ErrorAssertionFunc
-	}{
-		{"ok", capiKMS, args{&apiv1.CleanupCredentialsRequest{
-			Name: uri.New("kms", url.Values{
-				"issuer":     []string{chain[0].Issuer.CommonName},
-				"delete-key": []string{"true"},
-			}).String(),
-			RawSubject: chain[0].RawSubject,
-		}}, func(tt assert.TestingT, err error, i ...interface{}) bool {
-			_, loadErr := capiKMS.LoadCertificate(&apiv1.LoadCertificateRequest{
-				Name: platformCertName,
-			})
-			_, getErr := capiKMS.GetPublicKey(&apiv1.GetPublicKeyRequest{
-				Name: platformKeyName,
-			})
-			return assert.NoError(t, err) &&
-				assert.Error(t, loadErr, "certificate should be removed") &&
-				assert.Error(t, getErr, "CNG private key should be removed")
-		}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.assertion(t, tt.kms.CleanupCredentials(tt.args.req))
 		})
 	}
 }

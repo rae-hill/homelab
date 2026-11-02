@@ -62,14 +62,13 @@ const (
 	compareShift            = 16                                              // CERT_COMPARE_SHIFT
 	compareSHA1Hash         = 1                                               // CERT_COMPARE_SHA1_HASH
 	compareCertID           = 16                                              // CERT_COMPARE_CERT_ID
-	compareProp             = 5                                               // CERT_COMPARE_PROPERTY
 	findIssuerStr           = compareNameStrW<<compareShift | infoIssuerFlag  // CERT_FIND_ISSUER_STR_W
 	findIssuerName          = compareName<<compareShift | infoIssuerFlag      // CERT_FIND_ISSUER_NAME
 	findHash                = compareSHA1Hash << compareShift                 // CERT_FIND_HASH
-	findProperty            = compareProp << compareShift                     // CERT_FIND_PROPERTY
 	findCertID              = compareCertID << compareShift                   // CERT_FIND_CERT_ID
 
 	signatureKeyUsage = 0x80       // CERT_DIGITAL_SIGNATURE_KEY_USAGE
+	ncryptKeySpec     = 0xFFFFFFFF // CERT_NCRYPT_KEY_SPEC
 
 	BCRYPT_RSAPUBLIC_BLOB = "RSAPUBLICBLOB"
 	BCRYPT_ECCPUBLIC_BLOB = "ECCPUBLICBLOB"
@@ -80,35 +79,18 @@ const (
 	CRYPT_ACQUIRE_PREFER_NCRYPT_KEY_FLAG = uint32(0x00020000)
 	CRYPT_ACQUIRE_ONLY_NCRYPT_KEY_FLAG   = uint32(0x00040000)
 
-	// Keyset selection flags for CryptFindCertificateKeyProvInfo. Each flag
-	// restricts the search to that container; with neither flag the API
-	// searches both. We restrict explicitly so a machine-scoped certificate's
-	// key (in the local machine keyset, e.g. a CNG/PCP key created with
-	// NCRYPT_MACHINE_KEY_FLAG) is matched rather than missed.
-	CRYPT_FIND_USER_KEYSET_FLAG    = uint32(0x00000001)
-	CRYPT_FIND_MACHINE_KEYSET_FLAG = uint32(0x00000002)
-
-	// CRYPT_MACHINE_KEYSET marks a CRYPT_KEY_PROV_INFO as referencing a key in
-	// the local machine keyset rather than the current user's. It must be set
-	// in CRYPT_KEY_PROV_INFO.dwFlags when associating a certificate with a
-	// machine-scoped key (e.g. a TPM key created with NCRYPT_MACHINE_KEY_FLAG).
-	CRYPT_MACHINE_KEYSET = uint32(0x00000020)
-
 	CERT_ID_ISSUER_SERIAL_NUMBER = uint32(1)
 	CERT_ID_KEY_IDENTIFIER       = uint32(2)
 	CERT_ID_SHA1_HASH            = uint32(3)
 
 	CERT_KEY_PROV_INFO_PROP_ID = uint32(2)
-	CERT_FRIENDLY_NAME_PROP_ID = uint32(11)
-	CERT_DESCRIPTION_PROP_ID   = uint32(13)
 
 	CERT_NAME_STR_COMMA_FLAG = uint32(0x04000000)
 	CERT_SIMPLE_NAME_STR     = uint32(1)
 	CERT_X500_NAME_STR       = uint32(3)
 
-	LEGACY_KEY_SPEC_NONE = uint32(0)
-	AT_KEYEXCHANGE       = uint32(1)
-	AT_SIGNATURE         = uint32(2)
+	AT_KEYEXCHANGE = uint32(1)
+	AT_SIGNATURE   = uint32(2)
 
 	// Legacy CryptoAPI flags
 	bCryptPadPKCS1 = uint32(2)
@@ -171,7 +153,6 @@ var (
 	procCertFindCertificateInStore        = crypt32.MustFindProc("CertFindCertificateInStore")
 	procCryptFindCertificateKeyProvInfo   = crypt32.MustFindProc("CryptFindCertificateKeyProvInfo")
 	procCertGetCertificateContextProperty = crypt32.MustFindProc("CertGetCertificateContextProperty")
-	procCertSetCertificateContextProperty = crypt32.MustFindProc("CertSetCertificateContextProperty")
 	procCertStrToName                     = crypt32.MustFindProc("CertStrToNameW")
 )
 
@@ -208,18 +189,14 @@ type CERT_ID_SERIAL struct {
 	Serial   CERT_ISSUER_SERIAL_NUMBER
 }
 
-// CRYPT_KEY_PROV_INFO mirrors the wincrypt.h structure of the same name. The
-// container/provider names are LPWSTR pointers and the remaining members are
-// DWORDs, so they must be typed as such for the structure to be laid out
-// correctly when passed to CertSetCertificateContextProperty.
 type CRYPT_KEY_PROV_INFO struct {
-	pwszContainerName *uint16
-	pwszProvName      *uint16
-	dwProvType        uint32
-	dwFlags           uint32
-	cProvParam        uint32
-	rgProvParam       uintptr
-	dwKeySpec         uint32
+	pwszContainerName int
+	pwszProvName      int
+	dwProvType        int
+	dwFlags           int
+	cProvParam        int
+	rgProvParam       int
+	dwKeySpec         int
 }
 
 func errNoToStr(e uint32) string {
@@ -587,15 +564,10 @@ func findCertificateInStore(store windows.Handle, enc, findFlags, findType uint3
 	return (*windows.CertContext)(unsafe.Pointer(h)), nil
 }
 
-// cryptFindCertificateKeyProvInfo locates the private key matching the
-// certificate and records the association (CERT_KEY_PROV_INFO_PROP_ID) on the
-// certificate context. keysetFlags selects which key containers are searched
-// (CRYPT_FIND_USER_KEYSET_FLAG / CRYPT_FIND_MACHINE_KEYSET_FLAG); when zero the
-// API defaults to the current user's containers only.
-func cryptFindCertificateKeyProvInfo(certContext *windows.CertContext, keysetFlags uint32) error {
+func cryptFindCertificateKeyProvInfo(certContext *windows.CertContext) error {
 	r, _, err := procCryptFindCertificateKeyProvInfo.Call(
 		uintptr(unsafe.Pointer(certContext)),
-		uintptr(CRYPT_ACQUIRE_PREFER_NCRYPT_KEY_FLAG|keysetFlags),
+		uintptr(CRYPT_ACQUIRE_PREFER_NCRYPT_KEY_FLAG),
 		0,
 	)
 
@@ -607,48 +579,6 @@ func cryptFindCertificateKeyProvInfo(certContext *windows.CertContext, keysetFla
 		return fmt.Errorf("private key association failed: %v", errNoToStr(uint32(r)))
 	}
 
-	return nil
-}
-
-// setCertificateKeyProvInfo explicitly associates the certificate with a named
-// private key by attaching a CERT_KEY_PROV_INFO_PROP_ID property to the
-// certificate context. Unlike cryptFindCertificateKeyProvInfo, it does not
-// enumerate key containers to discover the key, so it works for keys that
-// discovery cannot locate — notably machine-scoped Microsoft Platform Crypto
-// Provider (TPM) keys, which live in the local machine keyset
-// (CRYPT_MACHINE_KEYSET) that CryptFindCertificateKeyProvInfo does not search.
-//
-// containerName is the CNG key (container) name, provName the storage provider
-// (e.g. "Microsoft Platform Crypto Provider"), dwFlags carries keyset flags
-// such as CRYPT_MACHINE_KEYSET, and dwKeySpec is the key spec (non-legacy CNG keys use
-// LEGACY_KEY_SPEC_NONE).
-func setCertificateKeyProvInfo(certContext *windows.CertContext, containerName, provName string, dwFlags, dwKeySpec uint32) error {
-	container, err := windows.UTF16PtrFromString(containerName)
-	if err != nil {
-		return fmt.Errorf("invalid key container name %q: %w", containerName, err)
-	}
-	var provider *uint16
-	if provName != "" {
-		if provider, err = windows.UTF16PtrFromString(provName); err != nil {
-			return fmt.Errorf("invalid provider name %q: %w", provName, err)
-		}
-	}
-
-	info := CRYPT_KEY_PROV_INFO{
-		pwszContainerName: container,
-		pwszProvName:      provider,
-		dwProvType:        0, // 0 selects a CNG (NCrypt) storage provider
-		dwFlags:           dwFlags,
-		dwKeySpec:         dwKeySpec,
-	}
-
-	// CertSetCertificateContextProperty copies the structure and the strings it
-	// references into the certificate context, and info (which holds the only
-	// references to container/provider) stays live through the call, so no
-	// runtime.KeepAlive is needed — matching the other cert property helpers.
-	if err := certSetCertificateContextProperty(certContext, CERT_KEY_PROV_INFO_PROP_ID, uintptr(unsafe.Pointer(&info))); err != nil {
-		return fmt.Errorf("CertSetCertificateContextProperty(CERT_KEY_PROV_INFO_PROP_ID) failed: %w", err)
-	}
 	return nil
 }
 
@@ -701,102 +631,6 @@ func cryptFindCertificateKeyContainerName(certContext *windows.CertContext) (str
 	}
 
 	return "", nil
-}
-
-func certSetCertificateContextProperty(certContext *windows.CertContext, propID uint32, pvData uintptr) error {
-	r0, _, err := procCertSetCertificateContextProperty.Call(
-		uintptr(unsafe.Pointer(certContext)),
-		uintptr(propID),
-		0,
-		pvData,
-	)
-
-	if r0 == 0 {
-		return err
-	}
-	return nil
-}
-
-func cryptSetCertificateFriendlyName(certContext *windows.CertContext, val string) error {
-	data := CRYPTOAPI_BLOB{
-		len: uint32(len(val)+1) * 2,
-		data: uintptr(unsafe.Pointer(wide(val))),
-	}
-
-	return certSetCertificateContextProperty(certContext, CERT_FRIENDLY_NAME_PROP_ID, uintptr(unsafe.Pointer(&data)))
-}
-
-func cryptSetCertificateDescription(certContext *windows.CertContext, val string) error {
-	data := CRYPTOAPI_BLOB{
-		len: uint32(len(val)+1) * 2,
-		data: uintptr(unsafe.Pointer(wide(val))),
-	}
-
-	return certSetCertificateContextProperty(certContext, CERT_DESCRIPTION_PROP_ID, uintptr(unsafe.Pointer(&data)))
-}
-
-func certGetCertificateContextProperty(certContext *windows.CertContext, propID uint32, pvData *byte, pcbData *uint32) error {
-	r0, _, err := procCertGetCertificateContextProperty.Call(
-		uintptr(unsafe.Pointer(certContext)),
-		uintptr(propID),
-		uintptr(unsafe.Pointer(pvData)),
-		uintptr(unsafe.Pointer(pcbData)),
-	)
-	if r0 == 0 {
-		return err
-	}
-	return nil
-}
-
-func cryptFindCertificateFriendlyName(certContext *windows.CertContext) (string, error) {
-	var size uint32
-
-	err := certGetCertificateContextProperty(certContext, CERT_FRIENDLY_NAME_PROP_ID, nil, &size)
-	if err != nil {
-		if errno, ok := err.(windows.Errno); ok && uint32(errno) == CRYPT_E_NOT_FOUND {
-			return "", nil
-		}
-
-		return "", err
-	}
-
-	if size == 0 {
-		return "", nil
-	}
-
-	buf := make([]byte, size)
-	err = certGetCertificateContextProperty(certContext, CERT_FRIENDLY_NAME_PROP_ID, &buf[0], &size)
-	if err != nil {
-		return "", err
-	}
-
-	uc := bytes.ReplaceAll(buf, []byte{0x00}, []byte(""))
-	return string(uc), nil
-}
-
-func cryptFindCertificateDescription(certContext *windows.CertContext) (string, error) {
-	var size uint32
-
-	err := certGetCertificateContextProperty(certContext, CERT_DESCRIPTION_PROP_ID, nil, &size)
-	if err != nil {
-		if errno, ok := err.(windows.Errno); ok && uint32(errno) == CRYPT_E_NOT_FOUND {
-			return "", nil
-		}
-
-		return "", err
-	}
-	if size == 0 {
-		return "", nil
-	}
-
-	buf := make([]byte, size)
-	err = certGetCertificateContextProperty(certContext, CERT_DESCRIPTION_PROP_ID, &buf[0], &size)
-	if err != nil {
-		return "", err
-	}
-
-	uc := bytes.ReplaceAll(buf, []byte{0x00}, []byte(""))
-	return string(uc), nil
 }
 
 func certStrToName(x500Str string) ([]byte, error) {
