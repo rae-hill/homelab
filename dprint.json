@@ -31,7 +31,8 @@
     ".pnp.cjs",
     ".pnp.loader.mjs",
     "repos/*",
-    "**/*.svg"
+    "**/*.svg",
+    "**/routeTree.gen.ts"
   ],
   "plugins": [
     "https://plugins.dprint.dev/typescript-0.95.15.wasm",

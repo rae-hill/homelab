@@ -1,0 +1,6 @@
+# TanStack Router devtools temp files
+.tanstack/
+
+# local env overrides
+.env.local
+.env.*.local

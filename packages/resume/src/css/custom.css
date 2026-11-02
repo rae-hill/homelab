@@ -1,0 +1,86 @@
+/**
+ * Global CSS for the resume SPA. Only CSS-only constructs live here now: design-token
+ * custom properties, the print `@page` footer rules, the parallax backdrop classes, and
+ * the `:has()` selector taming the third-party confetti iframe. Everything else (the
+ * html/body reset, scrollbar-gutter, fonts, etc.) lives in the Chakra theme.
+ */
+
+/* ---- Custom properties the app/print styles depend on -------------------------------- */
+
+:root {
+  /* Resume tag palette (category hues + fixed dark text), theme-independent. */
+  --rh-resume-tag-text-color: rgba(0, 0, 0, 0.9);
+  --rh-resume-tag-colors-red: #ff9d9d;
+  --rh-resume-tag-colors-orange: #ffc5aa;
+  --rh-resume-tag-colors-yellow: #eef8cd;
+  --rh-resume-tag-colors-green: #bbf1d2;
+  --rh-resume-tag-colors-blue: #cfebff;
+  --rh-resume-tag-colors-violet: #c5b3d3;
+  --rh-resume-tag-colors-brown: #dccfc0;
+  --rh-resume-tag-colors-teal: #b9ede4;
+  --rh-resume-tag-colors-pink: #f6c9de;
+
+  /* Glass overlay tint over the parallax backdrop (light = transparent). */
+  --background-blur-overlay-color: rgba(255, 255, 255, 0);
+}
+
+html[data-theme="dark"] {
+  --background-blur-overlay-color: rgba(36, 37, 38, 0.25);
+}
+
+/* ---- Parallax cherry-blossom backdrop + glass overlay -------------------------------- */
+
+.home-page-content__bg {
+  background: url(/img/cherry-blossom.webp);
+  background-size: cover;
+}
+
+.home-page-content__bg-glass {
+  backdrop-filter: blur(4px);
+  background-color: var(--background-blur-overlay-color);
+  transition-property: background-color;
+  transition-duration: 1.5s;
+  transition-timing-function: ease-in-out;
+}
+
+/* ---- Confetti vendor iframe z-index -------------------------------------------------- */
+
+.confetties-iframe,
+div:has(.confetties-iframe) {
+  z-index: var(--chakra-z-index-docked) !important;
+}
+
+/* ---- Print --------------------------------------------------------------------------- */
+
+@page :right {
+  @bottom-center {
+    content: "Last updated: " var(--chakra-z-index-todays-date) ""
+      var(--chakra-z-index-print-footer-revision)
+      ".  For an up to date version, visit https://rae-hill.dev/resume";
+    font-family: "Times New Roman", Times, serif;
+    font-size: 6pt;
+    color: var(--ifm-color-scheme);
+  }
+}
+
+@page :left {
+  @bottom-center {
+    content: "Last updated: " var(--chakra-z-index-todays-date) ""
+      var(--chakra-z-index-print-footer-revision)
+      ".  For an up to date version, visit https://rae-hill.dev/resume";
+    font-family: "Times New Roman", Times, serif;
+    font-size: 6pt;
+    color: var(--ifm-color-scheme);
+  }
+}
+
+@media print {
+  div:has(.confetties-iframe) {
+    display: none !important;
+  }
+
+  body {
+    background-color: var(--chakra-colors-bg);
+    print-color-adjust: exact !important;
+  }
+}
