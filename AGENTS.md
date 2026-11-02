@@ -90,6 +90,27 @@ Never edit or reformat anything under `./repos/` (read-only vendored subtrees). 
 refresh workflow — including pinning app subtrees to the tag nixpkgs 26.05 actually builds — see
 the `effect-services` skill → "Keeping Vendored Subtrees Up To Date".
 
+### Vendored App Source — Prefer Over Web Docs
+
+`./repos/` also vendors **upstream application source**, pinned to the exact tags nixpkgs builds.
+When investigating how vendored software actually behaves (CLI flags, API semantics, validation
+logic, error paths), **read the source** instead of looking up web documentation — docs frequently
+describe a different version than the one deployed, and sometimes lie outright. Fall back to web
+docs only for upstreams not vendored here or for tutorial-style material, and corroborate against
+the pinned tag's source before trusting them.
+
+| Question about                                                                      | Resolves to                                                                             |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| step-ca server behavior (provisioners, ACME challenges, attestation, policy, renew) | `./repos/step-ca/` (smallstep/certificates, tag `v0.29.0` = nixpkgs-26.05)              |
+| step CLI behavior (flags, issuance/renewal flows, KMS/attestation handling)         | `./repos/step-cli/` (smallstep/cli, tag `v0.30.2` = nixpkgs-26.05)                      |
+| go.step.sm/crypto (KMS drivers, YubiKey PIV, pemutil, x509util)                     | `./repos/crypto/` (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins v0.74.0) |
+| Kanidm server/CLI behavior                                                          | `./repos/kanidm/`                                                                       |
+| Technitium DNS behavior                                                             | `./repos/technitium-dnsserver/`                                                         |
+
+If a needed upstream is not vendored yet, add it as a subtree (see the `effect-services` skill →
+"Adding a New Vendored Subtree") pinned to the tag nixpkgs builds, rather than relying on web
+lookups.
+
 ### Hosts
 
 | Name        | Role                                                                              |
@@ -163,12 +184,13 @@ git commit --no-verify -m "..."
 
 ## Skill Index (detailed, loads on demand)
 
-| Skill              | Use when                                                                           |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| `validation`       | Running checks, fixing lint/type/test failures, doing anything with Nix evaluation |
-| `adding-endpoints` | Adding/modifying homelab-api endpoints, handlers, schemas, tests                   |
-| `effect-services`  | Writing Effect services/layers, using vendored `./repos/` references               |
-| `frontend`         | Editing `packages/homelab-frontend` (Astro, SolidJS, nanostores)                   |
-| `nix-hashes`       | `yarn.lock` changed or "fetchYarnDeps hash is out of date" build error             |
-| `nix-services`     | systemd services, OCI containers, or failure-notifs in `nix-config/`               |
-| `port-assignments` | Adding/changing ports, firewall rules, or `service-registry.nix`                   |
+| Skill                 | Use when                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `validation`          | Running checks, fixing lint/type/test failures, doing anything with Nix evaluation                                         |
+| `adding-endpoints`    | Adding/modifying homelab-api endpoints, handlers, schemas, tests                                                           |
+| `adding-client-certs` | Adding step-ca client-cert uses: hand-coded provisioners, UUID extension, serial→user maps, sops secrets, issuance/renewal |
+| `effect-services`     | Writing Effect services/layers, using vendored `./repos/` references                                                       |
+| `frontend`            | Editing `packages/homelab-frontend` (Astro, SolidJS, nanostores)                                                           |
+| `nix-hashes`          | `yarn.lock` changed or "fetchYarnDeps hash is out of date" build error                                                     |
+| `nix-services`        | systemd services, OCI containers, or failure-notifs in `nix-config/`                                                       |
+| `port-assignments`    | Adding/changing ports, firewall rules, or `service-registry.nix`                                                           |
