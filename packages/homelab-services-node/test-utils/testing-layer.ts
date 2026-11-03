@@ -1,4 +1,4 @@
-import { NodeFileSystem } from "@effect/platform-node"
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import { Config, ConfigProvider, Layer, Option, Schema } from "effect"
 import { Config as ServicesConfig, Schemas, Services } from "homelab-services"
 import * as path from "node:path"
@@ -7,47 +7,45 @@ import { DPoPProofBuilderServiceLive } from "./dpop.js"
 
 const privateDir = path.resolve(import.meta.dirname, "..", "private")
 
-const TestConfigProvider = Layer.setConfigProvider(
-  ConfigProvider.fromMap(
-    new Map([
-      ["HOMELAB_ORIGIN_URL", "http://localhost:3000"],
-      ["HOMELAB_SECRET_FILE", path.join(privateDir, "hmac-secret")],
-      ["TOKEN_ISSUER_PRIVATE_KEY_PATH", path.join(privateDir, "jwk.json")],
-      ["TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH", path.join(privateDir, "private-key-secret")],
-      ["TOKEN_ISSUER_PUBLIC_KEY_PATH", path.join(privateDir, "jwk.pub.json")],
-      ["API_KEYS_FILE", path.join(privateDir, "api-keys")],
-      ["FEATURE_FLAGS", "*"],
-      ["ROOT_CERT_DER", path.join(privateDir, "root.crt")],
-      ["INTERMEDIATE_CERT_DER", path.join(privateDir, "intermediate.crt")],
-      ["ROOT_CERT_CRT", path.join(privateDir, "root.crt")],
-      ["INTERMEDIATE_CERT_CRT", path.join(privateDir, "intermediate.crt")],
-      ["KANIDM_OPENID_PROVIDER_URL", "https://kanidm.test/oauth2/openid/test/.well-known/openid-configuration"],
-      ["SERIAL_NUMBERS_FILE", path.join(privateDir, "serial-numbers.json")],
-    ]),
-  ),
+const TestConfigProvider = ConfigProvider.layer(
+  ConfigProvider.fromUnknown({
+    HOMELAB_ORIGIN_URL: "http://localhost:3000",
+    HOMELAB_SECRET_FILE: path.join(privateDir, "hmac-secret"),
+    TOKEN_ISSUER_PRIVATE_KEY_PATH: path.join(privateDir, "jwk.json"),
+    TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH: path.join(privateDir, "private-key-secret"),
+    TOKEN_ISSUER_PUBLIC_KEY_PATH: path.join(privateDir, "jwk.pub.json"),
+    API_KEYS_FILE: path.join(privateDir, "api-keys"),
+    FEATURE_FLAGS: "*",
+    ROOT_CERT_DER: path.join(privateDir, "root.crt"),
+    INTERMEDIATE_CERT_DER: path.join(privateDir, "intermediate.crt"),
+    ROOT_CERT_CRT: path.join(privateDir, "root.crt"),
+    INTERMEDIATE_CERT_CRT: path.join(privateDir, "intermediate.crt"),
+    KANIDM_OPENID_PROVIDER_URL: "https://kanidm.test/oauth2/openid/test/.well-known/openid-configuration",
+    SERIAL_NUMBERS_FILE: path.join(privateDir, "serial-numbers.json"),
+  }),
 )
 
 const TestEnvLive = Layer.effect(
   ServicesConfig.Env.Env,
   Config.all({
-    originUrl: Schema.Config("HOMELAB_ORIGIN_URL", Schema.URL),
-    tokenIssuerPrivateKeyPath: Config.option(Config.string("TOKEN_ISSUER_PRIVATE_KEY_PATH")),
-    tokenIssuerPrivateKeySecretFile: Config.option(Config.string("TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH")),
-    tokenIssuerPublicKeyPath: Config.option(Config.string("TOKEN_ISSUER_PUBLIC_KEY_PATH")),
-    hmacSecretFilePath: Config.option(Config.string("HOMELAB_SECRET_FILE")),
-    featureFlags: Schema.Config("FEATURE_FLAGS", Schemas.FeatureFlags.FeatureFlagsSetSchema),
-    kanidmOidcUrl: Schema.Config("KANIDM_OPENID_PROVIDER_URL", Schema.URL),
-    caUrl: Config.withDefault(Schema.Config("CA_URL", Schema.URL), new URL("https://ca.plato-splunk.media")),
-    acmeDirectoryPath: Config.withDefault(Config.string("ACME_DIRECTORY_PATH"), "/acme/acme/directory"),
-    hardwareBound: Config.withDefault(Config.boolean("ACME_HARDWARE_BOUND"), true),
-    keyType: Config.withDefault(Config.string("ACME_KEY_TYPE"), "ECSECPrimeRandom"),
-    keySize: Config.withDefault(Config.integer("ACME_KEY_SIZE"), 384),
-    apiKeysFilePath: Config.string("API_KEYS_FILE"),
-    rootCertDerPath: Config.string("ROOT_CERT_DER"),
-    intermediateCertDerPath: Config.string("INTERMEDIATE_CERT_DER"),
-    rootCertCrtPath: Config.string("ROOT_CERT_CRT"),
-    intermediateCertCrtPath: Config.string("INTERMEDIATE_CERT_CRT"),
-    serialNumbersFile: Config.option(Config.string("SERIAL_NUMBERS_FILE")),
+    originUrl: Config.schema(Schema.URLFromString, "HOMELAB_ORIGIN_URL"),
+    tokenIssuerPrivateKeyPath: Config.option(Config.String("TOKEN_ISSUER_PRIVATE_KEY_PATH")),
+    tokenIssuerPrivateKeySecretFile: Config.option(Config.String("TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH")),
+    tokenIssuerPublicKeyPath: Config.option(Config.String("TOKEN_ISSUER_PUBLIC_KEY_PATH")),
+    hmacSecretFilePath: Config.option(Config.String("HOMELAB_SECRET_FILE")),
+    featureFlags: Config.schema(Schemas.FeatureFlags.FeatureFlagsSetSchema, "FEATURE_FLAGS"),
+    kanidmOidcUrl: Config.schema(Schema.URLFromString, "KANIDM_OPENID_PROVIDER_URL"),
+    caUrl: Config.withDefault(Config.schema(Schema.URLFromString, "CA_URL"), new URL("https://ca.plato-splunk.media")),
+    acmeDirectoryPath: Config.withDefault(Config.String("ACME_DIRECTORY_PATH"), "/acme/acme/directory"),
+    hardwareBound: Config.withDefault(Config.Boolean("ACME_HARDWARE_BOUND"), true),
+    keyType: Config.withDefault(Config.String("ACME_KEY_TYPE"), "ECSECPrimeRandom"),
+    keySize: Config.withDefault(Config.Int("ACME_KEY_SIZE"), 384),
+    apiKeysFilePath: Config.String("API_KEYS_FILE"),
+    rootCertDerPath: Config.String("ROOT_CERT_DER"),
+    intermediateCertDerPath: Config.String("INTERMEDIATE_CERT_DER"),
+    rootCertCrtPath: Config.String("ROOT_CERT_CRT"),
+    intermediateCertCrtPath: Config.String("INTERMEDIATE_CERT_CRT"),
+    serialNumbersFile: Config.option(Config.String("SERIAL_NUMBERS_FILE")),
   }),
 ).pipe(Layer.provide(TestConfigProvider))
 

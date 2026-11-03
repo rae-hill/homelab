@@ -33,7 +33,7 @@ export interface DPoPTokenCreatorServiceDef {
 }
 
 export class DPoPTokenCreatorService
-  extends Context.Tag(DPoPTokenCreatorServiceId)<DPoPTokenCreatorService, DPoPTokenCreatorServiceDef>()
+  extends Context.Service<DPoPTokenCreatorService, DPoPTokenCreatorServiceDef>()(DPoPTokenCreatorServiceId)
 {
 }
 
@@ -83,7 +83,7 @@ class DPoPTokenCreatorServiceImpl implements DPoPTokenCreatorServiceDef {
   ) {}
 
   createToken(options: CreateDPoPTokenOptions) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const ath = options.ath ?? (options.accessToken !== undefined
         ? nodeCrypto.createHash("sha256").update(options.accessToken, "ascii").digest("base64url")
         : undefined)

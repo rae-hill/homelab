@@ -13,7 +13,9 @@ export interface AcmeProfileServiceDef {
   ): Effect.Effect<Schemas.RootPayload.RootPayloadWire, ApiErrors.HttpApiEncodeError>
 }
 
-export class AcmeProfileService extends Context.Tag(AcmeProfileServiceId)<AcmeProfileService, AcmeProfileServiceDef>() {
+export class AcmeProfileService
+  extends Context.Service<AcmeProfileService, AcmeProfileServiceDef>()(AcmeProfileServiceId)
+{
 }
 
 /** {@inheritDoc AcmeProfileServiceDef.acmeProfile} */

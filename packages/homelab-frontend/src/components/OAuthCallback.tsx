@@ -1,5 +1,5 @@
-import { FetchHttpClient } from "@effect/platform"
-import { Effect, Layer } from "effect"
+import { ConfigProvider, Effect, Layer } from "effect"
+import { FetchHttpClient } from "effect/http"
 import { onMount } from "solid-js"
 import * as Lib from "../lib/index.js"
 import { FullPageSpinner } from "./FullPageSpinner/index.js"
@@ -21,7 +21,7 @@ export function OAuthCallback() {
     Effect.runPromise(
       program.pipe(
         Effect.provide(RuntimeLayer),
-        Effect.withConfigProvider(Lib.Env.AstroConfigProvider),
+        Effect.provideService(ConfigProvider.ConfigProvider, Lib.Env.AstroConfigProvider),
       ),
     ).catch((err) => {
       console.error("[OAuthCallback] error:", err)

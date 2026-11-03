@@ -23,7 +23,9 @@ export interface WifiProfileServiceDef {
   ): Effect.Effect<Schemas.RootPayload.RootPayloadWire, WifiConfigGenerationError | ApiErrors.HttpApiEncodeError>
 }
 
-export class WifiProfileService extends Context.Tag(WifiProfileServiceId)<WifiProfileService, WifiProfileServiceDef>() {
+export class WifiProfileService
+  extends Context.Service<WifiProfileService, WifiProfileServiceDef>()(WifiProfileServiceId)
+{
 }
 
 /** {@inheritDoc WifiProfileServiceDef.wpaPersonalWifi} */

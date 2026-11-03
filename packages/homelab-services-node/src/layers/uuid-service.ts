@@ -18,7 +18,7 @@ class UuidServiceImpl implements Services.UuidService.UuidServiceDef {
 
       return yield* pipe(
         uuid,
-        Schema.decode(Services.UuidService.UUIDSchema),
+        Schema.decodeEffect(Services.UuidService.UUIDSchema),
         Effect.orDie,
       )
     })

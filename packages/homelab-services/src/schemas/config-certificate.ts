@@ -2,10 +2,10 @@ import { Schema } from "effect"
 import { GenericPayloadSchema } from "./payload-generic.js"
 
 export const CertificateConfigSchema = GenericPayloadSchema.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       PayloadCertificateFileName: Schema.String,
-    }),
+    },
   ),
 )
 

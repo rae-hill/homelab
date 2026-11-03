@@ -11,5 +11,7 @@ export interface CertProfileServiceDef {
   readonly certProfile: Effect.Effect<Schemas.RootPayload.RootPayloadWire, ApiErrors.HttpApiEncodeError>
 }
 
-export class CertProfileService extends Context.Tag(CertProfileServiceId)<CertProfileService, CertProfileServiceDef>() {
+export class CertProfileService
+  extends Context.Service<CertProfileService, CertProfileServiceDef>()(CertProfileServiceId)
+{
 }

@@ -11,8 +11,10 @@ const intermediateArgs = (
   format: "crt" | "der" = "der",
 ): Homelab.CertEndpoints.Intermediate.IntermediateCertHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {},
-  path: { format },
+  params: { format },
 })
 
 const authorizedIdentity = new Identity.OIDCIdentity(

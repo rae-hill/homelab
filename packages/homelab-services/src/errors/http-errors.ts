@@ -1,5 +1,4 @@
-import { HttpApiError, HttpApiSchema } from "@effect/platform"
-import { Effect, ParseResult, Schema } from "effect"
+import { Effect, Schema, SchemaIssue } from "effect"
 import type { Identity } from "../identity.js"
 import { Operation } from "../operation.js"
 import type { ResourceURIs } from "../resource-uris.js"
@@ -8,6 +7,15 @@ import { ResourceURISchema } from "../schemas/resource-uris.js"
 
 export const BaseHttpErrorSchema = Schema.Struct({
   message: Schema.String,
+})
+
+/**
+ * A single schema issue, matching the shape produced by
+ * `SchemaIssue.makeFormatterStandardSchemaV1`.
+ */
+export const Issue = Schema.Struct({
+  message: Schema.String,
+  path: Schema.Array(Schema.String),
 })
 
 export const NotFoundReasonsSchema = Schema.Literal(
@@ -20,17 +28,17 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
     ...BaseHttpErrorSchema.fields,
     reason: NotFoundReasonsSchema,
   },
-  HttpApiSchema.annotations({
-    status: 404,
+  {
+    httpApiStatus: 404,
     description: "An error raised when one or more aspects of the request are not found",
-  }),
+  },
 ) {}
 
-export const BadRequestReasonsSchema = Schema.Literal(
+export const BadRequestReasonsSchema = Schema.Literals([
   "eap-client-username-required",
   "acme-invalid-client-identifier",
   "dns-ssid-required",
-)
+])
 
 export class BadRequest extends Schema.TaggedError<BadRequest>()(
   "BadRequest",
@@ -38,34 +46,34 @@ export class BadRequest extends Schema.TaggedError<BadRequest>()(
     ...BaseHttpErrorSchema.fields,
     reason: BadRequestReasonsSchema,
   },
-  HttpApiSchema.annotations({
-    status: 400,
+  {
+    httpApiStatus: 400,
     description: "An error raised when one or more aspects of the request are not valid",
-  }),
+  },
 ) {}
 
 export class InternalServerError extends Schema.TaggedError<InternalServerError>()(
   "InternalServerError",
   { ...BaseHttpErrorSchema.fields, error: OptionalUnknown },
-  HttpApiSchema.annotations({
-    status: 500,
+  {
+    httpApiStatus: 500,
     description: "An error raised when an unrecoverable error has occurred and warrants investigation",
-  }),
+  },
 ) {}
 
 export class NotImplemented extends Schema.TaggedError<NotImplemented>()(
   "NotImplemented",
   {
     ...BaseHttpErrorSchema.fields,
-    internalMethod: Schema.String.pipe(Schema.optionalWith({ exact: true })),
+    internalMethod: Schema.String.pipe(Schema.optionalKey),
   },
-  HttpApiSchema.annotations({
-    status: 501,
+  {
+    httpApiStatus: 501,
     description: "An error raised when an aspect of the request handler is not yet implemented",
-  }),
+  },
 ) {}
 
-export const AuthenticationErrorReasonsSchema = Schema.Literal(
+export const AuthenticationErrorReasonsSchema = Schema.Literals([
   "not-authenticated",
   "failed-to-verify",
   "invalid-credential",
@@ -73,7 +81,7 @@ export const AuthenticationErrorReasonsSchema = Schema.Literal(
   "invalid-claims",
   "signature-validation-failed",
   "unrecognized-issuer",
-)
+])
 
 export class AuthenticationError extends Schema.TaggedError<AuthenticationError>()(
   "AuthenticationError",
@@ -83,21 +91,21 @@ export class AuthenticationError extends Schema.TaggedError<AuthenticationError>
     reason: AuthenticationErrorReasonsSchema,
     error: OptionalUnknown,
   },
-  HttpApiSchema.annotations({
-    status: 401,
+  {
+    httpApiStatus: 401,
     description: "An error raised when an aspect of the request's authentication is invalid.",
-  }),
+  },
 ) {
 }
 
 export class AuthorizationError extends Schema.TaggedError<AuthorizationError>()(
   "AuthorizationError",
-  { ...BaseHttpErrorSchema.fields, resource: ResourceURISchema, operation: Schema.Enums(Operation) },
-  HttpApiSchema.annotations({
-    status: 403,
+  { ...BaseHttpErrorSchema.fields, resource: ResourceURISchema, operation: Schema.Enum(Operation) },
+  {
+    httpApiStatus: 403,
     description:
       "An error raised when the authenticated caller of a request is not authorized to perform an aspect of the request.",
-  }),
+  },
 ) {
   static fromFGA(identity: Identity, operation: Operation, resource: ResourceURIs): AuthorizationError {
     return new AuthorizationError({
@@ -119,19 +127,24 @@ export class AuthorizationError extends Schema.TaggedError<AuthorizationError>()
 export class HttpApiEncodeError extends Schema.TaggedError<HttpApiEncodeError>()(
   "HttpApiEncodeError",
   {
-    issues: Schema.Array(HttpApiError.Issue),
+    issues: Schema.Array(Issue),
     message: Schema.String,
   },
-  HttpApiSchema.annotations({
-    status: 500,
+  {
+    httpApiStatus: 500,
     description: "There was a problem serializing the response",
-  }),
+  },
 ) {
-  static fromParseError(error: ParseResult.ParseError): Effect.Effect<never, HttpApiEncodeError> {
-    return ParseResult.ArrayFormatter.formatError(error).pipe(
-      Effect.zip(ParseResult.TreeFormatter.formatError(error)),
-      Effect.map(([issues, message]) => new HttpApiEncodeError({ issues, message })),
-      Effect.andThen(Effect.fail),
+  static fromSchemaError(error: Schema.SchemaError): Effect.Effect<never, HttpApiEncodeError> {
+    const formatted = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue)
+    return Effect.fail(
+      new HttpApiEncodeError({
+        issues: formatted.issues.map((issue) => ({
+          message: issue.message,
+          path: (issue.path ?? []).map(String),
+        })),
+        message: SchemaIssue.makeFormatterDefault()(error.issue),
+      }),
     )
   }
 }

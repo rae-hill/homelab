@@ -31,11 +31,11 @@ describe("GET /mobile-config/wifi/:ssid/:encryption/_download", () => {
 
         const result = yield* Effect.flip(
           client["mobile-config"]["wifi-download"]({
-            path: {
+            params: {
               ssid: "abcd",
               encryption: "WPA2",
             },
-            urlParams: {
+            query: {
               enterpriseClientType: "None",
               password: "1234",
               disableMACRandomization: false,
@@ -62,18 +62,18 @@ describe("GET /mobile-config/wifi/:ssid/:encryption/_download", () => {
         const client = yield* makeApiClient
 
         const res = yield* Effect.flip(client["mobile-config"]["wifi-download"]({
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA2",
           },
-          urlParams: {
+          query: {
             enterpriseClientType: "PEAP",
             username: "foobar",
             password: "1234",
             disableMACRandomization: false,
             includeEthernetProfile: false,
           },
-          withResponse: true,
+          responseMode: "decoded-and-response",
           headers: {},
         }))
 
@@ -101,16 +101,16 @@ describe("GET /mobile-config/wifi/:ssid/:encryption/_download", () => {
         })
 
         const [, res] = yield* client["mobile-config"]["wifi-download"]({
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA2",
           },
-          urlParams: {
+          query: {
             enterpriseClientType: "None",
             password: "1234",
             disableMACRandomization: false,
           },
-          withResponse: true,
+          responseMode: "decoded-and-response",
           headers: {
             dpop: newDpopProof,
             authorization: `${token_type} ${access_token}`,
@@ -128,18 +128,18 @@ describe("GET /mobile-config/wifi/:ssid/:encryption/_download", () => {
         const client = yield* makeApiClient
 
         const [, res] = yield* client["mobile-config"]["wifi-download"]({
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA2",
           },
-          urlParams: {
+          query: {
             enterpriseClientType: "PEAP",
             username: "guest",
             password: "1234",
             disableMACRandomization: false,
             includeEthernetProfile: false,
           },
-          withResponse: true,
+          responseMode: "decoded-and-response",
           headers: {},
         })
 

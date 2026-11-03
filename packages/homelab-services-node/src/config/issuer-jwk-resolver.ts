@@ -1,5 +1,5 @@
-import { FetchHttpClient, FileSystem } from "@effect/platform"
-import { Data, Effect, flow, HashMap, Layer, Option, Schema, Tuple } from "effect"
+import { Effect, FileSystem, flow, HashMap, Layer, Option, Schema, Tuple } from "effect"
+import { FetchHttpClient } from "effect/http"
 import { Config, Schemas, StartupErrors, Utils } from "homelab-services"
 import type { JWTVerifyGetKey } from "jose"
 import { createLocalJWKSet, createRemoteJWKSet, customFetch, flattenedDecrypt, importJWK } from "jose"
@@ -26,11 +26,11 @@ export const IssuerJwkResolverLive = Layer.effect(
     )
 
     const localPrivateJwk = yield* privateKeyPath.pipe(
-      Option.zipWith(localPrivateJwkSecret, Data.tuple),
+      Option.zipWith(localPrivateJwkSecret, Tuple.make),
       Option.map(
         ([privateKeyPath, jwkSecret]) =>
           fs.readFile(privateKeyPath).pipe(
-            Effect.andThen(Schema.decode(Schemas.OAuth.JWEFromUint8Array)),
+            Effect.andThen(Schema.decodeEffect(Schemas.OAuth.JWEFromUint8Array)),
             Effect.andThen((localPrivateJwkEnrypted) =>
               Effect.tryPromise({
                 try() {
@@ -50,7 +50,7 @@ export const IssuerJwkResolverLive = Layer.effect(
             ),
             Effect.map((_) => _.plaintext),
             Effect.andThen(
-              Schema.decode(Schemas.OAuth.JWKFromUint8Array),
+              Schema.decodeEffect(Schemas.OAuth.JWKFromUint8Array),
             ),
           ),
       ),
@@ -62,7 +62,7 @@ export const IssuerJwkResolverLive = Layer.effect(
         flow(
           fs.readFile,
           Effect.andThen(
-            Schema.decode(Schemas.OAuth.JWKFromUint8Array),
+            Schema.decodeEffect(Schemas.OAuth.JWKFromUint8Array),
           ),
         ),
       ),
@@ -70,7 +70,7 @@ export const IssuerJwkResolverLive = Layer.effect(
     )
 
     const localPrivateKey = yield* localPrivateJwk.pipe(
-      Option.zipWith(localPublicJwk, Data.tuple),
+      Option.zipWith(localPublicJwk, Tuple.make),
       Option.map(
         ([localPrivateJwk, localPublicJwk]) =>
           Effect.tryPromise({
@@ -83,10 +83,11 @@ export const IssuerJwkResolverLive = Layer.effect(
               })
             },
           }).pipe(
-            Effect.filterOrDieMessage(
+            Effect.filterOrFail(
               (key): key is CryptoKey => !(key instanceof Uint8Array),
-              "Expected CryptoKey, got Uint8Array",
+              () => new globalThis.Error("Expected CryptoKey, got Uint8Array"),
             ),
+            Effect.orDie,
           ),
       ),
       Effect.transposeOption,
@@ -94,15 +95,15 @@ export const IssuerJwkResolverLive = Layer.effect(
 
     const localKeysets: Array<readonly [string, JWTVerifyGetKey]> = localPublicJwk.pipe(
       Option.map(
-        (localPublicJwk) => Data.tuple(origin.href, createLocalJWKSet({ keys: [Utils.fixJwkForJose(localPublicJwk)] })),
+        (localPublicJwk) => Tuple.make(origin.href, createLocalJWKSet({ keys: [Utils.fixJwkForJose(localPublicJwk)] })),
       ),
       Option.toArray,
     )
 
     const localKeypairs: Array<readonly [string, readonly [Schemas.OAuth.JWK, CryptoKey]]> = localPublicJwk
       .pipe(
-        Option.zipWith(localPrivateKey, Data.tuple),
-        Option.map((_) => Data.tuple(origin.href, _)),
+        Option.zipWith(localPrivateKey, Tuple.make),
+        Option.map((_) => Tuple.make(origin.href, _)),
         Option.toArray,
       )
 

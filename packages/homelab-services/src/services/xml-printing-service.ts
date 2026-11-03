@@ -13,10 +13,9 @@ export interface XmlPrintingServiceImpl {
   printXml(json: Record<string, Schemas.JSONExt.JSONExt>): Effect.Effect<Schemas.XML.XML, XmlPrintingError>
 }
 
-export class XmlPrintingService extends Context.Tag(XmlPrintingServiceId)<
-  XmlPrintingService,
-  XmlPrintingServiceImpl
->() {}
+export class XmlPrintingService
+  extends Context.Service<XmlPrintingService, XmlPrintingServiceImpl>()(XmlPrintingServiceId)
+{}
 
 /** {@inheritDoc XmlPrintingServiceImpl.printXml} */
 export function printXml(

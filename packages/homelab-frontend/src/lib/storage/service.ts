@@ -7,5 +7,5 @@ export interface StorageServiceDef {
 }
 
 export class StorageService
-  extends Context.Tag("homelab-frontend/StorageService")<StorageService, StorageServiceDef>()
+  extends Context.Service<StorageService, StorageServiceDef>()("homelab-frontend/StorageService")
 {}

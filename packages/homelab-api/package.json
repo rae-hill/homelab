@@ -29,8 +29,7 @@
     "coverage": "vitest --coverage"
   },
   "dependencies": {
-    "@effect/platform": "^0.96.x",
-    "effect": "^3.21.x",
+    "effect": "^4.1.x",
     "homelab-services": "workspace:*",
     "homelab-shared": "workspace:*"
   },
@@ -47,11 +46,11 @@
     }
   },
   "devDependencies": {
-    "@effect/vitest": "^0.29.x",
+    "@effect/vitest": "^4.1.x",
     "@types/node": "^24",
-    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/coverage-v8": "^5.x",
     "fast-xml-parser": "^5.5.11",
     "madge": "^8.x",
-    "vitest": "^3.x"
+    "vitest": "^5.x"
   }
 }

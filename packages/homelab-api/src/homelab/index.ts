@@ -1,4 +1,4 @@
-import { HttpApi } from "@effect/platform"
+import { HttpApi } from "effect/http-api"
 import { CertApi } from "./cert/index.js"
 import { MobileConfigApi } from "./mobile-config/index.js"
 import { OAuthApi } from "./oauth/index.js"

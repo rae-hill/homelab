@@ -82,7 +82,7 @@ export class OIDCIdentity extends IdentityBase implements Permissions {
   }
 
   get fullname(): Option.Option<string> {
-    return Option.fromNullable(this._fullname)
+    return Option.fromNullishOr(this._fullname)
   }
 
   get permissionSet(): ScopeOrGroupSet {

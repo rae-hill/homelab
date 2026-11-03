@@ -1,18 +1,14 @@
-import { Array, Effect, Schema } from "effect"
+import { Array, Schema, SchemaTransformation } from "effect"
 
-export function EnsureArray<A, I, R>(schema: Schema.Schema<A, I, R>) {
-  return Schema.transformOrFail(
-    Schema.Union(schema, Schema.Array(schema)),
-    Schema.Array(schema),
-    {
-      strict: true,
-      decode(_fromA, _options, _ast, fromI) {
-        return Effect.succeed(isArray(fromI) ? fromI : Array.of(fromI))
-      },
-      encode(_toI, _options, _ast, toA) {
-        return Effect.succeed(toA)
-      },
-    },
+export function EnsureArray<A, E, RD, RE>(schema: Schema.Codec<A, E, RD, RE>) {
+  return Schema.Union([schema, Schema.Array(schema)]).pipe(
+    Schema.decodeTo(
+      Schema.toType(Schema.Array(schema)),
+      SchemaTransformation.transform({
+        decode: (input: A | ReadonlyArray<A>): ReadonlyArray<A> => isArray(input) ? input : Array.of(input),
+        encode: (values: ReadonlyArray<A>): A | ReadonlyArray<A> => values,
+      }),
+    ),
   )
 }
 

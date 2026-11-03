@@ -13,16 +13,18 @@ const downloadArgs = (overrides?: {
   encryption?: "WPA3" | "WPA2"
   password?: string
 }): Homelab.MobileConfigEndpoints.WifiDownload.WifiMobileConfigDownloadHandlerArgs => ({
-  path: {
+  params: {
     ssid: overrides?.ssid ?? "0x676179",
     encryption: overrides?.encryption ?? "WPA3" as const,
   },
-  urlParams: {
+  query: {
     password: overrides?.password ?? "test-password",
     disableMACRandomization: false,
     enterpriseClientType: "None" as const,
   },
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {},
 })
 
@@ -87,10 +89,12 @@ describe("generateWifiProfile (shared logic)", () => {
   it.effect("should generate profile without authorization context", () =>
     Effect.gen(function*() {
       const result = yield* generateWifiProfile({
-        path: { ssid: "dialup-express", encryption: "WPA3" as const },
+        params: { ssid: "dialup-express", encryption: "WPA3" as const },
         payload: { password: "secret", disableMACRandomization: false },
-        urlParams: {},
+        query: {},
         request: {} as any,
+        endpoint: {} as any,
+        group: {} as any,
         headers: {},
       } as Homelab.MobileConfigEndpoints.Wifi.WifiMobileConfigHandlerArgs)
 

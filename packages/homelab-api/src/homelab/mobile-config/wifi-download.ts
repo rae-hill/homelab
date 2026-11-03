@@ -1,48 +1,36 @@
-import { HttpApiEndpoint, HttpApiError } from "@effect/platform"
-import { Schema, type Types } from "effect"
-import { ApiErrors, Schemas } from "homelab-services"
+import { Schema, Tuple, type Types } from "effect"
+import { HttpApiEndpoint } from "effect/http-api"
+import { ApiErrors, Middleware, Schemas } from "homelab-services"
 import { EncryptionParam, SSIDParam, WifiMobileConfigParams } from "./wifi.js"
 
-export const WifiMobileConfigDownloadParams = WifiMobileConfigParams.pipe(
-  Schema.extend(Schemas.Token.AuthQueryParams),
-)
+export const WifiMobileConfigDownloadParams = WifiMobileConfigParams
+  .mapMembers(Tuple.map(Schema.fieldsAssign(Schemas.Token.AuthQueryParams.fields)))
 
 export const WifiMobileConfigDownload = HttpApiEndpoint.get(
   "wifi-download",
-)`/wifi/${SSIDParam}/${EncryptionParam}/_download`
-  .setUrlParams(
-    WifiMobileConfigDownloadParams,
-  )
-  .addSuccess(Schemas.XML.XMLSchema)
-  .addError(
-    ApiErrors.NotImplemented,
-  )
-  .addError(
-    ApiErrors.InternalServerError,
-  )
-  .addError(
-    ApiErrors.BadRequest,
-  )
-  .addError(
-    ApiErrors.NotFound,
-  )
-  .addError(
-    HttpApiError.HttpApiDecodeError,
-  )
-  .addError(
-    ApiErrors.HttpApiEncodeError,
-  )
-  .addError(
-    ApiErrors.AuthenticationError,
-  )
-  .addError(
-    ApiErrors.AuthorizationError,
-  ).setHeaders(
-    Schemas.Token.TokenHeaders,
-  )
+  "/mobile-config/wifi/:ssid/:encryption/_download",
+  {
+    params: {
+      ssid: SSIDParam,
+      encryption: EncryptionParam,
+    },
+    query: WifiMobileConfigDownloadParams,
+    success: Schemas.XML.XMLSchema,
+    error: [
+      ApiErrors.NotImplemented,
+      ApiErrors.InternalServerError,
+      ApiErrors.BadRequest,
+      ApiErrors.NotFound,
+      ApiErrors.HttpApiEncodeError,
+      ApiErrors.AuthenticationError,
+      ApiErrors.AuthorizationError,
+    ],
+    headers: Schemas.Token.TokenHeaders,
+  },
+).middleware(Middleware.AuthMiddleware)
 
 export type WifiMobileConfigDownloadEndpoint = typeof WifiMobileConfigDownload
 
 export type WifiMobileConfigDownloadHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<WifiMobileConfigDownloadEndpoint>
+  HttpApiEndpoint.Request<WifiMobileConfigDownloadEndpoint>
 >

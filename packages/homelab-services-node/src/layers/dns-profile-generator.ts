@@ -42,8 +42,8 @@ class DnsProfileServiceImpl implements Services.DnsProfileGeneratorService.DnsPr
 
       return yield* pipe(
         rootPayloadService.rootPayload("DNS", dnsConfig),
-        Effect.andThen(Schema.encode(Schemas.RootPayload.RootPayloadSchema)),
-        Effect.catchTag("ParseError", ApiErrors.HttpApiEncodeError.fromParseError),
+        Effect.andThen(Schema.encodeEffect(Schemas.RootPayload.RootPayloadSchema)),
+        Effect.catchTag("SchemaError", ApiErrors.HttpApiEncodeError.fromSchemaError),
       )
     })
   }

@@ -1,42 +1,59 @@
-import { FileSystem } from "@effect/platform"
-import { Array, Data, Effect, flow, HashMap, Layer, Option, pipe, Redacted, Schema, Tuple } from "effect"
+import {
+  Array,
+  Effect,
+  FileSystem,
+  HashMap,
+  Layer,
+  Option,
+  pipe,
+  Redacted,
+  Schema,
+  SchemaTransformation,
+  Tuple,
+} from "effect"
 import { Config, Schemas } from "homelab-services"
 
-const ApiKeyMapSchema = Schema.transform(
-  Schema.Array(
-    Schema.Struct({
-      apiKey: Schema.Redacted(Schema.String),
-      email: Schema.String,
-      permissions: Schemas.HashSetFromArray.HashSetFromArray(Schemas.ScopeGroups.ScopeGroupSchema),
-    }),
-  ),
-  Schema.HashMapFromSelf({
-    key: Schema.RedactedFromSelf(Schema.String),
-    value: Schema.Tuple(Schema.HashSetFromSelf(Schemas.ScopeGroups.ScopeGroupSchema), Schema.String),
-  }),
-  {
-    strict: true,
-    decode: flow(
-      Array.map(({ apiKey, email, permissions }) => Data.tuple(apiKey, Data.tuple(permissions, email))),
-      HashMap.fromIterable,
+const ApiKeyEntrySchema = Schema.Struct({
+  apiKey: Schema.RedactedFromValue(Schema.String),
+  email: Schema.String,
+  permissions: Schemas.HashSetFromArray.HashSetFromArray(Schemas.ScopeGroups.ScopeGroupSchema),
+})
+
+type ApiKeyEntry = typeof ApiKeyEntrySchema.Type
+
+type ApiKeyMap = HashMap.HashMap<
+  Redacted.Redacted<string>,
+  readonly [Schemas.ScopeGroups.ScopeOrGroupSet, string]
+>
+
+const ApiKeyMapSchema = Schema.Array(ApiKeyEntrySchema).pipe(
+  Schema.decodeTo(
+    Schema.toType(
+      Schema.HashMap(
+        Schema.RedactedFromValue(Schema.String),
+        Schema.Tuple([
+          Schemas.HashSetFromArray.HashSetFromArray(Schemas.ScopeGroups.ScopeGroupSchema),
+          Schema.String,
+        ]),
+      ),
     ),
-    encode(_toI, toA) {
-      return pipe(
-        toA,
-        HashMap.toEntries,
-        Array.map(([apiKey, [permissions, email]]) => ({
+    SchemaTransformation.transform({
+      decode: (entries: ReadonlyArray<ApiKeyEntry>): ApiKeyMap =>
+        HashMap.fromIterable(
+          Array.map(entries, ({ apiKey, email, permissions }) => Tuple.make(apiKey, Tuple.make(permissions, email))),
+        ),
+      encode: (apiKeys: ApiKeyMap): ReadonlyArray<ApiKeyEntry> =>
+        Array.map(HashMap.toEntries(apiKeys), ([apiKey, [permissions, email]]) => ({
           apiKey,
           email,
           permissions,
         })),
-      )
-    },
-  },
+    }),
+  ),
 )
 
-const ParseApiKeys = Schema.compose(
-  Schemas.Buffer.StringFromUint8Array,
-  Schema.parseJson(ApiKeyMapSchema),
+const ParseApiKeys = Schemas.Buffer.StringFromUint8Array.pipe(
+  Schema.decodeTo(Schema.fromJsonString(ApiKeyMapSchema)),
 )
 
 export const ApiKeyConfigLive = Layer.effect(
@@ -47,7 +64,7 @@ export const ApiKeyConfigLive = Layer.effect(
 
     const apiKeys = yield* pipe(
       fs.readFile(apiKeysFilePath),
-      Effect.andThen(Schema.decode(ParseApiKeys)),
+      Effect.andThen(Schema.decodeEffect(ParseApiKeys)),
     )
 
     return new ApiKeyConfigImpl(apiKeys)
@@ -69,7 +86,7 @@ class ApiKeyConfigImpl implements Config.ApiKeyConfig.ApiKeyConfigDef {
   getRoles(apiKey: string): Option.Option<Schemas.ScopeGroups.ScopeOrGroupSet> {
     return HashMap.get(this.apiKeys, Redacted.make(apiKey)).pipe(
       Option.map(
-        Tuple.getFirst,
+        Tuple.get(0),
       ),
     )
   }
@@ -77,7 +94,7 @@ class ApiKeyConfigImpl implements Config.ApiKeyConfig.ApiKeyConfigDef {
   getEmail(apiKey: string): Option.Option<string> {
     return HashMap.get(this.apiKeys, Redacted.make(apiKey)).pipe(
       Option.map(
-        Tuple.getSecond,
+        Tuple.get(1),
       ),
     )
   }

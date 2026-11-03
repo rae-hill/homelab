@@ -1,4 +1,4 @@
-import { Effect, flow, Match, Option, pipe } from "effect"
+import { Effect, flow, Match, Option } from "effect"
 import type { Homelab } from "homelab-api"
 import { ApiErrors, Config, Middleware, Operation, Services } from "homelab-services"
 import { match, P } from "ts-pattern"
@@ -8,7 +8,7 @@ export const generateWifiProfile = Effect.fn("generateWifiProfile")(
     const profile = yield* match(args)
       .with(
         {
-          path: {
+          params: {
             ssid: P.select("ssid"),
           },
           payload: {
@@ -18,33 +18,31 @@ export const generateWifiProfile = Effect.fn("generateWifiProfile")(
           },
         },
         ({ disableMACRandomization, includeEthernetProfile, ssid }) =>
-          pipe(
-            Option.fromNullable(args.headers["x-forwarded-for"]),
-            Effect.transposeMapOption(
-              Config.SerialNumberConfig.resolveIp,
-            ),
-            Effect.map(Option.flatten),
-            Effect.filterOrElse(
-              Option.isSome,
+          Effect.gen(function*() {
+            const maybeSerialNumber = yield* Option.fromNullishOr(args.headers["x-forwarded-for"]).pipe(
+              Option.match({
+                onNone: () => Effect.succeed(Option.none<string>()),
+                onSome: (ip) => Config.SerialNumberConfig.resolveIp(ip),
+              }),
+            )
+
+            const serialNumber = yield* Effect.fromOption(
+              maybeSerialNumber,
               () =>
-                Effect.fail(
-                  new ApiErrors.AuthorizationError({
-                    resource: "Config_Wifi",
-                    operation: Operation.create,
-                    message: "Attempting to create EAP-TLS payload from an unrecognized IP address",
-                  }),
-                ),
-            ),
-            Effect.andThen(
-              ({ value: serialNumber }) =>
-                Services.WifiProfileGeneratorService.wpa3EnterpriseEAPTLSWifi(
-                  ssid,
-                  serialNumber,
-                  disableMACRandomization,
-                  includeEthernetProfile,
-                ),
-            ),
-          ),
+                new ApiErrors.AuthorizationError({
+                  resource: "Config_Wifi",
+                  operation: Operation.create,
+                  message: "Attempting to create EAP-TLS payload from an unrecognized IP address",
+                }),
+            )
+
+            return yield* Services.WifiProfileGeneratorService.wpa3EnterpriseEAPTLSWifi(
+              ssid,
+              serialNumber,
+              disableMACRandomization,
+              includeEthernetProfile,
+            )
+          }),
       )
       .with(
         {
@@ -52,7 +50,7 @@ export const generateWifiProfile = Effect.fn("generateWifiProfile")(
             enterpriseClientType: "PEAP",
           },
         },
-        ({ path: { ssid }, payload: { disableMACRandomization, includeEthernetProfile, password, username } }) =>
+        ({ params: { ssid }, payload: { disableMACRandomization, includeEthernetProfile, password, username } }) =>
           Services.WifiProfileGeneratorService.wpa3EnterprisePeapWifi(
             ssid,
             username,
@@ -61,15 +59,16 @@ export const generateWifiProfile = Effect.fn("generateWifiProfile")(
             includeEthernetProfile,
           ),
       )
-      .otherwise(
-        ({ path: { encryption, ssid }, payload: { disableMACRandomization, password } }) =>
-          Services.WifiProfileGeneratorService.wpaPersonalWifi(
-            encryption,
-            ssid,
-            password,
-            disableMACRandomization,
-          ),
-      )
+      .otherwise(({ params: { encryption, ssid }, payload }) => {
+        const password = "password" in payload ? payload.password : ""
+
+        return Services.WifiProfileGeneratorService.wpaPersonalWifi(
+          encryption,
+          ssid,
+          password,
+          payload.disableMACRandomization,
+        )
+      })
 
     return yield* Services.XmlPrintingService.printXml(
       profile,

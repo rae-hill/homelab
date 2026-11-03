@@ -1,30 +1,26 @@
-import { HashMap, Record, Schema } from "effect"
+import { HashMap, Record, Schema, SchemaTransformation } from "effect"
 
 /**
  * A transformation from Record to HashMap
  */
 export function HashSetFromRecord<
-  KeyIn extends string,
   KeyOut extends string,
+  KeyIn extends string,
   Out,
   In,
-  KeyR = never,
-  R = never,
 >(
-  key: Schema.Schema<KeyOut, KeyIn, KeyR>,
-  value: Schema.Schema<Out, In, R>,
-): Schema.Schema<HashMap.HashMap<KeyOut, Out>, Record<KeyIn, In>, R | KeyR> {
-  return Schema.transform(
-    Schema.Record({ key, value }),
-    Schema.HashMapFromSelf({ key, value }),
-    {
-      strict: true,
-      decode(_fromA, fromI) {
-        return HashMap.fromIterable(Record.toEntries(fromI as Record<KeyIn, In>))
-      },
-      encode(_toI, toA) {
-        return Record.fromEntries(HashMap.toEntries(toA)) as Record<KeyOut, Out>
-      },
-    },
+  key: Schema.Codec<KeyOut, KeyIn>,
+  value: Schema.Codec<Out, In>,
+) {
+  return Schema.Record(key as Schema.Codec<KeyOut, KeyIn> & Schema.Record.Key, value).pipe(
+    Schema.decodeTo(
+      Schema.toType(Schema.HashMap(key, value)),
+      SchemaTransformation.transform({
+        decode: (record: { readonly [P in KeyOut]: Out }) =>
+          HashMap.fromIterable(Record.toEntries(record) as Array<[KeyOut, Out]>),
+        encode: (map: HashMap.HashMap<KeyOut, Out>) =>
+          Record.fromEntries(HashMap.toEntries(map)) as unknown as { readonly [P in KeyOut]: Out },
+      }),
+    ),
   )
 }

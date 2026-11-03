@@ -9,10 +9,8 @@ export class UuidGenerationError extends Data.TaggedError("UuidGenerationError")
   }
 > {}
 
-export const UUIDSymbol = Symbol.for("homelab/UUID")
-
-export const UUIDSchema = Schema.UUID.pipe(
-  Schema.brand(UUIDSymbol),
+export const UUIDSchema = Schema.String.check(Schema.isUUID()).pipe(
+  Schema.brand("homelab/UUID"),
 )
 
 export type UUID = typeof UUIDSchema.Type
@@ -22,5 +20,5 @@ export interface UuidServiceDef {
   uuid(): Effect.Effect<UUID, UuidGenerationError>
 }
 
-export class UuidService extends Context.Tag(UuidServiceId)<UuidService, UuidServiceDef>() {
+export class UuidService extends Context.Service<UuidService, UuidServiceDef>()(UuidServiceId) {
 }

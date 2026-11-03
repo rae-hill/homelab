@@ -1,5 +1,5 @@
-import type { PlatformError } from "@effect/platform/Error"
 import { Context, Data } from "effect"
+import type { PlatformError } from "effect/PlatformError"
 
 export const CertificateServiceId = "homelab-api/services/certificate-service/CertificateService"
 
@@ -23,5 +23,7 @@ export interface CertificateServiceDef {
   readonly intermediateCrt: Buffer
 }
 
-export class CertificateService extends Context.Tag(CertificateServiceId)<CertificateService, CertificateServiceDef>() {
+export class CertificateService
+  extends Context.Service<CertificateService, CertificateServiceDef>()(CertificateServiceId)
+{
 }

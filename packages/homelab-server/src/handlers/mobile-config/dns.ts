@@ -8,26 +8,26 @@ export const handleDns = Effect.fn("handleDns")(
     const identity = yield* Middleware.CurrentIdentity
     yield* Services.AuthorizationService.canView(identity, "Config_DNS", args)
 
-    if (args.path.profile === "private_homelab_resolver_only" && !args.urlParams.ssid) {
+    if (args.params.profile === "private_homelab_resolver_only" && !args.query.ssid) {
       return yield* new ApiErrors.BadRequest({
         message: "SSID is required for the resolver-only profile",
         reason: "dns-ssid-required",
       })
     }
 
-    const name = args.urlParams.name ?? identity.principle
-    const ssid = Option.fromNullable(args.urlParams.ssid)
+    const name = args.query.name ?? identity.principle
+    const ssid = Option.fromNullishOr(args.query.ssid)
 
     const dnsProfileGenerator = yield* Services.DnsProfileGeneratorService.DnsProfileService
     const xmlPrintingService = yield* Services.XmlPrintingService.XmlPrintingService
 
-    const profile = yield* match(args.path.profile)
+    const profile = yield* match(args.params.profile)
       .with("private_tailscale", () => dnsProfileGenerator.tailscalePrivate(name, ssid))
       .with("monitoring_tailscale", () => dnsProfileGenerator.tailscaleMonitor(name, ssid))
       .with("private_homelab", () => dnsProfileGenerator.homelabPrivate(name, ssid))
       .with(
         "private_homelab_resolver_only",
-        () => dnsProfileGenerator.homelabPrivateResolverOnly(name, args.urlParams.ssid!),
+        () => dnsProfileGenerator.homelabPrivateResolverOnly(name, args.query.ssid!),
       )
       .exhaustive()
 

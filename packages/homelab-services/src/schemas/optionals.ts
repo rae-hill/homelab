@@ -1,36 +1,31 @@
-import { Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { type LazyArg } from "effect/Function"
+import { JsonUnknown } from "./JsonUnknown.js"
 
 export const OptionalStringOrArray = Optional(
-  Schema.Union(
-    Schema.String,
-    Schema.Array(Schema.String),
-  ),
+  Schema.Union([Schema.String, Schema.Array(Schema.String)]),
 )
 
 export const OptionalString = Optional(
   Schema.String,
 )
 
-export const OptionalUrl = Optional(Schema.URL)
+export const OptionalUrl = Optional(Schema.URLFromString)
 
-export const OptionalUnknown = Optional(Schema.Unknown)
+export const OptionalUnknown = Optional(JsonUnknown)
 
-export function OptionalArray<A, I, R>(schema: Schema.Schema<A, I, R>) {
+export function OptionalArray<A, E, RD, RE>(schema: Schema.Codec<A, E, RD, RE>) {
   return Optional(Schema.Array(schema))
 }
 
-export function Optional<A, I, R>(schema: Schema.Schema<A, I, R>) {
+export function Optional<A, E, RD, RE>(schema: Schema.Codec<A, E, RD, RE>) {
   return schema.pipe(
-    Schema.optionalWith({ exact: true }),
+    Schema.optionalKey,
   )
 }
 
-export function OptionalWithDefault<A, I, R>(schema: Schema.Schema<A, I, R>, _default: LazyArg<A>) {
+export function OptionalWithDefault<A, E, RD, RE>(schema: Schema.Codec<A, E, RD, RE>, _default: LazyArg<A>) {
   return schema.pipe(
-    Schema.optionalWith({
-      exact: true,
-      default: _default,
-    }),
+    Schema.withDecodingDefaultTypeKey(Effect.sync(_default)),
   )
 }

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-export const HTTPMethod = Schema.Literal(
+export const HTTPMethod = Schema.Literals([
   "GET",
   "HEAD",
   "PUT",
@@ -9,6 +9,6 @@ export const HTTPMethod = Schema.Literal(
   "DELETE",
   "CONNECT",
   "TRACE",
-)
+])
 
 export type HTTPMethod = typeof HTTPMethod.Type

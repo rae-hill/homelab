@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Schema, Struct } from "effect"
 import { OptionalUnixDateTime, UnixDateTime } from "./UnixDateTime.js"
 
 import { Constants } from "homelab-shared"
@@ -22,16 +22,15 @@ export const JWE = Schema.Struct({
   tag: OptionalString,
 })
 
-export const JWEFromUint8Array = Schema.compose(
-  StringFromUint8Array,
-  Schema.parseJson(JWE),
+export const JWEFromUint8Array = StringFromUint8Array.pipe(
+  Schema.decodeTo(Schema.fromJsonString(JWE)),
 )
 
 // ----------
 // JWKs
 // ----------
 
-export const KeyOp = Schema.Literal(
+export const KeyOp = Schema.Literals([
   "sign",
   "verify",
   "encrypt",
@@ -40,11 +39,11 @@ export const KeyOp = Schema.Literal(
   "unwrapKey",
   "deriveKey",
   "deriveBits",
-)
+])
 
 export const KeyOps = Optional(EnsureArray(KeyOp))
 
-export const KeyUse = Optional(Schema.Literal("sig", "enc"))
+export const KeyUse = Optional(Schema.Literals(["sig", "enc"]))
 
 export const BaseJWK = Schema.Struct({
   use: KeyUse,
@@ -57,56 +56,55 @@ export const BaseJWK = Schema.Struct({
 })
 
 export const ECJWK = BaseJWK.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       kty: Schema.Literal("EC"),
-      alg: Schema.Union(Crypto.ECDSAId, Crypto.PSSDSId),
+      alg: Schema.Union([Crypto.ECDSAId, Crypto.PSSDSId]),
       crv: Crypto.EllipticCurveId,
       x: Base64Url,
       y: Base64Url,
-    }),
+    },
   ),
 )
 
 export const RSAJWK = BaseJWK.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       kty: Schema.Literal("RSA"),
-      alg: Schema.Union(Crypto.RSADSId, Crypto.PSSDSId),
+      alg: Schema.Union([Crypto.RSADSId, Crypto.PSSDSId]),
       mod: OptionalBase64Url,
       exp: OptionalBase64Url,
       dp: OptionalString,
       dq: OptionalString,
       p: OptionalString,
       q: OptionalString,
-    }),
+    },
   ),
 )
 
 export const OKPJWK = BaseJWK.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       kty: Schema.Literal("OKP"),
       crv: Crypto.OKPCurveTypeId,
       x: Base64Url,
       alg: Schema.Literal("EdDSA"),
-    }),
+    },
   ),
 )
 
-export const JWK = Schema.Union(
+export const JWK = Schema.Union([
   ECJWK,
   RSAJWK,
   OKPJWK,
-)
+])
 
 export const OptionalJWK = Optional(JWK)
 
 export type JWK = typeof JWK.Type
 
-export const JWKFromUint8Array = Schema.compose(
-  StringFromUint8Array,
-  Schema.parseJson(JWK),
+export const JWKFromUint8Array = StringFromUint8Array.pipe(
+  Schema.decodeTo(Schema.fromJsonString(JWK)),
 )
 
 export const JWKs = Schema.Struct({
@@ -115,32 +113,31 @@ export const JWKs = Schema.Struct({
 
 export type JWKs = typeof JWKs.Type
 
-export const JWKsFromUint8Array = Schema.compose(
-  StringFromUint8Array,
-  Schema.parseJson(JWKs),
+export const JWKsFromUint8Array = StringFromUint8Array.pipe(
+  Schema.decodeTo(Schema.fromJsonString(JWKs)),
 )
 
 // ----------
 // JWSs
 // ----------
 
-export const AsymmetricJWSAlg = Schema.Union(
+export const AsymmetricJWSAlg = Schema.Union([
   Crypto.RSADSId,
   Crypto.ECDSAId,
-)
+])
 
-export const JWSAlgorithms = Schema.Union(
+export const JWSAlgorithms = Schema.Union([
   ...AsymmetricJWSAlg.members,
   Crypto.HMACId,
   Schema.Literal("none"),
-)
+])
 
 // ----------
 // JWTs
 // ----------
 
 export const JWTString = Schema.String.pipe(
-  Schema.pattern(/^[A-Za-z0-9_\-.]+$/g),
+  Schema.check(Schema.isPattern(/^[A-Za-z0-9_\-.]+$/g)),
 )
 
 export const BaseJOSEHeader = Schema.Struct({
@@ -152,16 +149,17 @@ export const BaseJOSEHeader = Schema.Struct({
   x5t: OptionalBase64Url,
 })
 
-export const DPoPJOSEHeader = BaseJOSEHeader.pipe(
-  Schema.omit("alg", "jwk"),
-  Schema.extend(
-    Schema.Struct({
-      alg: AsymmetricJWSAlg,
-      typ: Schema.Literal("dpop+jwt"),
-      jwk: JWK,
-    }),
-  ),
-)
+export const DPoPJOSEHeader = BaseJOSEHeader
+  .mapFields(Struct.omit(["alg", "jwk"]))
+  .pipe(
+    Schema.fieldsAssign(
+      {
+        alg: AsymmetricJWSAlg,
+        typ: Schema.Literal("dpop+jwt"),
+        jwk: JWK,
+      },
+    ),
+  )
 
 export const BaseJWT = Schema.Struct({
   iss: OptionalString,
@@ -174,41 +172,41 @@ export const BaseJWT = Schema.Struct({
 })
 
 export const IdJWT = BaseJWT.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       auth_time: OptionalUnixDateTime,
       nonce: OptionalString,
       amr: OptionalString,
       azp: OptionalString,
-    }),
+    },
   ),
 )
 
-export const DPoPProofJWT = BaseJWT.pipe(
-  Schema.omit("jti", "iat"),
-  Schema.extend(
-    Schema.Struct({
-      jti: Schema.String,
-      htm: HTTPMethod,
-      htu: Schema.URL,
-      iat: UnixDateTime,
-      ath: OptionalBase64Url,
-      nonce: OptionalString,
-    }),
-  ),
-)
+export const DPoPProofJWT = BaseJWT
+  .mapFields(Struct.omit(["jti", "iat"]))
+  .pipe(
+    Schema.fieldsAssign(
+      {
+        jti: Schema.String,
+        htm: HTTPMethod,
+        htu: Schema.URLFromString,
+        iat: UnixDateTime,
+        ath: OptionalBase64Url,
+        nonce: OptionalString,
+      },
+    ),
+  )
 
-export const DPoPProofHTTPParams = DPoPProofJWT.pipe(
-  Schema.pick("htm", "htu"),
-)
+export const DPoPProofHTTPParams = DPoPProofJWT
+  .mapFields(Struct.pick(["htm", "htu"]))
 
 export const HomelabIdentityJWT = IdJWT.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       [Constants.JWT_ROLES_KEY]: ScopeGroupSetSchema,
       email: Schema.String,
       preferred_username: Optional(Schema.String),
       name: Optional(Schema.String),
-    }),
+    },
   ),
 )

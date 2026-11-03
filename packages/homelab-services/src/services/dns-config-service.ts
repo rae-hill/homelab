@@ -20,4 +20,4 @@ export interface DnsConfigServiceDef {
   homelabPrivateResolverOnly(name: string, ssid: string): Effect.Effect<Schemas.DnsConfig.DNSConfig>
 }
 
-export class DnsConfigService extends Context.Tag(DnsConfigServiceId)<DnsConfigService, DnsConfigServiceDef>() {}
+export class DnsConfigService extends Context.Service<DnsConfigService, DnsConfigServiceDef>()(DnsConfigServiceId) {}

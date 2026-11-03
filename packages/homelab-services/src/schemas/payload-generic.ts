@@ -11,6 +11,6 @@ export const GenericPayloadSchema = Schema.Struct({
   PayloadRemovalDisallowed: Optional(Schema.Boolean),
   PayloadType: Schema.String,
   PayloadScope: Optional(Schema.String),
-  PayloadUUID: Schema.UUID,
-  PayloadVersion: Schema.Int.pipe(Schema.positive()),
+  PayloadUUID: Schema.String.check(Schema.isUUID()),
+  PayloadVersion: Schema.Int.check(Schema.isGreaterThan(0)),
 })

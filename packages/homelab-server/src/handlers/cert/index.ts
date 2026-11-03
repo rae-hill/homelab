@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/http-api"
 import { Homelab } from "homelab-api"
 import { handleCombined } from "./combined.js"
 import { handleIntermediate } from "./intermediate.js"

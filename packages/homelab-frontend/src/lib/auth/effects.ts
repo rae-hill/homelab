@@ -1,5 +1,6 @@
-import { HttpApiClient, HttpClient, HttpClientRequest, HttpClientResponse } from "@effect/platform"
 import { Effect } from "effect"
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { HttpApiClient } from "effect/http-api"
 import { Homelab } from "homelab-api"
 import { Schemas } from "homelab-services"
 import { API_BASE_URL } from "../env.js"
@@ -15,7 +16,7 @@ export const fetchOIDCWellKnown = Effect.fn("fetchOIDCWellKnown")(function*() {
   const wellKnownUrl = yield* OIDC_WELL_KNOWN_URL
 
   const client = (yield* HttpClient.HttpClient).pipe(
-    HttpClient.withTracerPropagation(false),
+    HttpClient.transformResponse(Effect.provideService(HttpClient.TracerPropagationEnabled, false)),
   )
   const response = yield* client.execute(HttpClientRequest.get(wellKnownUrl))
   return yield* HttpClientResponse.schemaBodyJson(Schemas.OIDC.OIDCWellKnown)(response)
@@ -74,7 +75,7 @@ export const handleOIDCCallback = Effect.fn("handleOIDCCallback")(function*() {
 
   const wk = yield* fetchOIDCWellKnown()
   const client = (yield* HttpClient.HttpClient).pipe(
-    HttpClient.withTracerPropagation(false),
+    HttpClient.transformResponse(Effect.provideService(HttpClient.TracerPropagationEnabled, false)),
   )
 
   const response = yield* client.execute(

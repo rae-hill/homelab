@@ -17,5 +17,5 @@ export interface EapClientConfigServiceDef {
 }
 
 export class EapClientConfigService
-  extends Context.Tag(EapClientConfigServiceId)<EapClientConfigService, EapClientConfigServiceDef>()
+  extends Context.Service<EapClientConfigService, EapClientConfigServiceDef>()(EapClientConfigServiceId)
 {}

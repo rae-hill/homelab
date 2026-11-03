@@ -1,5 +1,4 @@
-import { HttpApiGroup } from "@effect/platform"
-import { Middleware } from "homelab-services"
+import { HttpApiGroup } from "effect/http-api"
 import * as CertsDownload from "./certs-download.js"
 import * as Certs from "./certs.js"
 import * as DnsDownload from "./dns-download.js"
@@ -14,8 +13,6 @@ export const MobileConfigApi = HttpApiGroup.make("mobile-config")
   .add(DnsDownload.DnsDownload)
   .add(Wifi.WifiMobileConfig)
   .add(WifiDownload.WifiMobileConfigDownload)
-  .prefix("/mobile-config")
-  .middleware(Middleware.AuthMiddleware)
 
 export * as CertsDownload from "./certs-download.js"
 export * as Certs from "./certs.js"

@@ -13,5 +13,5 @@ export interface EthernetConfigServiceDef {
 }
 
 export class EthernetConfigService
-  extends Context.Tag(EthernetConfigServiceId)<EthernetConfigService, EthernetConfigServiceDef>()
+  extends Context.Service<EthernetConfigService, EthernetConfigServiceDef>()(EthernetConfigServiceId)
 {}

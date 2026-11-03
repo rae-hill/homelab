@@ -1,5 +1,5 @@
-import { HttpApiClient } from "@effect/platform"
 import { Console, Effect, Option } from "effect"
+import { HttpApiClient } from "effect/http-api"
 import { Homelab } from "homelab-api"
 import { API_BASE_URL } from "../env.js"
 import { deriveProfile } from "./state.js"
@@ -21,8 +21,8 @@ export const downloadDnsProfile = Effect.fn("downloadDnsProfile")(
     const client = yield* HttpApiClient.make(Homelab.HomelabApi, { baseUrl: apiBaseUrl })
 
     const result = yield* client["mobile-config"].dns({
-      path: { profile },
-      urlParams: {},
+      params: { profile },
+      query: {},
       ...token ? { headers: { authorization: `Bearer ${token}` } } : { headers: {} },
     })
 

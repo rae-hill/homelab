@@ -16,14 +16,8 @@
     "test:staged": "vitest related --run"
   },
   "dependencies": {
-    "@effect/cluster": "^0.59.x",
-    "@effect/experimental": "^0.60.x",
-    "@effect/opentelemetry": "^0.63.x",
-    "@effect/platform": "^0.96.x",
-    "@effect/platform-node": "^0.107.x",
-    "@effect/rpc": "^0.75.x",
-    "@effect/sql": "^0.51.x",
-    "@effect/workflow": "^0.18.x",
+    "@effect/opentelemetry": "^4.1.x",
+    "@effect/platform-node": "^4.1.x",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.220.x",
     "@opentelemetry/resources": "^2.9.0",
@@ -34,7 +28,7 @@
     "@opentelemetry/sdk-trace-web": "^2.9.0",
     "@opentelemetry/semantic-conventions": "^1.41.x",
     "bufferutil": "^4.1.0",
-    "effect": "^3.21.x",
+    "effect": "^4.1.x",
     "homelab-api": "workspace:*",
     "homelab-services": "workspace:*",
     "homelab-services-node": "workspace:*",
@@ -45,11 +39,11 @@
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.54.1",
-    "@effect/vitest": "^0.29.x",
+    "@effect/vitest": "^4.1.x",
     "@types/node": "^24",
     "jose": "^6.x",
     "madge": "^8.0.0",
     "rolldown": "^1.0.0-rc.7",
-    "vitest": "^3.x"
+    "vitest": "^5.x"
   }
 }

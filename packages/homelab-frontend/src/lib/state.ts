@@ -32,17 +32,17 @@ function readURL(): Omit<AppParams, "tab"> {
   const keepLogs = params.get("keepLogs")
 
   return {
-    ssid: Option.fromNullable(params.get("ssid") || null),
+    ssid: Option.fromNullishOr(params.get("ssid") || null),
     encryption: Option.some(enc === "WPA2" || enc === "WPA3" ? enc : "WPA3" as const),
-    password: Option.fromNullable(params.get("password") || null),
-    username: Option.fromNullable(params.get("username") || null),
-    disableMACRandomization: Option.fromNullable(dmr === "true" ? true : dmr === "false" ? false : null),
-    includeEthernetProfile: Option.fromNullable(
+    password: Option.fromNullishOr(params.get("password") || null),
+    username: Option.fromNullishOr(params.get("username") || null),
+    disableMACRandomization: Option.fromNullishOr(dmr === "true" ? true : dmr === "false" ? false : null),
+    includeEthernetProfile: Option.fromNullishOr(
       includeEthernetProfile === "true" ? true : includeEthernetProfile === "false" ? false : null,
     ),
-    blockAds: Option.fromNullable(blockAds === "true" ? true : blockAds === "false" ? false : null),
-    tailscale: Option.fromNullable(tailscale === "true" ? true : tailscale === "false" ? false : null),
-    keepLogs: Option.fromNullable(keepLogs === "true" ? true : keepLogs === "false" ? false : null),
+    blockAds: Option.fromNullishOr(blockAds === "true" ? true : blockAds === "false" ? false : null),
+    tailscale: Option.fromNullishOr(tailscale === "true" ? true : tailscale === "false" ? false : null),
+    keepLogs: Option.fromNullishOr(keepLogs === "true" ? true : keepLogs === "false" ? false : null),
   }
 }
 

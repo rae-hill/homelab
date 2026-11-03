@@ -69,7 +69,7 @@ export interface EnvDef {
   readonly serialNumbersFile: Option.Option<string>
 }
 
-export class Env extends Context.Tag("homelab-api/config/env/Env")<Env, EnvDef>() {}
+export class Env extends Context.Service<Env, EnvDef>()("homelab-api/config/env/Env") {}
 
 /** {@inheritDoc EnvDef.originUrl} */
 export const originUrl = Env.pipe(Effect.map((_) => _.originUrl))

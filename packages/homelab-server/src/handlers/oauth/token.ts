@@ -1,5 +1,5 @@
-import { HttpApp, HttpServerResponse } from "@effect/platform"
 import { Effect, flow, Match } from "effect"
+import { HttpEffect, HttpServerResponse } from "effect/http"
 import type { Homelab } from "homelab-api"
 import { ApiErrors, Middleware, Services } from "homelab-services"
 
@@ -13,7 +13,7 @@ export const handleToken = Effect.fn("handleToken")(
 
     yield* Services.AuthorizationService.canCreate(identity, "OAuth_Token", args)
 
-    yield* HttpApp.appendPreResponseHandler(
+    yield* HttpEffect.appendPreResponseHandler(
       (_, res) => Effect.succeed(HttpServerResponse.setHeader(res, "DPoP-Nonce", nonce)),
     )
 

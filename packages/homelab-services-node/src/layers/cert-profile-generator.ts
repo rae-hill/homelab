@@ -42,13 +42,13 @@ class CertProfileServiceImpl implements Services.CertProfileGeneratorService.Cer
           intermediatePayload,
         ),
         Effect.andThen(
-          Schema.encode(
+          Schema.encodeEffect(
             Schemas.RootPayload.RootPayloadSchema,
           ),
         ),
         Effect.catchTag(
-          "ParseError",
-          ApiErrors.HttpApiEncodeError.fromParseError,
+          "SchemaError",
+          ApiErrors.HttpApiEncodeError.fromSchemaError,
         ),
       )
     })

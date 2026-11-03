@@ -15,7 +15,7 @@ class NonceServiceImpl implements Services.NonceService.NonceServiceDef {
   constructor(private readonly hmacService: typeof Services.HMACService.HMACService.Service) {}
 
   withTime(time: DateTime.DateTime) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const epochSeconds = Math.floor(DateTime.toEpochMillis(time) / Constants.MS_PER_S)
       const timestamp = epochSeconds.toString()
       const hmac = yield* this.hmacService.hmacDigest(timestamp)
@@ -25,7 +25,7 @@ class NonceServiceImpl implements Services.NonceService.NonceServiceDef {
   }
 
   validateNonce(nonce: string) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const parts = nonce.split(".")
       if (parts.length !== 2) {
         return yield* new Services.NonceService.NonceValidationError({
@@ -52,7 +52,7 @@ class NonceServiceImpl implements Services.NonceService.NonceServiceDef {
         })
       }
 
-      return DateTime.unsafeMake(epochSeconds * Constants.MS_PER_S)
+      return DateTime.makeUnsafe(epochSeconds * Constants.MS_PER_S)
     })
   }
 }

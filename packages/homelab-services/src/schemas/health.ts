@@ -1,103 +1,90 @@
-import { HttpApiSchema } from "@effect/platform"
-import { Array, Effect, flow, Option, pipe, Record, Schema, String } from "effect"
+import { Array, flow, pipe, Record, Schema, SchemaTransformation, String } from "effect"
+import { HttpApiSchema } from "effect/http-api"
 
-export const ServiceNameSchema = Schema.Literal(
+export const ServiceNameSchema = Schema.Literals([
   "Jellyfin",
   "Kanidm",
   "Step-CA",
-)
+])
 
-export const StatusSchema = Schema.Literal(
+export const StatusSchema = Schema.Literals([
   "Unreachable",
   "Unhealthy",
-)
+])
 
-export const UnhealthyResponseMessage = Schema.TemplateLiteral(
+export const UnhealthyResponseMessage = Schema.TemplateLiteral([
   ServiceNameSchema,
   " is ",
   StatusSchema,
   Schema.String,
-)
+])
 
 export const HealthyResponseMessage = Schema.Literal(
   "All services healthy",
 )
 
-export const HealthResponseSchemaWire = Schema.Union(
+export const HealthResponseSchemaWire = Schema.Union([
   UnhealthyResponseMessage,
   HealthyResponseMessage,
-).pipe(
-  Schema.annotations({
+]).pipe(
+  Schema.annotate({
     description: "Lists services that are unreachable or have indicated an unhealthy status",
   }),
-  HttpApiSchema.withEncoding({
-    kind: "Text",
+  HttpApiSchema.asText({
     contentType: "text/plain",
   }),
 )
 
-export const HealthResponseSchemaType = Schema.Record({
-  key: ServiceNameSchema,
-  value: Schema.Literal(...StatusSchema.literals, "Healthy"),
-})
+export const HealthResponseSchemaType = Schema.Record(
+  ServiceNameSchema,
+  Schema.Literals([...StatusSchema.literals, "Healthy"]),
+)
 
-export const HealthResponseSchema = Schema.transformOrFail(
-  HealthResponseSchemaWire,
-  HealthResponseSchemaType,
-  {
-    strict: true,
-    decode(fromA) {
-      if (
-        fromA === "All services healthy"
-      ) {
-        return Effect.succeed({
+export const HealthResponseSchema = HealthResponseSchemaWire.pipe(
+  Schema.decodeTo(
+    HealthResponseSchemaType,
+    SchemaTransformation.transform({
+      decode: (fromA: typeof HealthResponseSchemaWire.Type): typeof HealthResponseSchemaType.Encoded => {
+        const healthy = {
           Jellyfin: "Healthy",
           Kanidm: "Healthy",
           "Step-CA": "Healthy",
-        })
-      }
+        } as const
 
-      const unhealthies = pipe(
-        splitTemplateComma(fromA),
-        fromEntriesLiteral,
-      )
+        if (
+          fromA === "All services healthy"
+        ) {
+          return healthy
+        }
 
-      return Effect.succeed(
-        {
-          // @ts-expect-error -- unhealthies is really a partial record
-          Jellyfin: "Healthy",
-          // @ts-expect-error
-          Kanidm: "Healthy",
-          // @ts-expect-error
-          "Step-CA": "Healthy",
-          ...unhealthies,
-        },
-      )
-    },
-    encode(struct) {
-      if (
-        Record.every(
-          struct,
-          (status) => status === "Healthy",
+        const unhealthies = pipe(
+          splitTemplateComma(fromA),
+          fromEntriesLiteral,
         )
-      ) {
-        return Effect.succeed("All services healthy" as const)
-      }
 
-      return pipe(
-        Record.filterMap(
-          struct,
-          (status, key) => status === "Healthy" ? Option.none() : Option.some(`${key} is ${status}` as const),
-        ),
-        Record.values,
-        joinTemplatesComma,
-        Effect.succeed,
-      )
-    },
-  },
-).pipe(
-  HttpApiSchema.withEncoding({
-    kind: "Text",
+        return { ...healthy, ...unhealthies }
+      },
+      encode: (struct: typeof HealthResponseSchemaType.Encoded): typeof HealthResponseSchemaWire.Type => {
+        if (
+          Record.every(
+            struct,
+            (status) => status === "Healthy",
+          )
+        ) {
+          return "All services healthy" as const
+        }
+
+        const unhealthies: Array<typeof UnhealthyResponseMessage.Type> = []
+        for (const [key, status] of Record.toEntries(struct)) {
+          if (status !== "Healthy") {
+            unhealthies.push(`${key} is ${status}`)
+          }
+        }
+        return joinTemplatesComma(unhealthies)
+      },
+    }),
+  ),
+  HttpApiSchema.asText({
     contentType: "text/plain",
   }),
 )

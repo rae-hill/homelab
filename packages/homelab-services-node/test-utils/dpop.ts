@@ -19,7 +19,7 @@ export interface DPoPProofBuilderServiceDef {
 }
 
 export class DPoPProofBuilderService
-  extends Context.Tag(DPoPProofBuilderServiceId)<DPoPProofBuilderService, DPoPProofBuilderServiceDef>()
+  extends Context.Service<DPoPProofBuilderService, DPoPProofBuilderServiceDef>()(DPoPProofBuilderServiceId)
 {
 }
 
@@ -59,7 +59,7 @@ class DPoPProofBuilderServiceImpl implements DPoPProofBuilderServiceDef {
   ) {}
 
   buildProof(options: DPoPProofBuilderOptions) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const nowUnixS = options.iat ?? Math.floor(
         DateTime.toEpochMillis(yield* DateTime.now) / Constants.MS_PER_S,
       )

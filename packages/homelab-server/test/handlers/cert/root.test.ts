@@ -9,8 +9,10 @@ const withIdentity = (identity: Identity.Identity) => Layer.succeed(Middleware.C
 
 const rootArgs = (format: "crt" | "der" = "der"): Homelab.CertEndpoints.Root.RootCertHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {},
-  path: { format },
+  params: { format },
 })
 
 const authorizedIdentity = new Identity.OIDCIdentity(

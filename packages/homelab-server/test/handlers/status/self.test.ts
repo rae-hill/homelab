@@ -11,6 +11,8 @@ const selfArgs = (overrides?: {
   "x-forwarded-for"?: string
 }): Homelab.StatusEndpoints.Self.SelfEndpointHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {
     ...(overrides?.["x-forwarded-for"] != null
       && { "x-forwarded-for": overrides["x-forwarded-for"] as Schemas.IpAddress.IpAddress }),

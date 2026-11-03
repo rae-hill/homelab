@@ -1,5 +1,5 @@
-import { HttpClient, HttpClientRequest } from "@effect/platform"
 import { Effect } from "effect"
+import { HttpClient, HttpClientRequest } from "effect/http"
 
 export const callWithHeaders = <A, E, R>(
   headers: Record<string, string>,

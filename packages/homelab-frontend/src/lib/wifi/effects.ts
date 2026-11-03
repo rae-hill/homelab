@@ -1,5 +1,5 @@
-import { HttpApiClient } from "@effect/platform"
 import { Console, Effect, Option } from "effect"
+import { HttpApiClient } from "effect/http-api"
 import { Homelab } from "homelab-api"
 import { API_BASE_URL } from "../env.js"
 import { fromOption, MissingParamError } from "../util.js"
@@ -46,9 +46,9 @@ export const downloadAppleProfile = Effect.fn("downloadAppleProfile")(
     }
 
     const result = yield* client["mobile-config"].wifi({
-      path: { ssid, encryption },
+      params: { ssid, encryption },
       payload: payload as any,
-      urlParams: {},
+      query: {},
       headers: token ? { authorization: `Bearer ${token}` } : {},
     })
 

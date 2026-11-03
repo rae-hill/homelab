@@ -8,17 +8,19 @@ import { HandlerTestLayer } from "../../../test-utils/testing-layer.js"
 const withIdentity = (identity: Identity.Identity) => Layer.succeed(Middleware.CurrentIdentity, identity)
 
 const dnsArgs = (overrides?: {
-  profile?: Homelab.MobileConfigEndpoints.Dns.DnsHandlerArgs["path"]["profile"]
+  profile?: Homelab.MobileConfigEndpoints.Dns.DnsHandlerArgs["params"]["profile"]
   name?: string
   ssid?: string
 }): Homelab.MobileConfigEndpoints.Dns.DnsHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {},
-  urlParams: {
+  query: {
     ...(overrides?.name ? { name: overrides.name } : {}),
     ...(overrides?.ssid ? { ssid: overrides.ssid } : {}),
   },
-  path: { profile: overrides?.profile ?? "private_homelab" },
+  params: { profile: overrides?.profile ?? "private_homelab" },
 })
 
 const authorizedIdentity = new Identity.OIDCIdentity(

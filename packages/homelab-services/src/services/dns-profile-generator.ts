@@ -33,4 +33,6 @@ export interface DnsProfileServiceDef {
   ): Effect.Effect<Schemas.RootPayload.RootPayloadWire, ApiErrors.HttpApiEncodeError>
 }
 
-export class DnsProfileService extends Context.Tag(DnsProfileServiceId)<DnsProfileService, DnsProfileServiceDef>() {}
+export class DnsProfileService
+  extends Context.Service<DnsProfileService, DnsProfileServiceDef>()(DnsProfileServiceId)
+{}

@@ -1,14 +1,17 @@
-import { HttpApiEndpoint } from "@effect/platform"
 import type { Types } from "effect"
+import { HttpApiEndpoint } from "effect/http-api"
 import { Schemas } from "homelab-services"
 
 export const OAuthAuthorizationWellKnownEndpoint = HttpApiEndpoint.get(
   "well-known-oauth-authorization",
-)`/oauth-authorization-server`
-  .addSuccess(Schemas.WellKnown.OAuthAuthorizationServerWellKnown)
+  "/.well-known/oauth-authorization-server",
+  {
+    success: Schemas.WellKnown.OAuthAuthorizationServerWellKnown,
+  },
+)
 
 export type OAuthAuthorizationWellKnownEndpoint = typeof OAuthAuthorizationWellKnownEndpoint
 
 export type HealthEndpointHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<OAuthAuthorizationWellKnownEndpoint>
+  HttpApiEndpoint.Request<OAuthAuthorizationWellKnownEndpoint>
 >

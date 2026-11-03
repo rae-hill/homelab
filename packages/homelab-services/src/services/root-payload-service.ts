@@ -13,5 +13,7 @@ export interface RootPayloadServiceDef {
   ): Effect.Effect<Schemas.RootPayload.RootPayload>
 }
 
-export class RootPayloadService extends Context.Tag(RootPayloadServiceId)<RootPayloadService, RootPayloadServiceDef>() {
+export class RootPayloadService
+  extends Context.Service<RootPayloadService, RootPayloadServiceDef>()(RootPayloadServiceId)
+{
 }

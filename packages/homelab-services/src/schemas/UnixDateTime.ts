@@ -1,4 +1,4 @@
-import { DateTime, ParseResult, Schema } from "effect"
+import { DateTime, Effect, Schema, SchemaGetter, SchemaIssue } from "effect"
 
 /**
  * A unix timestamp to DateTime
@@ -8,37 +8,18 @@ import { DateTime, ParseResult, Schema } from "effect"
  * @remarks
  * schemata-ts was better #biased
  */
-export const UnixDateTime = Schema.compose(
-  Schema.transform(Schema.Positive, Schema.Positive, {
-    decode(s) {
-      return s * 1000
-    },
-    encode(ms) {
-      return ms / 1000
-    },
+export const UnixDateTime = Schema.Number.check(Schema.isGreaterThan(0)).pipe(
+  Schema.decodeTo(Schema.DateTimeUtc, {
+    decode: SchemaGetter.transformEffect((seconds: number) =>
+      Effect.fromOption(
+        DateTime.make(seconds * 1000),
+        () => new SchemaIssue.InvalidValue({ message: "Failed to parse number into Date" }),
+      )
+    ),
+    encode: SchemaGetter.transform((dateTime) => DateTime.toEpochMillis(dateTime) / 1000),
   }),
-  Schema.transformOrFail(
-    Schema.Positive,
-    Schema.DateTimeUtcFromSelf,
-    {
-      strict: true,
-      decode(fromA, _fromI, ast) {
-        return DateTime.make(fromA).pipe(
-          ParseResult.fromOption(() => new ParseResult.Type(ast, fromA, "Failed to parse number into Date")),
-        )
-      },
-      encode(_toI, _options, _ast, toA) {
-        return toA.pipe(
-          DateTime.toEpochMillis,
-          ParseResult.succeed,
-        )
-      },
-    },
-  ),
 )
 
 export const OptionalUnixDateTime = UnixDateTime.pipe(
-  Schema.optionalWith({
-    exact: true,
-  }),
+  Schema.optionalKey,
 )

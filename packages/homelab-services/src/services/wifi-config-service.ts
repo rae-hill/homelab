@@ -37,5 +37,5 @@ export interface WifiConfigServiceDef {
   ): Effect.Effect<Schemas.WifiConfig.WifiConfig, WifiConfigGenerationError>
 }
 
-export class WifiConfigService extends Context.Tag(WifiConfigServiceId)<WifiConfigService, WifiConfigServiceDef>() {
+export class WifiConfigService extends Context.Service<WifiConfigService, WifiConfigServiceDef>()(WifiConfigServiceId) {
 }

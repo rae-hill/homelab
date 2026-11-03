@@ -15,7 +15,7 @@ export interface OIDCAuthenticationServiceDef {
 }
 
 export class OIDCAuthenticationService
-  extends Context.Tag(OIDCAuthenticationServiceId)<OIDCAuthenticationService, OIDCAuthenticationServiceDef>()
+  extends Context.Service<OIDCAuthenticationService, OIDCAuthenticationServiceDef>()(OIDCAuthenticationServiceId)
 {
 }
 

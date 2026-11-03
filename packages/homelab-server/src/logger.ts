@@ -1,4 +1,4 @@
-import { Array, Cause, Config, FiberId, HashMap, Inspectable, Layer, List, Logger } from "effect"
+import { Array, Cause, Config, Formatter, Inspectable, Layer, Logger, References } from "effect"
 import { match } from "ts-pattern"
 
 export const structureLogMessage = (u: unknown): unknown => {
@@ -9,7 +9,7 @@ export const structureLogMessage = (u: unknown): unknown => {
       return String(u)
     }
     default: {
-      return Inspectable.toJSON(u)
+      return Inspectable.toJson(u)
     }
   }
 }
@@ -39,44 +39,42 @@ function getLoggableMessage(
 }
 
 export const jsonLogger = Logger.make<unknown, unknown>(
-  ({ annotations, cause, date, fiberId, logLevel, message, spans }) => {
+  ({ cause, date, fiber, logLevel, message }) => {
     const now = date.getTime()
     const annotationsObj: Record<string, unknown> = {}
     const spansObj: Record<string, number> = {}
 
-    if (HashMap.size(annotations) > 0) {
-      for (const [k, v] of annotations) {
-        annotationsObj[k] = structureLogMessage(v)
-      }
+    const annotations = fiber.getRef(References.CurrentLogAnnotations)
+    for (const [k, v] of Object.entries(annotations)) {
+      annotationsObj[k] = structureLogMessage(v)
     }
 
-    if (List.isCons(spans)) {
-      for (const span of spans) {
-        spansObj[span.label] = now - span.startTime
-      }
+    const spans = fiber.getRef(References.CurrentLogSpans)
+    for (const [label, timestamp] of spans) {
+      spansObj[label] = now - timestamp
     }
 
     const loggedMessage = getLoggableMessage(message)
 
     return {
-      logLevel: logLevel.label,
+      logLevel,
       timestamp: date.toISOString(),
-      cause: Cause.isEmpty(cause) ? undefined : Cause.pretty(cause, { renderErrorCause: true }),
+      cause: cause.reasons.length > 0 ? Cause.pretty(cause) : undefined,
       annotations: annotationsObj,
       spans: spansObj,
-      fiberId: FiberId.threadName(fiberId),
+      fiberId: String(fiber.id),
       ...loggedMessage,
     }
   },
 )
 
 export const jsonConsoleLogger = jsonLogger.pipe(
-  Logger.map(Inspectable.stringifyCircular),
+  Logger.map(Formatter.formatJson),
   Logger.withLeveledConsole,
 )
 
-export const LoggerLive = Layer.unwrapEffect(
-  Config.option(Config.literal("JSON", "pretty")("LOG_STYLE"))
+export const LoggerLive = Layer.unwrap(
+  Config.option(Config.Literals(["JSON", "pretty"], "LOG_STYLE"))
     .pipe(
       Config.map(
         (_) =>
@@ -84,11 +82,11 @@ export const LoggerLive = Layer.unwrapEffect(
             .with(
               { _tag: "None" },
               { _tag: "Some", value: "JSON" },
-              () => Logger.replace(Logger.defaultLogger, jsonConsoleLogger),
+              () => Logger.layer([jsonConsoleLogger]),
             )
             .with(
               { _tag: "Some", value: "pretty" },
-              () => Logger.pretty,
+              () => Logger.layer([Logger.consolePretty()]),
             )
             .exhaustive(),
       ),

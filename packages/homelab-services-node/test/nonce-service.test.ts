@@ -20,7 +20,7 @@ describe("NonceService", () => {
 
     it.effect("should include the unix timestamp as the first part", () =>
       Effect.gen(function*() {
-        const time = DateTime.unsafeMake(1700000000000)
+        const time = DateTime.makeUnsafe(1700000000000)
         const nonce = yield* Services.NonceService.withTime(time)
 
         const [timestamp] = nonce.split(".")
@@ -29,7 +29,7 @@ describe("NonceService", () => {
 
     it.effect("should produce deterministic nonces for the same time", () =>
       Effect.gen(function*() {
-        const time = DateTime.unsafeMake(1700000000000)
+        const time = DateTime.makeUnsafe(1700000000000)
         const nonce1 = yield* Services.NonceService.withTime(time)
         const nonce2 = yield* Services.NonceService.withTime(time)
 
@@ -38,8 +38,8 @@ describe("NonceService", () => {
 
     it.effect("should produce different nonces for different times", () =>
       Effect.gen(function*() {
-        const time1 = DateTime.unsafeMake(1700000000000)
-        const time2 = DateTime.unsafeMake(1700000001000)
+        const time1 = DateTime.makeUnsafe(1700000000000)
+        const time2 = DateTime.makeUnsafe(1700000001000)
         const nonce1 = yield* Services.NonceService.withTime(time1)
         const nonce2 = yield* Services.NonceService.withTime(time2)
 
@@ -50,7 +50,7 @@ describe("NonceService", () => {
   describe("validateNonce", () => {
     it.effect("should return the DateTime encoded in the nonce", () =>
       Effect.gen(function*() {
-        const time = DateTime.unsafeMake(1700000000000)
+        const time = DateTime.makeUnsafe(1700000000000)
         const nonce = yield* Services.NonceService.withTime(time)
 
         const result = yield* Services.NonceService.validateNonce(nonce)
@@ -95,7 +95,7 @@ describe("NonceService", () => {
 
     it.effect("should fail with invalid-hmac for tampered nonce", () =>
       Effect.gen(function*() {
-        const time = DateTime.unsafeMake(1700000000000)
+        const time = DateTime.makeUnsafe(1700000000000)
         const nonce = yield* Services.NonceService.withTime(time)
         const [timestamp] = nonce.split(".")
         const tamperedNonce = `${timestamp}.tampered-hmac`
@@ -112,7 +112,7 @@ describe("NonceService", () => {
 
     it.effect("should fail with invalid-hmac for nonce with modified timestamp", () =>
       Effect.gen(function*() {
-        const time = DateTime.unsafeMake(1700000000000)
+        const time = DateTime.makeUnsafe(1700000000000)
         const nonce = yield* Services.NonceService.withTime(time)
         const [, hmac] = nonce.split(".")
         const tamperedNonce = `1700000001.${hmac}`

@@ -1,5 +1,5 @@
-import { Headers, HttpServerRequest } from "@effect/platform"
-import { Array, Effect, flow, Layer, Option, Redacted, String } from "effect"
+import { Array, Effect, flow, Layer, Option, Redacted, Result, String } from "effect"
+import { Headers, HttpServerRequest } from "effect/http"
 import { Middleware } from "homelab-services"
 
 const extractBasicPassword: (authHeader: string) => Option.Option<string> = flow(
@@ -15,6 +15,7 @@ const extractDPopTokens: (dpopHeader: string) => ReadonlyArray<string> = flow(
     flow(
       String.trim,
       Option.liftPredicate(String.isNonEmpty),
+      Result.fromOption(() => undefined),
     ),
   ),
 )
@@ -22,15 +23,19 @@ const extractDPopTokens: (dpopHeader: string) => ReadonlyArray<string> = flow(
 export const BasicAuthMiddlewareLive = Layer.succeed(
   Middleware.BasicAuthMiddleware,
   {
-    apiKey: (authHeader: Redacted.Redacted) =>
+    apiKey: (httpEffect, { credential }) =>
       Effect.gen(function*() {
-        const apiKey = extractBasicPassword(Redacted.value(authHeader))
+        const apiKey = extractBasicPassword(Redacted.value(credential))
         const request = yield* HttpServerRequest.HttpServerRequest
         const dpopTokens = Headers.get(request.headers, "dpop").pipe(
           Option.andThen(extractDPopTokens),
           Option.getOrElse(() => Array.empty<string>()),
         )
-        return { apiKey, dpopTokens }
+        return yield* Effect.provideService(
+          httpEffect,
+          Middleware.BasicAuthCredentials,
+          { apiKey, dpopTokens },
+        )
       }),
   },
 )
