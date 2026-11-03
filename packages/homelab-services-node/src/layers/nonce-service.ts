@@ -1,6 +1,6 @@
 import { DateTime, Effect, Layer } from "effect"
 import { Services } from "homelab-services"
-import { Constants } from "homelab-shared"
+import { Constants } from "shared"
 
 export const NonceServiceLive = Layer.effect(
   Services.NonceService.NonceService,

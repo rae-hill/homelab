@@ -1,7 +1,7 @@
 import { Schema, Struct } from "effect"
 import { OptionalUnixDateTime, UnixDateTime } from "./UnixDateTime.js"
 
-import { Constants } from "homelab-shared"
+import { Constants } from "shared"
 import { Base64, Base64Url, OptionalBase64Url } from "./Base64.js"
 import { StringFromUint8Array } from "./Buffer.js"
 import * as Crypto from "./Crypto.js"

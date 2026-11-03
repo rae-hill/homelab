@@ -4,16 +4,17 @@
 
 When the user refers to a package by name in a TypeScript/frontend/backend/test context, resolve to `./packages/<package-name>/src/...`.
 
-| User says                          | Resolves to                                       |
-| ---------------------------------- | ------------------------------------------------- |
-| `homelab-frontend/dir/foo.ts`      | `./packages/homelab-frontend/src/dir/foo.ts`      |
-| `homelab-api/dir/foo.ts`           | `./packages/homelab-api/src/dir/foo.ts`           |
-| `homelab-server/dir/foo.ts`        | `./packages/homelab-server/src/dir/foo.ts`        |
-| `homelab-services/dir/foo.ts`      | `./packages/homelab-services/src/dir/foo.ts`      |
-| `homelab-services-node/dir/foo.ts` | `./packages/homelab-services-node/src/dir/foo.ts` |
-| `homelab-shared/dir/foo.ts`        | `./packages/homelab-shared/src/dir/foo.ts`        |
-| `homelab-data/dir/foo.ts`          | `./packages/homelab-data/src/dir/foo.ts`          |
-| `homelab-e2e-tests/dir/foo.ts`     | `./packages/homelab-e2e-tests/src/dir/foo.ts`     |
+| User says                                              | Resolves to                                       |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| `homelab-frontend/dir/foo.ts`                          | `./packages/homelab-frontend/src/dir/foo.ts`      |
+| `homelab-api/dir/foo.ts`                               | `./packages/homelab-api/src/dir/foo.ts`           |
+| `homelab-server/dir/foo.ts`                            | `./packages/homelab-server/src/dir/foo.ts`        |
+| `homelab-services/dir/foo.ts`                          | `./packages/homelab-services/src/dir/foo.ts`      |
+| `homelab-services-node/dir/foo.ts`                     | `./packages/homelab-services-node/src/dir/foo.ts` |
+| `shared/dir/foo.ts`                                    | `./packages/shared/src/dir/foo.ts`                |
+| `homelab-shared/dir/foo.ts` (legacy name for `shared`) | `./packages/shared/src/dir/foo.ts`                |
+| `homelab-data/dir/foo.ts`                              | `./packages/homelab-data/src/dir/foo.ts`          |
+| `homelab-e2e-tests/dir/foo.ts`                         | `./packages/homelab-e2e-tests/src/dir/foo.ts`     |
 
 ## Nix Packages & Config
 

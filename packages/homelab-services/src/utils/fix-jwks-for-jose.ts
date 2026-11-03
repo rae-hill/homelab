@@ -1,5 +1,5 @@
 import { Array } from "effect"
-import { Utils } from "homelab-shared"
+import { Utils } from "shared"
 import type { JSONWebKeySet, JWK as JoseJWK } from "jose"
 import type { JWK, JWKs } from "../schemas/OAuth.js"
 

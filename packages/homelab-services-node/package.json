@@ -25,8 +25,8 @@
     "effect": "^4.1.x",
     "homelab-data": "workspace:*",
     "homelab-services": "workspace:*",
-    "homelab-shared": "workspace:*",
     "jose": "^6.2.1",
+    "shared": "workspace:*",
     "utf-8-validate": "^6.0.6"
   },
   "devDependencies": {

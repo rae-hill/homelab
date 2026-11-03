@@ -1,6 +1,6 @@
 import { Context, DateTime, Effect, Layer } from "effect"
 import type { Schemas } from "homelab-services"
-import { Constants } from "homelab-shared"
+import { Constants } from "shared"
 import { exportJWK, generateKeyPair, SignJWT } from "jose"
 
 export const DPoPProofBuilderServiceId = "homelab-services-node/test-utils/dpop/DPoPProofBuilderService"

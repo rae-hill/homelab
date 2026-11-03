@@ -1,13 +1,13 @@
 {
-  "name": "homelab-shared",
+  "name": "shared",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "Shared constants and utilities for homelab services",
+  "description": "Shared schemas, constants, and utilities for homelab frontends and backends (browser-safe)",
   "repository": {
     "type": "git",
     "url": "<PLACEHOLDER>",
-    "directory": "packages/homelab-shared"
+    "directory": "packages/shared"
   },
   "publishConfig": {
     "access": "public",
@@ -28,11 +28,8 @@
     "coverage": "vitest --coverage"
   },
   "dependencies": {
-    "@effect/platform-node": "^4.1.x",
-    "bufferutil": "^4.1.0",
     "effect": "^4.1.x",
-    "type-fest": "^5.4.4",
-    "utf-8-validate": "^6.0.6"
+    "type-fest": "^5.4.4"
   },
   "effect": {
     "generateExports": {

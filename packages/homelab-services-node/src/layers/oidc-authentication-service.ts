@@ -1,6 +1,6 @@
 import { Effect, Layer, pipe, Schema } from "effect"
 import { ApiErrors, Identity, Schemas, Services } from "homelab-services"
-import { Constants } from "homelab-shared"
+import { Constants } from "shared"
 import type { JWTVerifyGetKey } from "jose"
 import { jwtVerify } from "jose"
 import {

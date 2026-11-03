@@ -32,7 +32,7 @@
     "homelab-api": "workspace:*",
     "homelab-services": "workspace:*",
     "homelab-services-node": "workspace:*",
-    "homelab-shared": "workspace:*",
+    "shared": "workspace:*",
     "ts-pattern": "^5.9.0",
     "tsx": "^4.21.0",
     "utf-8-validate": "^6.0.6"

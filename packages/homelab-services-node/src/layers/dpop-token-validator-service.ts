@@ -1,6 +1,6 @@
 import { Array, DateTime, Effect, Layer, Option, pipe, Schema } from "effect"
 import { ApiErrors, Schemas, Services, Utils } from "homelab-services"
-import { Constants } from "homelab-shared"
+import { Constants } from "shared"
 import { decodeJwt, decodeProtectedHeader, jwtVerify } from "jose"
 import * as Crypto from "node:crypto"
 

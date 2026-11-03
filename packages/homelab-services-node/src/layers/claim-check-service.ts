@@ -1,6 +1,6 @@
 import { DateTime, Effect, HashMap, Layer, Option } from "effect"
 import { ApiErrors, type Identity, Services } from "homelab-services"
-import { Constants } from "homelab-shared"
+import { Constants } from "shared"
 import * as Crypto from "node:crypto"
 
 const CHECK_CLAIM_EXPIRATION = Constants.FIVE_MINUTES_SECONDS
