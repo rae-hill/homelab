@@ -12,7 +12,7 @@ export const RemoteOIDCWellKnownDetailsServiceId =
   "homelab-api/config/oidc-config-remote/RemoteOIDCWellKnownDetailsService"
 
 export class RemoteOIDCWellKnownDetailsService
-  extends Context.Tag(RemoteOIDCWellKnownDetailsServiceId)<RemoteOIDCWellKnownDetailsService, RemoteOIDCConfig>()
+  extends Context.Service<RemoteOIDCWellKnownDetailsService, RemoteOIDCConfig>()(RemoteOIDCWellKnownDetailsServiceId)
 {
 }
 

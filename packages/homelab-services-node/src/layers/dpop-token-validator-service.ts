@@ -87,12 +87,12 @@ class DPoPTokenValidatorServiceImpl implements Services.DPoPTokenValidatorServic
 
           const parsedToken = yield* pipe(
             payload,
-            Schema.decodeUnknown(Schemas.OAuth.DPoPProofJWT),
+            Schema.decodeUnknownEffect(Schemas.OAuth.DPoPProofJWT),
           )
 
           const parsedHeaders = yield* pipe(
             protectedHeader,
-            Schema.decodeUnknown(Schemas.OAuth.DPoPJOSEHeader),
+            Schema.decodeUnknownEffect(Schemas.OAuth.DPoPJOSEHeader),
           )
 
           if (parsedToken.htm !== expectedHtm) {
@@ -123,7 +123,7 @@ class DPoPTokenValidatorServiceImpl implements Services.DPoPTokenValidatorServic
           } satisfies Services.DPoPTokenValidatorService.DPoPValidationResult
         },
         Effect.catchTags({
-          ParseError(err) {
+          SchemaError(err) {
             return new ApiErrors.AuthenticationError({
               reason: "invalid-credential",
               message: "Invalid DPoP Token",
@@ -163,7 +163,7 @@ class DPoPTokenValidatorServiceImpl implements Services.DPoPTokenValidatorServic
   }
 
   private validateNonce(nonce: typeof Schemas.OAuth.DPoPProofJWT.Type["nonce"]) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       if (nonce === undefined) {
         return yield* new ApiErrors.AuthenticationError({
           reason: "invalid-credential",
@@ -192,7 +192,7 @@ class DPoPTokenValidatorServiceImpl implements Services.DPoPTokenValidatorServic
       const now = yield* DateTime.now
       const nonceExpiry = DateTime.addDuration(nonceTime, "5 minutes")
 
-      if (!DateTime.lessThan(now, nonceExpiry)) {
+      if (!DateTime.isLessThan(now, nonceExpiry)) {
         return yield* new ApiErrors.AuthenticationError({
           reason: "expired-credential",
           message: "DPoP nonce has expired",

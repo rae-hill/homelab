@@ -9,8 +9,10 @@ const withIdentity = (identity: Identity.Identity) => Layer.succeed(Middleware.C
 
 const certsArgs = (): Homelab.MobileConfigEndpoints.Certs.CertsHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {},
-  urlParams: {},
+  query: {},
 })
 
 const authorizedIdentity = new Identity.OIDCIdentity(

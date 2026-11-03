@@ -20,10 +20,11 @@ export interface FineGrainedAuthorizationServiceDef {
   ): (effect: Effect.Effect<true, E, R>) => Effect.Effect<true, E | AuthorizationError | InternalServerError, R>
 }
 
-export class FineGrainedAuthorizationService extends Context.Tag(FineGrainedAuthorizationServiceId)<
-  FineGrainedAuthorizationService,
-  FineGrainedAuthorizationServiceDef
->() {
+export class FineGrainedAuthorizationService
+  extends Context.Service<FineGrainedAuthorizationService, FineGrainedAuthorizationServiceDef>()(
+    FineGrainedAuthorizationServiceId,
+  )
+{
 }
 
 /** {@inheritDoc FineGrainedAuthorizationServiceDef.refine} */

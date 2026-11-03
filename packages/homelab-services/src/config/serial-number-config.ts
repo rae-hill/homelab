@@ -9,7 +9,7 @@ export interface SerialNumberConfigDef {
 }
 
 export class SerialNumberConfig
-  extends Context.Tag(SerialNumberConfigId)<SerialNumberConfig, SerialNumberConfigDef>()
+  extends Context.Service<SerialNumberConfig, SerialNumberConfigDef>()(SerialNumberConfigId)
 {}
 
 /** {@inheritDoc SerialNumberConfigDef.resolveIp} */

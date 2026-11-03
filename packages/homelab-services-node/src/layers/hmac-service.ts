@@ -1,5 +1,4 @@
-import { FileSystem } from "@effect/platform"
-import { Effect, Layer, Option, String } from "effect"
+import { Effect, FileSystem, Layer, Option, String } from "effect"
 import { Config, Services } from "homelab-services"
 import * as Crypto from "node:crypto"
 
@@ -22,7 +21,7 @@ class HMACServiceImpl implements Services.HMACService.HMACServiceDef {
   constructor(private readonly secret: Option.Option<string>) {}
 
   hmacDigest(data: string) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const secret = yield* this.secret.pipe(
         Option.match({
           onSome: Effect.succeed,

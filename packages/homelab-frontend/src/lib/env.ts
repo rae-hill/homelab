@@ -1,6 +1,6 @@
 import { Config, ConfigProvider } from "effect"
 
-export const AstroConfigProvider = ConfigProvider.fromJson({
+export const AstroConfigProvider = ConfigProvider.fromUnknown({
   PUBLIC_API_BASE_URL: import.meta.env.PUBLIC_API_BASE_URL ?? "",
   ...(import.meta.env.PUBLIC_OIDC_WELL_KNOWN_URL != null &&
     { PUBLIC_OIDC_WELL_KNOWN_URL: import.meta.env.PUBLIC_OIDC_WELL_KNOWN_URL }),
@@ -12,11 +12,11 @@ export const AstroConfigProvider = ConfigProvider.fromJson({
     { PUBLIC_UPGRADE_TARGET_ORIGIN: import.meta.env.PUBLIC_UPGRADE_TARGET_ORIGIN }),
 })
 
-export const API_BASE_URL = Config.string("PUBLIC_API_BASE_URL")
-export const OIDC_WELL_KNOWN_URL = Config.string("PUBLIC_OIDC_WELL_KNOWN_URL")
-export const OIDC_CLIENT_ID = Config.string("PUBLIC_OIDC_CLIENT_ID")
-export const UPGRADE_STATUS_URL = Config.string("PUBLIC_UPGRADE_STATUS_URL")
-export const UPGRADE_TARGET_ORIGIN = Config.string("PUBLIC_UPGRADE_TARGET_ORIGIN")
+export const API_BASE_URL = Config.String("PUBLIC_API_BASE_URL")
+export const OIDC_WELL_KNOWN_URL = Config.String("PUBLIC_OIDC_WELL_KNOWN_URL")
+export const OIDC_CLIENT_ID = Config.String("PUBLIC_OIDC_CLIENT_ID")
+export const UPGRADE_STATUS_URL = Config.String("PUBLIC_UPGRADE_STATUS_URL")
+export const UPGRADE_TARGET_ORIGIN = Config.String("PUBLIC_UPGRADE_TARGET_ORIGIN")
 
 /** Base path without trailing slash (e.g. "" or "/ui") */
 const raw = import.meta.env.BASE_URL ?? "/"

@@ -44,13 +44,13 @@ class AcmeProfileServiceImpl implements Services.AcmeProfileGeneratorService.Acm
           acmePayload,
         ),
         Effect.andThen(
-          Schema.encode(
+          Schema.encodeEffect(
             Schemas.RootPayload.RootPayloadSchema,
           ),
         ),
         Effect.catchTag(
-          "ParseError",
-          ApiErrors.HttpApiEncodeError.fromParseError,
+          "SchemaError",
+          ApiErrors.HttpApiEncodeError.fromSchemaError,
         ),
       )
     })

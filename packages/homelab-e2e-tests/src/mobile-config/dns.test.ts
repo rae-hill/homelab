@@ -30,8 +30,8 @@ describe("GET /mobile-config/dns/:profile", () => {
 
         const result = yield* Effect.flip(
           client["mobile-config"].dns({
-            path: { profile: "private_homelab" },
-            urlParams: {},
+            params: { profile: "private_homelab" },
+            query: {},
             headers: {
               dpop: dpopProof,
               authorization: `${token_type} ${access_token}`,
@@ -63,8 +63,8 @@ describe("GET /mobile-config/dns/:profile", () => {
 
         const result = yield* Effect.flip(
           client["mobile-config"].dns({
-            path: { profile: "private_homelab_resolver_only" },
-            urlParams: {},
+            params: { profile: "private_homelab_resolver_only" },
+            query: {},
             headers: {
               dpop: dpopProof,
               authorization: `${token_type} ${access_token}`,
@@ -94,8 +94,8 @@ describe("GET /mobile-config/dns/:profile", () => {
         })
 
         const result = yield* client["mobile-config"].dns({
-          path: { profile: "private_homelab" },
-          urlParams: {},
+          params: { profile: "private_homelab" },
+          query: {},
           headers: {
             dpop: dpopProof,
             authorization: `${token_type} ${access_token}`,

@@ -86,7 +86,7 @@ describe("POST /oauth/token", () => {
         const apiKeyB64 = Buffer.from(`:${TEST_API_KEY}`).toString("base64url")
 
         const [{ access_token, token_type }, res] = yield* apiClient.oauth.token({
-          withResponse: true,
+          responseMode: "decoded-and-response",
           headers: {
             dpop: dpopProof,
             authorization: `${apiKeyB64}`,

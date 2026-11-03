@@ -227,7 +227,7 @@ class AppleMdmXmlPrintingImpl {
     if (this.isObject(json)) {
       return Effect.reduce(
         Record.toEntries(json),
-        Lines.empty,
+        () => Lines.empty,
         (z, [k, v]) =>
           this.encodeContent(v, depthLevel + 1).pipe(
             Effect.map(
@@ -258,7 +258,7 @@ class AppleMdmXmlPrintingImpl {
     if (this.isArray(json)) {
       return Effect.reduce(
         json,
-        Lines.empty,
+        () => Lines.empty,
         (z, v) =>
           this.encodeContent(v, depthLevel + 1).pipe(
             Effect.map(

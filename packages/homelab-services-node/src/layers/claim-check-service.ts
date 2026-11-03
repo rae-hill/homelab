@@ -14,7 +14,7 @@ class ClaimCheckServiceImpl implements Services.ClaimCheckService.ClaimCheckServ
   ) {}
 
   issue(identity: Identity.Identity) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const expiration = yield* DateTime.now.pipe(
         Effect.map(
           DateTime.add({ seconds: CHECK_CLAIM_EXPIRATION }),
@@ -37,7 +37,7 @@ class ClaimCheckServiceImpl implements Services.ClaimCheckService.ClaimCheckServ
   }
 
   validate(claimCheck: string): Effect.Effect<Identity.Identity, ApiErrors.AuthenticationError> {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const cacheItem = HashMap.get(this.claimCheckCache, claimCheck)
 
       const identity = yield* Option.match(cacheItem, {

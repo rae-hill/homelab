@@ -1,6 +1,10 @@
-import { FetchHttpClient, HttpApiBuilder, HttpApiSwagger, HttpClient, HttpMiddleware } from "@effect/platform"
-import { NodeFileSystem, NodeRuntime } from "@effect/platform-node"
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
+import * as NodePath from "@effect/platform-node/NodePath"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import { Effect, Layer } from "effect"
+import { FetchHttpClient, HttpClient, HttpRouter } from "effect/http"
+import { HttpApiSwagger } from "effect/http-api"
+import { Homelab } from "homelab-api"
 import { Layers, Shell } from "homelab-services-node"
 import { ApiLive } from "./api.js"
 import { EnvLive } from "./env.js"
@@ -9,12 +13,13 @@ import { OtelLive } from "./otel.js"
 import { HttpServerLive } from "./server.js"
 import { ProfileUuidConfigLive } from "./uuids.js"
 
-const Server = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
-  Layer.provide(HttpApiSwagger.layer()),
-  Layer.provide(HttpApiBuilder.middlewareOpenApi()),
+const Routes = ApiLive.pipe(
+  Layer.merge(HttpApiSwagger.layer(Homelab.HomelabApi)),
+)
+
+const Server = HttpRouter.serve(Routes).pipe(
   Layer.provide(LoggerLive),
   Layer.provide(OtelLive),
-  Layer.provide(ApiLive),
   Layer.provide(Shell.Authentication.Aggregate),
   Layer.provide(Shell.Authorization.Aggregate),
   Layer.provide(Shell.Crypto.Aggregate),
@@ -25,13 +30,13 @@ const Server = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   Layer.provide(Shell.Config.ConfigLive),
   Layer.provide(EnvLive),
   Layer.provide(NodeFileSystem.layer),
+  Layer.provide(NodePath.layer),
   Layer.provide(
     Layer.effect(
       HttpClient.HttpClient,
       Effect.map(HttpClient.HttpClient, HttpClient.filterStatusOk),
     ).pipe(Layer.provide(FetchHttpClient.layer)),
   ),
-  Layer.provide(Layer.succeed(FetchHttpClient.Fetch, globalThis.fetch)),
   Layer.provide(HttpServerLive),
   Layer.tapError(Effect.logFatal),
 )
@@ -39,7 +44,6 @@ const Server = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
 NodeRuntime.runMain(
   Layer.launch(Server),
   {
-    disablePrettyLogger: true,
     disableErrorReporting: false,
   },
 )

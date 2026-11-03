@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/http-api"
 import { Homelab } from "homelab-api"
 
 import { handleClaimCheck } from "./claim-check.js"

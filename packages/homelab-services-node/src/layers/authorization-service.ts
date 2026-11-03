@@ -27,7 +27,7 @@ class AuthorizationServiceImpl implements Services.AuthorizationService.Authoriz
 
   canCreate(identity: Identity.Identity, resource: ResourceURIs.ResourceURIs, params: unknown) {
     return this.canView(identity, resource, params).pipe(
-      Effect.zipRight(this.hasFeatureFlag(resource, Operation.create)),
+      Effect.andThen(this.hasFeatureFlag(resource, Operation.create)),
       this.authorize(identity, Operation.create, resource),
       this.authorizeFga(identity, Operation.create, resource, params),
     )
@@ -35,7 +35,7 @@ class AuthorizationServiceImpl implements Services.AuthorizationService.Authoriz
 
   canModify(identity: Identity.Identity, resource: ResourceURIs.ResourceURIs, params: unknown) {
     return this.canCreate(identity, resource, params).pipe(
-      Effect.zipRight(this.hasFeatureFlag(resource, Operation.modify)),
+      Effect.andThen(this.hasFeatureFlag(resource, Operation.modify)),
       this.authorize(identity, Operation.modify, resource),
       this.authorizeFga(identity, Operation.modify, resource, params),
     )
@@ -43,7 +43,7 @@ class AuthorizationServiceImpl implements Services.AuthorizationService.Authoriz
 
   canDelete(identity: Identity.Identity, resource: ResourceURIs.ResourceURIs, params: unknown) {
     return this.canModify(identity, resource, params).pipe(
-      Effect.zipRight(this.hasFeatureFlag(resource, Operation.delete)),
+      Effect.andThen(this.hasFeatureFlag(resource, Operation.delete)),
       this.authorize(identity, Operation.delete, resource),
       this.authorizeFga(identity, Operation.delete, resource, params),
     )
@@ -74,7 +74,8 @@ class AuthorizationServiceImpl implements Services.AuthorizationService.Authoriz
   private hasFeatureFlag(resource: ResourceURIs.ResourceURIs, op: Operation) {
     return pipe(
       true as const,
-      Effect.liftPredicate(
+      Effect.succeed,
+      Effect.filterOrFail(
         () => this.featureFlagService.enabled(resource, op),
         () => ApiErrors.AuthorizationError.fromFeatureFlag(resource, op),
       ),

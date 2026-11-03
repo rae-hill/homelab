@@ -1,6 +1,3 @@
-import { Foldable } from "@effect/typeclass"
-import * as Array from "@effect/typeclass/data/Array"
-import * as String from "@effect/typeclass/data/String"
 import type { NonEmptyReadonlyArray } from "effect/Array"
 
 export type Line = readonly [depth: number, line: string]
@@ -29,9 +26,10 @@ export interface CompilationParamters {
 }
 
 export function compile(params: CompilationParamters): (lines: Lines) => string {
-  return Foldable.combineMap(Array.Foldable)(String.Monoid)(
-    ([depth, line]) => `${params.indent.repeat(depth)}${line}${params.newline}`,
-  )
+  return (lines) =>
+    lines
+      .map(([depth, line]) => `${params.indent.repeat(depth)}${line}${params.newline}`)
+      .join("")
 }
 
 export function isNonEmpty(lines: Lines): lines is NonEmptyLines {

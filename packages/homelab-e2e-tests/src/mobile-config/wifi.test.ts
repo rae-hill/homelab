@@ -1,5 +1,5 @@
 import { assert, describe, expect, it } from "@effect/vitest"
-import { Effect, ParseResult } from "effect"
+import { Effect, Schema } from "effect"
 import { ApiErrors } from "homelab-services"
 import {
   BASE_URL,
@@ -36,7 +36,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
               disableMACRandomization: false,
               password: "1234",
             },
-            path: {
+            params: {
               ssid: "abcd",
               encryption: "WPA2",
             },
@@ -44,7 +44,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
               dpop: newDpopProof,
               authorization: `${token_type} ${access_token}`,
             },
-            urlParams: {},
+            query: {},
           }),
         )
 
@@ -80,7 +80,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
               enterpriseClientType: "EAP-TLS",
               includeEthernetProfile: false,
             },
-            path: {
+            params: {
               ssid: "abcd",
               encryption: "WPA2",
             },
@@ -89,7 +89,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
               authorization: `${token_type} ${access_token}`,
               "x-forwarded-for": "10.0.0.99" as any,
             },
-            urlParams: {},
+            query: {},
           }),
         )
 
@@ -121,7 +121,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
               password: "1234",
               enterpriseClientType: "PEAP",
             } as any,
-            path: {
+            params: {
               ssid: "abcd",
               encryption: "WPA2",
             },
@@ -129,13 +129,13 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
               dpop: newDpopProof,
               authorization: `${token_type} ${access_token}`,
             },
-            urlParams: {},
+            query: {},
           }),
         )
 
         assert(
-          result instanceof ParseResult.ParseError,
-          `expected instanceof ParseError but got ${JSON.stringify(result)}`,
+          result instanceof Schema.SchemaError,
+          `expected instanceof SchemaError but got ${JSON.stringify(result)}`,
         )
       }).pipe(Effect.provide(E2ETestLayer)))
     it.live("rejects when username does not match Idenitity", () =>
@@ -159,7 +159,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             includeEthernetProfile: false,
             username: "bob",
           },
-          path: {
+          params: {
             ssid: "abcd",
             encryption: "WPA2",
           },
@@ -167,7 +167,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             dpop: newDpopProof,
             authorization: `${token_type} ${access_token}`,
           },
-          urlParams: {},
+          query: {},
         }))
 
         assert(
@@ -201,7 +201,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             includeEthernetProfile: false,
             username: "test",
           },
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA2",
           },
@@ -209,7 +209,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             dpop: newDpopProof,
             authorization: `${token_type} ${access_token}`,
           },
-          urlParams: {},
+          query: {},
         })
 
         expect(result).toBeDefined()
@@ -227,12 +227,12 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             includeEthernetProfile: false,
             username: "test",
           },
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA2",
           },
           headers: {},
-          urlParams: {},
+          query: {},
         }))
 
         assert(
@@ -254,12 +254,12 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             includeEthernetProfile: false,
             username: "guest",
           },
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA2",
           },
           headers: {},
-          urlParams: {},
+          query: {},
         })
 
         expect(result).toBeDefined()
@@ -284,7 +284,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             enterpriseClientType: "EAP-TLS",
             includeEthernetProfile: false,
           },
-          path: {
+          params: {
             ssid: "0x676179",
             encryption: "WPA3",
           },
@@ -293,7 +293,7 @@ describe("PUT /mobile-config/wifi/:ssid/:encryption", () => {
             authorization: `${token_type} ${access_token}`,
             "x-forwarded-for": "192.168.1.10" as any,
           },
-          urlParams: {},
+          query: {},
         })
 
         expect(result).toContain("<?xml")

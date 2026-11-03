@@ -13,7 +13,7 @@ export interface HMACServiceDef {
   readonly hmacDigest: (data: string) => Effect.Effect<string, HMACDigestError>
 }
 
-export class HMACService extends Context.Tag(HMACServiceId)<HMACService, HMACServiceDef>() {
+export class HMACService extends Context.Service<HMACService, HMACServiceDef>()(HMACServiceId) {
 }
 
 /** {@inheritDoc HMACServiceDef.hmacDigest} */

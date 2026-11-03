@@ -1,6 +1,7 @@
-import { FetchHttpClient, HttpClient } from "@effect/platform"
-import { NodeFileSystem, NodePath } from "@effect/platform-node"
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
+import * as NodePath from "@effect/platform-node/NodePath"
 import { ConfigProvider, Effect, Layer } from "effect"
+import { FetchHttpClient, HttpClient, HttpServerRequest } from "effect/http"
 import { Layers } from "homelab-services-node"
 import {
   IntegrationTestLayer as ApiIntegrationTestLayer,
@@ -26,24 +27,22 @@ export { buildProof, DPoPProofBuilderService, getPublicJWK } from "homelab-servi
 const privateDir = path.resolve(import.meta.dirname, "..", "private")
 const certsDir = path.resolve(import.meta.dirname, "..", "..", "..", "certs")
 
-const TestConfigProvider = Layer.setConfigProvider(
-  ConfigProvider.fromMap(
-    new Map([
-      ["HOMELAB_ORIGIN_URL", "http://localhost:3000"],
-      ["HOMELAB_SECRET_FILE", path.join(privateDir, "hmac-secret")],
-      ["TOKEN_ISSUER_PRIVATE_KEY_PATH", path.join(privateDir, "jwk.json")],
-      ["TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH", path.join(privateDir, "private-key-secret")],
-      ["TOKEN_ISSUER_PUBLIC_KEY_PATH", path.join(privateDir, "jwk.pub.json")],
-      ["API_KEYS_FILE", path.join(privateDir, "api-keys")],
-      ["FEATURE_FLAGS", "*"],
-      ["ROOT_CERT_DER", path.join(certsDir, "alford-root.der")],
-      ["INTERMEDIATE_CERT_DER", path.join(certsDir, "intermediate_ca_2.der")],
-      ["ROOT_CERT_CRT", path.join(certsDir, "alford-root.crt")],
-      ["INTERMEDIATE_CERT_CRT", path.join(certsDir, "intermediate_ca_2.crt")],
-      ["KANIDM_OPENID_PROVIDER_URL", "https://kanidm.test/oauth2/openid/test/.well-known/openid-configuration"],
-      ["SERIAL_NUMBERS_FILE", path.join(privateDir, "serial-numbers.json")],
-    ]),
-  ),
+const TestConfigProvider = ConfigProvider.layer(
+  ConfigProvider.fromUnknown({
+    HOMELAB_ORIGIN_URL: "http://localhost:3000",
+    HOMELAB_SECRET_FILE: path.join(privateDir, "hmac-secret"),
+    TOKEN_ISSUER_PRIVATE_KEY_PATH: path.join(privateDir, "jwk.json"),
+    TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH: path.join(privateDir, "private-key-secret"),
+    TOKEN_ISSUER_PUBLIC_KEY_PATH: path.join(privateDir, "jwk.pub.json"),
+    API_KEYS_FILE: path.join(privateDir, "api-keys"),
+    FEATURE_FLAGS: "*",
+    ROOT_CERT_DER: path.join(certsDir, "alford-root.der"),
+    INTERMEDIATE_CERT_DER: path.join(certsDir, "intermediate_ca_2.der"),
+    ROOT_CERT_CRT: path.join(certsDir, "alford-root.crt"),
+    INTERMEDIATE_CERT_CRT: path.join(certsDir, "intermediate_ca_2.crt"),
+    KANIDM_OPENID_PROVIDER_URL: "https://kanidm.test/oauth2/openid/test/.well-known/openid-configuration",
+    SERIAL_NUMBERS_FILE: path.join(privateDir, "serial-numbers.json"),
+  }),
 )
 
 const TestEnvLive = EnvLive.pipe(Layer.provide(TestConfigProvider))
@@ -147,6 +146,7 @@ export const HandlerTestLayer = Layer.mergeAll(
   TestHttpClient,
   NodeFileSystem.layer,
   NodePath.layer,
+  Layer.succeed(HttpServerRequest.HttpServerRequest, {} as any),
 )
 
 export const IntegrationTestLayer = Layer.mergeAll(

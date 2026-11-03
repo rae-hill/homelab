@@ -15,7 +15,9 @@ export interface IssuerJwkResolverDef {
   isLocalIssuer(issuer: string): boolean
 }
 
-export class IssuerJwkResolver extends Context.Tag(IssuerJwkResolverId)<IssuerJwkResolver, IssuerJwkResolverDef>() {}
+export class IssuerJwkResolver
+  extends Context.Service<IssuerJwkResolver, IssuerJwkResolverDef>()(IssuerJwkResolverId)
+{}
 
 /** {@inheritDoc IssuerJwkResolverDef.getJwkKeyVerifier} */
 export function getJwkKeyVerifier(

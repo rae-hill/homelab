@@ -4,7 +4,7 @@ import * as OAuthSchemas from "./OAuth.js"
 import { Optional } from "./optionals.js"
 
 export const AuthorizationHeader = Schema.String.pipe(
-  Schema.pattern(/^[A-Za-z0-9_\-. ]+$/g),
+  Schema.check(Schema.isPattern(/^[A-Za-z0-9_\-. ]+$/g)),
 )
 
 export const TokenResponse = Schema.Struct({

@@ -1,4 +1,4 @@
-import { DateTime, Effect, HashSet, Layer, Option, pipe, Schema } from "effect"
+import { Array, DateTime, Effect, Layer, Option, pipe, Schema } from "effect"
 import { ApiErrors, Config, Identity, Schemas, Services } from "homelab-services"
 import { Constants } from "homelab-shared"
 import { decodeJwt, SignJWT } from "jose"
@@ -26,9 +26,9 @@ export const TokenIssuerServiceLive = Layer.effect(
       ),
     )
 
-    const kid = yield* Option.fromNullable(publicKey.kid).pipe(
+    const kid = yield* Option.fromNullishOr(publicKey.kid).pipe(
       Option.match({
-        onNone: () => Effect.dieMessage("Public signing key missing KID"),
+        onNone: () => Effect.die(new globalThis.Error("Public signing key missing KID")),
         onSome: Effect.succeed,
       }),
     )
@@ -60,16 +60,16 @@ class TokenIssuerServiceImpl implements Services.TokenIssuerService.TokenIssuerS
     apiKey: Option.Option<string>,
     dpopTokens: ReadonlyArray<string>,
   ) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const [email, apiKeyScopes] = yield* this.getApiKeyEmailRoles(apiKey)
 
       const { htm, htu } = yield* this.extractDpop(dpopTokens).pipe(
         Effect.andThen(
-          Schema.decodeUnknown(
+          Schema.decodeUnknownEffect(
             Schemas.OAuth.DPoPProofHTTPParams,
           ),
         ),
-        Effect.catchTag("ParseError", (err) =>
+        Effect.catchTag("SchemaError", (err) =>
           new ApiErrors.AuthenticationError({
             reason: "invalid-credential",
             message: "Received invalid DPoP",
@@ -85,7 +85,7 @@ class TokenIssuerServiceImpl implements Services.TokenIssuerService.TokenIssuerS
 
       const accessToken = yield* this.signAccessToken(
         jwk,
-        HashSet.toValues(apiKeyScopes),
+        Array.fromIterable(apiKeyScopes),
         email,
       )
 
@@ -101,7 +101,8 @@ class TokenIssuerServiceImpl implements Services.TokenIssuerService.TokenIssuerS
   private extractDpop(dpopTokens: ReadonlyArray<string>) {
     return pipe(
       dpopTokens,
-      Effect.liftPredicate(
+      Effect.succeed,
+      Effect.filterOrFail(
         (tokens): tokens is [string] => tokens.length === 1,
         (tokens) =>
           new ApiErrors.AuthenticationError({
@@ -109,23 +110,25 @@ class TokenIssuerServiceImpl implements Services.TokenIssuerService.TokenIssuerS
             message: tokens.length === 0 ? "DPoP proof is required" : "Received multiple DPoP tokens",
           }),
       ),
-      Effect.tryMap({
-        try([dpopToken]) {
-          return decodeJwt(dpopToken)
-        },
-        catch(error) {
-          return new ApiErrors.AuthenticationError({
-            reason: "invalid-credential",
-            message: "Failed to decode DPoP token claims",
-            error,
-          })
-        },
-      }),
+      Effect.flatMap(([dpopToken]) =>
+        Effect.try({
+          try() {
+            return decodeJwt(dpopToken)
+          },
+          catch(error) {
+            return new ApiErrors.AuthenticationError({
+              reason: "invalid-credential",
+              message: "Failed to decode DPoP token claims",
+              error,
+            })
+          },
+        })
+      ),
     )
   }
 
   private getApiKeyEmailRoles(apiKey: Option.Option<string>) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const providedApiKey = yield* apiKey.pipe(
         Option.map(Effect.succeed),
         Option.getOrElse(() =>
@@ -172,7 +175,7 @@ class TokenIssuerServiceImpl implements Services.TokenIssuerService.TokenIssuerS
   }
 
   private signAccessToken(dpopJwk: Schemas.OAuth.JWK, roles: ReadonlyArray<string>, email: string) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const dpopJwkDigest = yield* Effect.try({
         try() {
           return Crypto.hash("sha256", JSON.stringify(dpopJwk))

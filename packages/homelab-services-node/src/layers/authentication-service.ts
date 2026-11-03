@@ -1,4 +1,4 @@
-import { Effect, flow, Layer, Option } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { ApiErrors, Config, Identity, Services } from "homelab-services"
 import type { Schemas } from "homelab-services"
 import type { JWTVerifyGetKey } from "jose"
@@ -45,7 +45,7 @@ class AuthenticationServiceImpl implements Services.AuthenticationService.Authen
           return Effect.succeed(new Identity.GuestIdentity())
         },
         onSome: (jwt) =>
-          Effect.gen(this, function*() {
+          Effect.gen({ self: this }, function*() {
             const issuer = yield* this.getJwtIssuer(jwt)
             const jwkKey = yield* this.getJwkKey(issuer)
 
@@ -93,17 +93,15 @@ class AuthenticationServiceImpl implements Services.AuthenticationService.Authen
         })
       },
     }).pipe(
-      Effect.andThen(
-        flow(
-          Effect.fromNullable,
-          Effect.mapError(
-            () =>
-              new ApiErrors.AuthenticationError({
-                reason: "invalid-claims",
-                message: "JWT is missing issuer claim",
-              }),
-          ),
-        ),
+      Effect.andThen((iss) =>
+        Effect.fromOption(
+          Option.fromNullishOr(iss),
+          () =>
+            new ApiErrors.AuthenticationError({
+              reason: "invalid-claims",
+              message: "JWT is missing issuer claim",
+            }),
+        )
       ),
     )
   }

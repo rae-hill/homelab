@@ -19,7 +19,7 @@ export interface NonceServiceDef {
   readonly validateNonce: (nonce: string) => Effect.Effect<DateTime.DateTime, NonceValidationError | HMACDigestError>
 }
 
-export class NonceService extends Context.Tag(NonceServiceId)<NonceService, NonceServiceDef>() {
+export class NonceService extends Context.Service<NonceService, NonceServiceDef>()(NonceServiceId) {
 }
 
 /** {@inheritDoc NonceServiceDef.withTime} */

@@ -19,5 +19,5 @@ export interface CertConfigServiceDef {
   ): Effect.Effect<Schemas.CertificatePayload.CertificateConfig>
 }
 
-export class CertConfigService extends Context.Tag(CertConfigServiceId)<CertConfigService, CertConfigServiceDef>() {
+export class CertConfigService extends Context.Service<CertConfigService, CertConfigServiceDef>()(CertConfigServiceId) {
 }

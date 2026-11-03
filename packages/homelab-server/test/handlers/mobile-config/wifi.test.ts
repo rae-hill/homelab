@@ -39,13 +39,15 @@ const wifiArgs = (overrides?: {
     }
 
   return {
-    path: {
+    params: {
       ssid: overrides?.ssid ?? "0x676179",
       encryption: overrides?.encryption ?? "WPA3" as const,
     },
     payload,
-    urlParams: {},
+    query: {},
     request: {} as any,
+    endpoint: {} as any,
+    group: {} as any,
     headers: {},
   } as Homelab.MobileConfigEndpoints.Wifi.WifiMobileConfigHandlerArgs
 }

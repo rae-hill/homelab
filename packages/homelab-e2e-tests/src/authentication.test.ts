@@ -1,6 +1,6 @@
-import { HttpClient, type HttpClientError, HttpClientRequest, type HttpClientResponse } from "@effect/platform"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
+import { HttpClient, type HttpClientError, HttpClientRequest, type HttpClientResponse } from "effect/http"
 import * as Crypto from "node:crypto"
 import {
   BASE_URL,

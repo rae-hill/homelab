@@ -23,7 +23,7 @@ export type AuthenticationServiceDef = {
 }
 
 export class AuthenticationService
-  extends Context.Tag(AuthenticationServiceId)<AuthenticationService, AuthenticationServiceDef>()
+  extends Context.Service<AuthenticationService, AuthenticationServiceDef>()(AuthenticationServiceId)
 {
 }
 

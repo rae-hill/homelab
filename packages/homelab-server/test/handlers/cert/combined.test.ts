@@ -9,6 +9,8 @@ const withIdentity = (identity: Identity.Identity) => Layer.succeed(Middleware.C
 
 const combinedArgs = (): Homelab.CertEndpoints.Combined.CombinedCertHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {},
 })
 

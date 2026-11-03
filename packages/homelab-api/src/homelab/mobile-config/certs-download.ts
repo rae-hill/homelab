@@ -1,26 +1,24 @@
-import { HttpApiEndpoint, HttpApiError } from "@effect/platform"
 import type { Types } from "effect"
-import { ApiErrors, Schemas } from "homelab-services"
+import { HttpApiEndpoint } from "effect/http-api"
+import { ApiErrors, Middleware, Schemas } from "homelab-services"
 
-export const CertsDownload = HttpApiEndpoint.get("certs-download")`/certs/_download`
-  .addSuccess(Schemas.XML.XMLSchema)
-  .addError(ApiErrors.NotImplemented)
-  .addError(ApiErrors.InternalServerError)
-  .addError(ApiErrors.BadRequest)
-  .addError(ApiErrors.NotFound)
-  .addError(HttpApiError.HttpApiDecodeError)
-  .addError(ApiErrors.HttpApiEncodeError)
-  .addError(ApiErrors.AuthorizationError)
-  .addError(
+export const CertsDownload = HttpApiEndpoint.get("certs-download", "/mobile-config/certs/_download", {
+  query: Schemas.Token.AuthQueryParams,
+  success: Schemas.XML.XMLSchema,
+  error: [
+    ApiErrors.NotImplemented,
+    ApiErrors.InternalServerError,
+    ApiErrors.BadRequest,
+    ApiErrors.NotFound,
+    ApiErrors.HttpApiEncodeError,
+    ApiErrors.AuthorizationError,
     ApiErrors.AuthenticationError,
-  )
-  .setHeaders(Schemas.Token.TokenHeaders)
-  .setUrlParams(
-    Schemas.Token.AuthQueryParams,
-  )
+  ],
+  headers: Schemas.Token.TokenHeaders,
+}).middleware(Middleware.AuthMiddleware)
 
 export type CertsDownloadEndpoint = typeof CertsDownload
 
 export type CertsDownloadHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<CertsDownloadEndpoint>
+  HttpApiEndpoint.Request<CertsDownloadEndpoint>
 >

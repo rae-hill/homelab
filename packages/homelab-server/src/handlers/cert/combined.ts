@@ -1,5 +1,5 @@
-import { HttpApp, HttpServerResponse } from "@effect/platform"
 import { Effect } from "effect"
+import { HttpEffect, HttpServerResponse } from "effect/http"
 import type { Homelab } from "homelab-api"
 import { Middleware, Services } from "homelab-services"
 
@@ -11,7 +11,7 @@ export const handleCombined = Effect.fn("handleCombined")(
     const certService = yield* Services.CertificateService.CertificateService
     const combined = Buffer.concat([certService.rootCrt, Buffer.from("\n"), certService.intermediateCrt])
 
-    yield* HttpApp.appendPreResponseHandler(
+    yield* HttpEffect.appendPreResponseHandler(
       (_, res) =>
         Effect.succeed(
           HttpServerResponse.setHeaders(res, {

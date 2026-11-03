@@ -1,21 +1,24 @@
-import { HttpApiEndpoint, HttpApiSchema } from "@effect/platform"
 import type { Types } from "effect"
-import { ApiErrors, type ResourceURIs, Schemas } from "homelab-services"
+import { Schema } from "effect"
+import { HttpApiEndpoint, HttpApiSchema } from "effect/http-api"
+import { ApiErrors, Middleware, type ResourceURIs, Schemas } from "homelab-services"
 
 export const URI = "Cert_Root" satisfies ResourceURIs.ResourceURIs
 export type URI = typeof URI
 
-export const FormatParam = HttpApiSchema.param("format", Schemas.CertFormat.CertFormat)
+export const FormatParam = Schemas.CertFormat.CertFormat
 
-export const RootCert = HttpApiEndpoint.get("root")`/root/${FormatParam}`
-  .addSuccess(HttpApiSchema.Uint8Array())
-  .addError(ApiErrors.AuthorizationError)
-  .setHeaders(Schemas.Token.TokenHeaders)
+export const RootCert = HttpApiEndpoint.get("root", "/cert/root/:format", {
+  params: { format: FormatParam },
+  success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+  error: [ApiErrors.AuthorizationError],
+  headers: Schemas.Token.TokenHeaders,
+}).middleware(Middleware.AuthMiddleware)
 
 export type RootCertEndpoint = typeof RootCert
 
 export type RootCertHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<RootCertEndpoint>
+  HttpApiEndpoint.Request<RootCertEndpoint>
 >
 
 declare module "homelab-services/resource-uris" {

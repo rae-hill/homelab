@@ -1,5 +1,5 @@
-import { type HttpClient } from "@effect/platform"
 import { Effect, Option } from "effect"
+import { type HttpClient } from "effect/http"
 import { Homelab } from "homelab-api"
 import { type Schemas } from "homelab-services"
 import * as Crypto from "node:crypto"
@@ -22,16 +22,16 @@ export const getToken = (apiKey: string): Effect.Effect<
     const apiClient = yield* makeApiClient
 
     const [tokenResponse, res] = yield* apiClient.oauth.token({
-      withResponse: true,
+      responseMode: "decoded-and-response",
       headers: {
         dpop: dpopProof,
         authorization: apiKeyB64,
       },
     })
 
-    const nonce = yield* Option.fromNullable(res.headers["dpop-nonce"]).pipe(
+    const nonce = yield* Option.fromNullishOr(res.headers["dpop-nonce"]).pipe(
       Option.match({
-        onNone: () => Effect.dieMessage("Nonce not returned from token endpoint"),
+        onNone: () => Effect.die(new globalThis.Error("Nonce not returned from token endpoint")),
         onSome: Effect.succeed,
       }),
     )

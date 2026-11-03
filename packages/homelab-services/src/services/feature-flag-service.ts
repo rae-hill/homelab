@@ -9,7 +9,9 @@ export interface FeatureFlagServiceDef {
   enabled(resource: ResourceURIs, operation: Operation): boolean
 }
 
-export class FeatureFlagService extends Context.Tag(FeatureFlagServiceId)<FeatureFlagService, FeatureFlagServiceDef>() {
+export class FeatureFlagService
+  extends Context.Service<FeatureFlagService, FeatureFlagServiceDef>()(FeatureFlagServiceId)
+{
 }
 
 /** {@inheritDoc FeatureFlagServiceDef.enabled} */

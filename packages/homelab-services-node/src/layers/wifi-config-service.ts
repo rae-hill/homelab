@@ -74,7 +74,7 @@ class WifiConfigServiceImpl implements Services.WifiConfigService.WifiConfigServ
       )
     }
 
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const eapConfig = yield* this.eapClientConfig.peapConfig(username, password)
 
       return {
@@ -114,7 +114,7 @@ class WifiConfigServiceImpl implements Services.WifiConfigService.WifiConfigServ
       )
     }
 
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const eapConfig = yield* this.eapClientConfig.eapTlsConfig()
 
       return {

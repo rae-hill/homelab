@@ -26,7 +26,7 @@ export type ClaimCheckServiceDef = {
   >
 }
 
-export class ClaimCheckService extends Context.Tag(ClaimCheckServiceId)<ClaimCheckService, ClaimCheckServiceDef>() {
+export class ClaimCheckService extends Context.Service<ClaimCheckService, ClaimCheckServiceDef>()(ClaimCheckServiceId) {
 }
 
 /** {@inheritDoc ClaimCheckServiceDef.issue} */

@@ -9,80 +9,80 @@ export const DNSSettingsBase = Schema.Struct({
 })
 
 export const DNSSettingsHttps = DNSSettingsBase.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       DNSProtocol: Schema.Literal("HTTPS"),
-      ServerURL: Schema.URL,
-    }),
+      ServerURL: Schema.URLFromString,
+    },
   ),
 )
 
 export const DNSSettingsTLS = DNSSettingsBase.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       DNSProtocol: Schema.Literal("TLS"),
       ServerName: Schema.String,
-      ServerURL: Optional(Schema.URL),
-    }),
+      ServerURL: Optional(Schema.URLFromString),
+    },
   ),
 )
 
-export const DNSSettings = Schema.Union(
+export const DNSSettings = Schema.Union([
   DNSSettingsHttps,
   DNSSettingsTLS,
-)
+])
 
 export const OnDemandRulesBase = Schema.Struct({
-  DNSDomainMatch: Optional(Schema.Array(Schema.URL)),
+  DNSDomainMatch: Optional(Schema.Array(Schema.URLFromString)),
   DNSServerAddressMatch: Optional(Schema.String),
-  InterfaceTypeMatch: Optional(Schema.Literal("Ethernet", "WiFi", "Cellular")),
+  InterfaceTypeMatch: Optional(Schema.Literals(["Ethernet", "WiFi", "Cellular"])),
   SSIDMatch: Optional(Schema.Array(Schema.String)),
-  URLStringProbe: Optional(Schema.URL),
+  URLStringProbe: Optional(Schema.URLFromString),
 })
 
 export const OnDemandRulesConnect = OnDemandRulesBase.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       Action: Schema.Literal("Connect"),
-    }),
+    },
   ),
 )
 
 export const OnDemandRulesDisconnect = OnDemandRulesBase.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       Action: Schema.Literal("Disconnect"),
-    }),
+    },
   ),
 )
 
 export const OnDemandRulesActionParameters = Schema.Struct({
-  DomainAction: Schema.Literal("NeverConnect", "ConnectIfNeeded"),
-  Domains: Schema.Array(Schema.URL),
+  DomainAction: Schema.Literals(["NeverConnect", "ConnectIfNeeded"]),
+  Domains: Schema.Array(Schema.URLFromString),
 })
 
 export const OnDemandRulesEvaluateConnection = OnDemandRulesBase.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       Action: Schema.Literal("EvaluateConnection"),
       ActionParameters: Optional(Schema.Array(OnDemandRulesActionParameters)),
-    }),
+    },
   ),
 )
 
-export const OnDemandRules = Schema.Union(
+export const OnDemandRules = Schema.Union([
   OnDemandRulesDisconnect,
   OnDemandRulesConnect,
   OnDemandRulesEvaluateConnection,
-)
+])
 
 export const DNSConfigSchema = GenericPayloadSchema.pipe(
-  Schema.extend(
-    Schema.Struct({
+  Schema.fieldsAssign(
+    {
       DNSSettings,
       OnDemandRules: Optional(Schema.Array(OnDemandRules)),
       ProhibitDisablement: OptionalWithDefault(Schema.Boolean, constFalse),
-    }),
+    },
   ),
 )
 

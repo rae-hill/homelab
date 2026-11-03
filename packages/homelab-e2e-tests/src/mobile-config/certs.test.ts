@@ -30,7 +30,7 @@ describe("GET /mobile-config/certs", () => {
 
         const result = yield* Effect.flip(
           client["mobile-config"].certs({
-            urlParams: {},
+            query: {},
             headers: {
               dpop: newDpopProof,
               authorization: `${token_type} ${access_token}`,
@@ -64,7 +64,7 @@ describe("GET /mobile-config/certs", () => {
         })
 
         const result = yield* client["mobile-config"].certs({
-          urlParams: {},
+          query: {},
           headers: {
             dpop: newDpopProof,
             authorization: `${token_type} ${access_token}`,
@@ -79,7 +79,7 @@ describe("GET /mobile-config/certs", () => {
         const client = yield* makeApiClient
 
         const result = yield* client["mobile-config"].certs({
-          urlParams: {},
+          query: {},
           headers: {},
         })
 

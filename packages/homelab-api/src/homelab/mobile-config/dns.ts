@@ -1,39 +1,38 @@
-import { HttpApiEndpoint, HttpApiError, HttpApiSchema } from "@effect/platform"
 import type { Types } from "effect"
 import { Schema } from "effect"
-import { ApiErrors, type ResourceURIs, Schemas } from "homelab-services"
+import { HttpApiEndpoint } from "effect/http-api"
+import { ApiErrors, Middleware, type ResourceURIs, Schemas } from "homelab-services"
 
 export const URI = "Config_DNS" satisfies ResourceURIs.ResourceURIs
 export type URI = typeof URI
 
-export const DnsProfileParam = HttpApiSchema.param("profile", Schemas.DnsProfile.DnsProfileSchema)
+export const DnsProfileParam = Schemas.DnsProfile.DnsProfileSchema
 
 export const DnsQueryParams = Schemas.Token.AuthQueryParams.pipe(
-  Schema.extend(Schema.Struct({
+  Schema.fieldsAssign({
     name: Schemas.Optionals.Optional(Schema.String),
     ssid: Schemas.Optionals.Optional(Schema.String),
-  })),
+  }),
 )
 
-export const Dns = HttpApiEndpoint.get("dns")`/dns/${DnsProfileParam}`
-  .addSuccess(Schemas.XML.XMLSchema)
-  .addError(ApiErrors.InternalServerError)
-  .addError(ApiErrors.BadRequest)
-  .addError(ApiErrors.AuthorizationError)
-  .addError(
+export const Dns = HttpApiEndpoint.get("dns", "/mobile-config/dns/:profile", {
+  params: { profile: DnsProfileParam },
+  query: DnsQueryParams,
+  success: Schemas.XML.XMLSchema,
+  error: [
+    ApiErrors.InternalServerError,
+    ApiErrors.BadRequest,
+    ApiErrors.AuthorizationError,
     ApiErrors.AuthenticationError,
-  )
-  .addError(HttpApiError.HttpApiDecodeError)
-  .addError(
     ApiErrors.HttpApiEncodeError,
-  )
-  .setHeaders(Schemas.Token.TokenHeaders)
-  .setUrlParams(DnsQueryParams)
+  ],
+  headers: Schemas.Token.TokenHeaders,
+}).middleware(Middleware.AuthMiddleware)
 
 export type DnsEndpoint = typeof Dns
 
 export type DnsHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<DnsEndpoint>
+  HttpApiEndpoint.Request<DnsEndpoint>
 >
 
 declare module "homelab-services/resource-uris" {

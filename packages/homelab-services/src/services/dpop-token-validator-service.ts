@@ -33,7 +33,7 @@ export interface DPoPTokenValidatorServiceDef {
 }
 
 export class DPoPTokenValidatorService
-  extends Context.Tag(DPoPTokenValidatorServiceId)<DPoPTokenValidatorService, DPoPTokenValidatorServiceDef>()
+  extends Context.Service<DPoPTokenValidatorService, DPoPTokenValidatorServiceDef>()(DPoPTokenValidatorServiceId)
 {
 }
 

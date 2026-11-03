@@ -30,7 +30,9 @@ export interface TokenIssuerServiceDef {
   >
 }
 
-export class TokenIssuerService extends Context.Tag(TokenIssuerServiceId)<TokenIssuerService, TokenIssuerServiceDef>() {
+export class TokenIssuerService
+  extends Context.Service<TokenIssuerService, TokenIssuerServiceDef>()(TokenIssuerServiceId)
+{
 }
 
 /** {@inheritDoc TokenIssuerServiceDef.issueToken} */

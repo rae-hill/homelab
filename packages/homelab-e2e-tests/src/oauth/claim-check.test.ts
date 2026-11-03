@@ -109,7 +109,7 @@ describe("POST /oauth/claim-check", () => {
         })
 
         const result = yield* client["mobile-config"].certs({
-          urlParams: { claim_check },
+          query: { claim_check },
           headers: {},
         })
 

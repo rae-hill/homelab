@@ -40,7 +40,6 @@ export interface ProfileUuidConfigDef {
   readonly homelabPayloadEthernetUuid: UUID
 }
 
-export class ProfileUuidConfig extends Context.Tag(ProfileUuidConfigId)<
-  ProfileUuidConfig,
-  ProfileUuidConfigDef
->() {}
+export class ProfileUuidConfig
+  extends Context.Service<ProfileUuidConfig, ProfileUuidConfigDef>()(ProfileUuidConfigId)
+{}

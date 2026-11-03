@@ -1,47 +1,29 @@
-import { HttpApiEndpoint, HttpApiError } from "@effect/platform"
 import type { Types } from "effect"
-import { ApiErrors, type ResourceURIs, Schemas } from "homelab-services"
+import { HttpApiEndpoint } from "effect/http-api"
+import { ApiErrors, Middleware, type ResourceURIs, Schemas } from "homelab-services"
 
 export const URI = "Config_Certs" satisfies ResourceURIs.ResourceURIs
 export type URI = typeof URI
 
-export const Certs = HttpApiEndpoint.get("certs")`/certs`
-  .addSuccess(Schemas.XML.XMLSchema)
-  .addError(
+export const Certs = HttpApiEndpoint.get("certs", "/mobile-config/certs", {
+  query: Schemas.Token.AuthQueryParams,
+  success: Schemas.XML.XMLSchema,
+  error: [
     ApiErrors.NotImplemented,
-  )
-  .addError(
     ApiErrors.InternalServerError,
-  )
-  .addError(
     ApiErrors.BadRequest,
-  )
-  .addError(
     ApiErrors.NotFound,
-  )
-  .addError(
-    HttpApiError.HttpApiDecodeError,
-  )
-  .addError(
     ApiErrors.HttpApiEncodeError,
-  )
-  .addError(
     ApiErrors.AuthorizationError,
-  )
-  .addError(
     ApiErrors.AuthenticationError,
-  )
-  .setHeaders(
-    Schemas.Token.TokenHeaders,
-  )
-  .setUrlParams(
-    Schemas.Token.AuthQueryParams,
-  )
+  ],
+  headers: Schemas.Token.TokenHeaders,
+}).middleware(Middleware.AuthMiddleware)
 
 export type CertsEndpoint = typeof Certs
 
 export type CertsHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<CertsEndpoint>
+  HttpApiEndpoint.Request<CertsEndpoint>
 >
 
 declare module "homelab-services/resource-uris" {

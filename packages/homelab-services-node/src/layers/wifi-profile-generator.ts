@@ -59,13 +59,13 @@ class WifiProfileServiceImpl implements Services.WifiProfileGeneratorService.Wif
           wifiPayload,
         ),
         Effect.andThen(
-          Schema.encode(
+          Schema.encodeEffect(
             Schemas.RootPayload.RootPayloadSchema,
           ),
         ),
         Effect.catchTag(
-          "ParseError",
-          ApiErrors.HttpApiEncodeError.fromParseError,
+          "SchemaError",
+          ApiErrors.HttpApiEncodeError.fromSchemaError,
         ),
       )
     })
@@ -79,7 +79,7 @@ class WifiProfileServiceImpl implements Services.WifiProfileGeneratorService.Wif
   > {
     const [, username, password, , includeEthernetProfile] = wifiParams
 
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const rootCertPayload = yield* this.certConfigService.rootCert(
         "roots.crt",
         this.certs.rootCert,
@@ -110,13 +110,13 @@ class WifiProfileServiceImpl implements Services.WifiProfileGeneratorService.Wif
           ...payloads,
         ),
         Effect.andThen(
-          Schema.encode(
+          Schema.encodeEffect(
             Schemas.RootPayload.RootPayloadSchema,
           ),
         ),
         Effect.catchTag(
-          "ParseError",
-          ApiErrors.HttpApiEncodeError.fromParseError,
+          "SchemaError",
+          ApiErrors.HttpApiEncodeError.fromSchemaError,
         ),
       )
     })
@@ -130,7 +130,7 @@ class WifiProfileServiceImpl implements Services.WifiProfileGeneratorService.Wif
   > {
     const [, serialNumber, , includeEthernetProfile] = wifiParams
 
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       const rootCertPayload = yield* this.certConfigService.rootCert(
         "roots.crt",
         this.certs.rootCert,
@@ -165,13 +165,13 @@ class WifiProfileServiceImpl implements Services.WifiProfileGeneratorService.Wif
           ...payloads,
         ),
         Effect.andThen(
-          Schema.encode(
+          Schema.encodeEffect(
             Schemas.RootPayload.RootPayloadSchema,
           ),
         ),
         Effect.catchTag(
-          "ParseError",
-          ApiErrors.HttpApiEncodeError.fromParseError,
+          "SchemaError",
+          ApiErrors.HttpApiEncodeError.fromSchemaError,
         ),
       )
     })

@@ -20,15 +20,14 @@
     "test:watch": "vitest watch"
   },
   "dependencies": {
-    "@effect/platform": "^0.96.x",
-    "effect": "^3.21.x",
+    "effect": "^4.1.x",
     "homelab-shared": "workspace:*",
     "jose": "^6.2.1"
   },
   "devDependencies": {
-    "@effect/vitest": "^0.29.x",
+    "@effect/vitest": "^4.1.x",
     "@types/node": "^24",
     "madge": "^8.0.0",
-    "vitest": "^3.x"
+    "vitest": "^5.x"
   }
 }

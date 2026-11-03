@@ -12,5 +12,5 @@ export interface AcmeConfigServiceDef {
   ): Effect.Effect<Schemas.ACME.AcmeConfig>
 }
 
-export class AcmeConfigService extends Context.Tag(AcmeConfigServiceId)<AcmeConfigService, AcmeConfigServiceDef>() {
+export class AcmeConfigService extends Context.Service<AcmeConfigService, AcmeConfigServiceDef>()(AcmeConfigServiceId) {
 }

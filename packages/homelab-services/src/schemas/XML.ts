@@ -1,11 +1,9 @@
-import { HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
-
-export const XMLSymbol = Symbol.for("homelab/XML")
+import { HttpApiSchema } from "effect/http-api"
 
 export const XMLSchema = Schema.String.pipe(
-  Schema.brand(XMLSymbol),
-  Schema.annotations({
+  Schema.brand("homelab/XML"),
+  Schema.annotate({
     description: "An XML Document",
     title: "XML",
     examples: [
@@ -16,8 +14,7 @@ export const XMLSchema = Schema.String.pipe(
 </plist>` as any,
     ],
   }),
-  HttpApiSchema.withEncoding({
-    kind: "Text",
+  HttpApiSchema.asText({
     contentType: "application/xml",
   }),
 )

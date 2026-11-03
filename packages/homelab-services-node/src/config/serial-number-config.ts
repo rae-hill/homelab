@@ -1,10 +1,10 @@
-import { FileSystem } from "@effect/platform"
-import { Effect, HashMap, Layer, Option, pipe, Schema } from "effect"
+import { Effect, FileSystem, HashMap, Layer, Option, pipe, Schema } from "effect"
 import { Config, Schemas } from "homelab-services"
 
-const ParseSerialNumbers = Schema.compose(
-  Schemas.Buffer.StringFromUint8Array,
-  Schema.parseJson(Schemas.HashMapFromRecord.HashSetFromRecord(Schemas.IpAddress.IpAddress, Schema.String)),
+const ParseSerialNumbers = Schemas.Buffer.StringFromUint8Array.pipe(
+  Schema.decodeTo(
+    Schema.fromJsonString(Schemas.HashMapFromRecord.HashSetFromRecord(Schemas.IpAddress.IpAddress, Schema.String)),
+  ),
 )
 
 export const SerialNumberConfigLive = Layer.effect(
@@ -19,7 +19,7 @@ export const SerialNumberConfigLive = Layer.effect(
     const fs = yield* FileSystem.FileSystem
     const serialNumbers = yield* pipe(
       fs.readFile(filePath.value),
-      Effect.andThen(Schema.decode(ParseSerialNumbers)),
+      Effect.andThen(Schema.decodeEffect(ParseSerialNumbers)),
     )
 
     return new SerialNumberConfigImpl(serialNumbers)

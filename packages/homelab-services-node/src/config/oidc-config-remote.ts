@@ -1,5 +1,5 @@
-import { HttpClient, HttpClientResponse } from "@effect/platform"
 import { Console, Effect, Layer } from "effect"
+import { HttpClient, HttpClientResponse } from "effect/http"
 import { Config, Schemas } from "homelab-services"
 
 export const RemoteOIDCWellKnownDetailsServiceLive = Layer.effect(

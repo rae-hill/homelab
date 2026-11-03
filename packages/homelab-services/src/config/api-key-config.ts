@@ -12,7 +12,7 @@ export interface ApiKeyConfigDef {
   readonly getEmail: (apiKey: string) => Option.Option<string>
 }
 
-export class ApiKeyConfig extends Context.Tag(ApiKeyConfigId)<ApiKeyConfig, ApiKeyConfigDef>() {}
+export class ApiKeyConfig extends Context.Service<ApiKeyConfig, ApiKeyConfigDef>()(ApiKeyConfigId) {}
 
 /** {@inheritDoc ApiKeyConfigDef.getRoles} */
 export function getRoles(

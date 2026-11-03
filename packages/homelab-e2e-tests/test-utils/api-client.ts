@@ -1,4 +1,4 @@
-import { HttpApiClient } from "@effect/platform"
+import { HttpApiClient } from "effect/http-api"
 import { Homelab } from "homelab-api"
 
 export const BASE_URL = "http://localhost:3000"

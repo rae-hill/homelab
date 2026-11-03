@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-export const ResourceURISchema = Schema.Literal(
+export const ResourceURISchema = Schema.Literals([
   "Config_Wifi",
   "Config_Certs",
   "Config_DNS",
@@ -11,6 +11,6 @@ export const ResourceURISchema = Schema.Literal(
   "Status_Self",
   "OAuth_Token",
   "OAuth_ClaimCheck",
-)
+])
 
 export const ResourceURILiterals = ResourceURISchema.literals

@@ -1,6 +1,6 @@
-import { FetchHttpClient, HttpClient } from "@effect/platform"
 import { assert, describe, expect, it } from "@effect/vitest"
 import { Effect, HashSet, Layer } from "effect"
+import { FetchHttpClient, HttpClient } from "effect/http"
 import { type Homelab } from "homelab-api"
 import { ApiErrors, Identity, Middleware } from "homelab-services"
 import { handleHealth } from "../../../src/handlers/status/health.js"
@@ -10,6 +10,8 @@ const withIdentity = (identity: Identity.Identity) => Layer.succeed(Middleware.C
 
 const healthArgs = (): Homelab.StatusEndpoints.Health.HealthEndpointHandlerArgs => ({
   request: {} as any,
+  endpoint: {} as any,
+  group: {} as any,
   headers: {} as any,
 })
 

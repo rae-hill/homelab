@@ -28,7 +28,7 @@ describe("GET /cert/root/:format", () => {
         })
         const result = yield* Effect.flip(
           client.cert.root({
-            path: { format: "der" },
+            params: { format: "der" },
             headers: { dpop: dpopProof, authorization: `${token_type} ${access_token}` },
           }),
         )
@@ -51,7 +51,7 @@ describe("GET /cert/root/:format", () => {
           accessToken: access_token,
         })
         const result = yield* client.cert.root({
-          path: { format: "der" },
+          params: { format: "der" },
           headers: { dpop: dpopProof, authorization: `${token_type} ${access_token}` },
         })
         expect(result).toBeInstanceOf(Uint8Array)
@@ -69,7 +69,7 @@ describe("GET /cert/root/:format", () => {
           accessToken: access_token,
         })
         const result = yield* client.cert.root({
-          path: { format: "crt" },
+          params: { format: "crt" },
           headers: { dpop: dpopProof, authorization: `${token_type} ${access_token}` },
         })
         expect(result).toBeInstanceOf(Uint8Array)

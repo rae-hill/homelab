@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Arbitrary, Console, Effect, FastCheck, Layer } from "effect"
-import { constFalse, constTrue } from "effect/Function"
+import { Effect, Layer } from "effect"
 import { XMLParser } from "fast-xml-parser"
 import { Schemas, Services } from "homelab-services"
 import { Layers } from "../src/index.js"
@@ -218,34 +217,17 @@ describe("AppleMdmXmlPrintingService", () => {
         ),
       ))
 
-    it.effect("should generate valid XML for any RootPayload schema instance", () =>
-      Effect.gen(function*() {
-        const service = yield* Services.XmlPrintingService.XmlPrintingService
-        const arbitrary = Arbitrary.make(Schemas.RootPayload.RootPayloadSchema)
-        const xmlParser = new XMLParser()
-
-        yield* Effect.try(
-          () =>
-            FastCheck.assert(
-              FastCheck.asyncProperty(
-                arbitrary,
-                (payload) =>
-                  service.printXml(payload as Record<string, Schemas.JSONExt.JSONExt>).pipe(
-                    Effect.tap(
-                      (xmlPayload) => Effect.try(() => xmlParser.parse(xmlPayload)),
-                    ),
-                    Effect.tapError(Console.error),
-                    Effect.mapBoth(
-                      {
-                        onFailure: constFalse,
-                        onSuccess: constTrue,
-                      },
-                    ),
-                    Effect.runPromise,
-                  ),
-              ),
-            ),
-        )
-      }).pipe(Effect.provide(TestLayer)))
+    it.effect.prop(
+      "should generate valid XML for any RootPayload schema instance",
+      [Schemas.RootPayload.RootPayloadSchema],
+      ([payload]) =>
+        Effect.gen(function*() {
+          const service = yield* Services.XmlPrintingService.XmlPrintingService
+          const xmlParser = new XMLParser()
+          const xmlPayload = yield* service.printXml(payload as Record<string, Schemas.JSONExt.JSONExt>)
+          yield* Effect.try(() => xmlParser.parse(xmlPayload))
+          return true
+        }).pipe(Effect.provide(TestLayer)),
+    )
   })
 })
