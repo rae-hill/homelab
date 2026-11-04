@@ -2,6 +2,7 @@ import { Box, ChakraProvider, Text } from "@chakra-ui/react"
 import { createRootRoute, Outlet, useNavigate, useSearch } from "@tanstack/react-router"
 import { useEffect } from "react"
 
+import { DownloadFab } from "../components/download-fab"
 import { EffectsFab } from "../components/effects-fab"
 import { Header } from "../components/header"
 import { PrintConfigFab } from "../components/print-config-fab"
@@ -79,6 +80,7 @@ function RootComponent() {
           <Outlet />
           <Footer />
           <EffectsFab />
+          <DownloadFab />
           <PrintConfigFab />
         </PrintConfigProvider>
       </ChakraProvider>

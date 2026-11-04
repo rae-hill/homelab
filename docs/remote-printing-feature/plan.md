@@ -85,38 +85,45 @@ Move from `packages/resume/src/state/print-config/` to `packages/shared/src/prin
 
 ### 1c. Reusable Effect OIDC services in `shared`
 
-Browser-safe OIDC building blocks, designed for reuse by a future homelab-frontend
-(vite/react) rewrite. Library: **`oidc-client-ts`** for the PKCE redirect flow (user
-preference; maintained; not redux-specific — redux state is derived from it), wrapped in
-Effect services. DPoP proofs (required by homelab-server's auth middleware) via Web
-Crypto (candidate: `jose`, which runs on Web Crypto in browsers).
+**Resolved by research (session 1 — see progress.md for the full findings):**
 
-Proposed modules under `packages/shared/src/oidc/`:
+- **No DPoP needed in the browser.** `AuthenticationService`
+  (`homelab-services-node/src/layers/authentication-service.ts`) only enforces DPoP for
+  **local-issuer** tokens (the API-key `/oauth/token` path used by automation/e2e).
+  Kanidm-issued tokens (remote issuer, JWKS from `KANIDM_OPENID_PROVIDER_URL`) skip DPoP
+  entirely — `Authorization: Bearer <token>` is sufficient.
+- **The bearer token must be the kanidm `id_token`** (not the access token): the server's
+  `jwtVerify` requires `aud: "homelab"` + `email` + `roles` claims, which kanidm puts in
+  the id_token (claim-map roles land there). This mirrors homelab-frontend's existing
+  (quirky but load-bearing) behavior — `WifiPage.tsx` sends `t.id_token`.
+- homelab-frontend hand-rolls PKCE + code exchange in Effect (`src/lib/auth/*`) with no
+  library. For `shared` we use **`oidc-client-ts`** (user preference) wrapped in Effect
+  services — it handles PKCE, state, nonce, storage, and expiry.
 
-- `config.ts` — `Schema.Struct` for OIDC/client config (authority, clientId,
-  redirectPath, scopes, homelab API base URL) + env-var plumbing helpers.
-- `auth-service.ts` — Effect service wrapping `oidc-client-ts` `UserManager`:
-  `login` (redirect), `handleRedirectCallback`, `getUser`/`isAuthenticated`,
-  `signout`, `renewToken` (silent refresh where possible). Errors as
-  `Schema.TaggedError`s.
-- `dpop.ts` — `DpopProofService`: ephemeral EC key (Web Crypto, non-extractable
-  stored in IndexedDB/localStorage per `oidc-client-ts` DPoP guidance), proof JWT
-  generation (`htm`, `htu`, `ath`, `jti`, `iat`, `nonce` if required) — must match
-  what `homelab-services-node/src/layers/dpop-token-validator-service.ts` validates.
-- `homelab-client.ts` — Effect service producing authenticated requests to
-  homelab-server: kanidm access token → homelab-server token exchange (`/oauth/token`;
-  exact grant/DPoP binding per homelab-frontend's current flow — see Phase 2 research),
-  then typed calls (prefer `HttpApiClient` from `homelab-api` if browser-safe, else
-  `HttpClient` from `@effect/platform` + shared schemas).
-- `status.ts` — `checkReachable(baseUrl): Effect<boolean>` — unauthenticated
-  `GET /status/health` probe (network check).
+Modules under `packages/shared/src/oidc/` — **exposed via a `./oidc` subpath export**
+(`"exports": { ".": …, "./oidc": "./src/oidc/index.ts" }`) so node-side consumers of
+`shared` never pull the browser-only `oidc-client-ts` into their bundles:
 
-> **Open questions (resolve from explore findings / homelab-frontend source before
-> coding 1c):** exact `/oauth/token` grant type + claim-check flow the frontend uses;
-> whether the browser needs DPoP for kanidm-issued tokens or only for homelab-server
-> tokens; token storage strategy (memory vs sessionStorage); whether
-> `@effect/platform`'s `HttpClient` (browser fetch layer) is preferred over
-> `homelab-api`'s client.
+- `config.ts` — Effect `Schema.Struct` for client config: `authority` (kanidm
+  client-scoped discovery base, e.g. `https://idm.plato-splunk.media/oauth2/openid/homelab`),
+  `clientId` (`"homelab"`), `redirectUri`, `scope` (default `"openid profile email"`),
+  `postLogoutRedirectUri?`.
+- `auth-service.ts` — `AuthService` (`Context.Service` v4 style): `login()` (redirect),
+  `handleRedirectCallback()`, `getUser(): Option<OidcUser>` (session-storage backed,
+  expiry-aware), `signout()`. `OidcUser` = `{ idToken, accessToken, profile: { email?,
+  name?, roles? } , expiresAt }` mapped from oidc-client-ts `User`. Errors:
+  `Data.TaggedError("AuthError")`. Impl wraps `UserManager` (`WebStorageStateStore` +
+  `sessionStorage`); all promise calls via `Effect.tryPromise`.
+- `reachability.ts` — `checkReachable(apiBaseUrl): Effect<boolean>`: unauthenticated
+  `GET {api}/status/health` via fetch-in-Effect; **any** HTTP response (even 4xx) proves
+  tailscale reachability; only network errors mean unreachable. (`/status/health` is
+  guest-accessible: `GuestIdentity` carries `Status_Health.view`.)
+
+Typed API calls (`HttpApiClient` over `homelab-api`) live in **resume**, not shared —
+`shared` must not depend on `homelab-api` (cycle: homelab-api → homelab-services →
+shared). resume gains `homelab-api` as a workspace dep; vite tree-shakes the definitions
+(homelab-frontend proves this bundling works; homelab-services is browser-safe — jose v6
+is Web-Crypto based, no `node:` imports in the definition package).
 
 ---
 
@@ -163,21 +170,25 @@ only; nothing secret):
 
 - `nix-config/modules/features/homelab-api/oidc.nix`:
   - `callbackPath`: add absolute literal `"https://resume.rae-hill.dev/oauth/callback"`
-    (absolute entries are used verbatim, like the localhost one). Consider dev URL
+    (absolute entries are used verbatim, like the localhost one). Add dev URL
     `http://localhost:5173/oauth/callback` (vite dev port) for local testing.
-  - `scopeMaps`: ensure the resume-printing group gets `openid profile email` (add
-    `"resume.printing" = [ "openid" "profile" "email" ];` if scope maps gate token
-    issuance per group).
+  - `scopeMaps`: add `"resume.printing" = [ "openid" "profile" "email" ];` so group
+    members can complete the flow.
   - `claimMaps.roles.valuesByGroup`: add `"resume.printing" = [ "Resume_Print" ];`.
-- kanidm group provisioning: create group `resume.printing` + member (jacob). Find
-  where `homelab.admins`/`homelab.access` groups are declared (search nix-config for
-  kanidm group provisioning / `kanidm-provision`) and follow that pattern.
-- **CORS**: allow origin `https://resume.rae-hill.dev` (and dev origins
-  `http://localhost:5173`, plus existing frontend origins) on homelab-server — locate
-  current CORS config (server.ts/main.ts; per explore findings) and extend; prefer an
-  env-driven allowlist (`ALLOWED_ORIGINS` in the sops template) over hardcoding.
+- **Kanidm group provisioning** (resolved): `nix-config/modules/features/kanidm/service.nix`
+  — add `"resume.printing" = { };` to `provision.groups` and list it under
+  `provision.persons.jacob.groups` (+ `rae` — the resume's owner; confirm with user).
+- **CORS** (resolved): `homelab-server/src/api.ts` uses `HttpRouter.cors()` with **no
+  options** → Effect v4 defaults to `access-control-allow-origin: *`, reflecting
+  requested headers. Cross-origin calls from `resume.rae-hill.dev` with a Bearer header
+  **already work — no CORS change strictly required**. Optional hardening: env-driven
+  `allowedOrigins` allowlist (default stays wildcard when unset so unknown consumers —
+  dashboards, mobileconfig downloads — don't break). Decision: keep wildcard, document;
+  revisit if the user wants tightening.
 - Auth middleware already ingests the `roles` claim (`Constants.JWT_ROLES_KEY`) into
-  `OIDCIdentity` permissions — no server code change needed for role plumbing.
+  `OIDCIdentity` permissions — no server code change needed for role plumbing. Server
+  requires `aud: "homelab"`, claims `email` + `roles` → the browser must send the kanidm
+  **id_token** as Bearer (see 1c).
 
 ### 2e. Verification
 
@@ -337,6 +348,17 @@ New group `resume` (prefix baked into paths, per current style):
   ="resume-<date>.pdf">` click → revoke. Loading spinner state on the FAB; error
   surface (toast or inline tooltip state).
 - Uses the redux print-config state at click time (current edited config).
+
+> **De-risk (Buffer in the browser):** `homelab-services/src/schemas/Buffer.ts`
+> (`StringFromUint8Array`, used by `TokenHeaders` on every endpoint) references Node's
+> global `Buffer` in its **decode** direction (`Buffer.from(bytes).toString("utf-8")`).
+> The references are lazy (inside arrows / an `instanceof` guard), so importing is safe;
+> the client only **encodes** headers (`Uint8Array.from(str)` — no Buffer). This is why
+> homelab-frontend can bundle `homelab-api` today. If resume's vite build still trips on
+> `Buffer`/`global` (some transitive import evaluates it eagerly), add to
+> `packages/resume/vite.config.ts`: `define: { global: "globalThis" }` and a Buffer
+> polyfill, or import only the `resume` group's client. Verify with `yarn workspace
+> resume build` early in Phase 6.
 
 ---
 

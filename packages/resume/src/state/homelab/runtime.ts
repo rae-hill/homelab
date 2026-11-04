@@ -27,7 +27,7 @@ function makeAuthLayer() {
 let cachedAuthLayer: ReturnType<typeof makeAuthLayer> | undefined
 
 /** Lazily built (browser-only globals) and cached per page load. */
-function authLayer(): ReturnType<typeof makeAuthLayer> {
+export function authLayer(): ReturnType<typeof makeAuthLayer> {
   if (cachedAuthLayer === undefined) {
     cachedAuthLayer = makeAuthLayer()
   }

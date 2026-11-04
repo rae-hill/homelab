@@ -11642,6 +11642,7 @@ __metadata:
     "@types/react-dom": "npm:^18.3.7"
     "@vitejs/plugin-react": "npm:6.1.2"
     effect: "npm:4.1.2"
+    homelab-api: "workspace:*"
     next-themes: "npm:^0.4.6"
     react: "npm:^18.3.1"
     react-dom: "npm:^18.3.1"
