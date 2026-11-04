@@ -6,6 +6,7 @@ import { LuDownload } from "react-icons/lu"
 import { useCanPrintResume } from "../state/homelab"
 import { downloadPdf, requestResumePdf } from "../state/homelab/print"
 import { useConfigIO } from "../state/print-config"
+import { toaster } from "./chakra/toaster"
 import { Tooltip } from "./chakra/tooltip"
 import { useColorMode } from "./ui/color-mode"
 
@@ -20,6 +21,9 @@ export interface DownloadFabProps {
  * that renders the current print config to a PDF on the homelab server (headless chrome)
  * and downloads it. Only rendered when the tailscale-only API is reachable AND the
  * signed-in identity carries the `Resume_Print` role. Hidden in print.
+ *
+ * Feedback: the button shows a spinner while rendering; success/failure surface as toasts
+ * (see `chakra/toaster.tsx`). The `<Toaster />` viewport is mounted once in `__root.tsx`.
  */
 export function DownloadFab({
   bottom = [22, 22, 28],
@@ -29,19 +33,34 @@ export function DownloadFab({
   const { exportBase64 } = useConfigIO()
   const { colorMode } = useColorMode()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleClick = useCallback(() => {
     if (busy) {
       return
     }
     setBusy(true)
-    setError(null)
     const theme = colorMode === "dark" ? "dark" : "light"
     void Effect.runPromise(
       requestResumePdf(exportBase64(), theme).pipe(
-        Effect.tap((pdf) => Effect.sync(() => downloadPdf(pdf))),
-        Effect.catch((err) => Effect.sync(() => setError(err.message))),
+        Effect.tap((pdf) =>
+          Effect.sync(() => {
+            downloadPdf(pdf)
+            toaster.create({
+              title: "PDF ready",
+              description: "Your resume PDF has been downloaded.",
+              type: "success",
+            })
+          })
+        ),
+        Effect.catch((err) =>
+          Effect.sync(() =>
+            toaster.create({
+              title: "Couldn't download PDF",
+              description: err.message,
+              type: "error",
+            })
+          )
+        ),
       ),
     ).then(() => setBusy(false))
   }, [busy, colorMode, exportBase64])
@@ -51,11 +70,6 @@ export function DownloadFab({
   }
 
   const hidePrint = { "@media print": { display: "none" } }
-  const tooltip = error !== null ?
-    error
-    : busy ?
-    "Rendering PDF…"
-    : "Download PDF (rendered by headless chrome on the homelab)"
 
   return (
     <Tooltip
@@ -63,7 +77,7 @@ export function DownloadFab({
       openDelay={200}
       closeDelay={100}
       positioning={{ placement: "top" }}
-      content={tooltip}
+      content={busy ? "Rendering PDF…" : "Download PDF (headless chrome on the homelab)"}
       contentProps={{ css: hidePrint }}
     >
       <IconButton
@@ -76,7 +90,7 @@ export function DownloadFab({
         rounded="full"
         size="xl"
         shadow="lg"
-        colorPalette={error !== null ? "red" : "purple"}
+        colorPalette="purple"
         aria-disabled={busy}
         onClick={handleClick}
       >

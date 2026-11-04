@@ -2,13 +2,14 @@ import { Box, ChakraProvider, Text } from "@chakra-ui/react"
 import { createRootRoute, Outlet, useNavigate, useSearch } from "@tanstack/react-router"
 import { useEffect } from "react"
 
+import { Toaster, toaster } from "../components/chakra/toaster"
 import { DownloadFab } from "../components/download-fab"
 import { EffectsFab } from "../components/effects-fab"
 import { Header } from "../components/header"
 import { PrintConfigFab } from "../components/print-config-fab"
 import { ColorModeProvider } from "../components/ui/color-mode"
-import { useHomelabBootstrap } from "../state/homelab"
-import { PrintConfigProvider } from "../state/print-config"
+import { homelabActions, useHomelabBootstrap, useHomelabError } from "../state/homelab"
+import { PrintConfigProvider, useAppDispatch } from "../state/print-config"
 import { theme } from "../theme/theme"
 
 /**
@@ -74,8 +75,10 @@ function RootComponent() {
   return (
     <ColorModeProvider forcedTheme={search.theme}>
       <ChakraProvider value={theme}>
+        <Toaster />
         <PrintConfigProvider>
           <HomelabBootstrap />
+          <HomelabErrorToasts />
           <Header />
           <Outlet />
           <Footer />
@@ -91,6 +94,27 @@ function RootComponent() {
 /** Runs the homelab bootstrap effects once on mount; renders nothing. */
 function HomelabBootstrap() {
   useHomelabBootstrap()
+  return null
+}
+
+/**
+ * Bridges the redux `homelab.error` state into a toast, then clears it (so the same
+ * error can surface again on a later transition). Renders nothing.
+ */
+function HomelabErrorToasts() {
+  const error = useHomelabError()
+  const dispatch = useAppDispatch()
+  useEffect(() => {
+    if (error === null) {
+      return
+    }
+    toaster.create({
+      title: "Homelab sign-in problem",
+      description: error,
+      type: "error",
+    })
+    dispatch(homelabActions.setError(null))
+  }, [error, dispatch])
   return null
 }
 
