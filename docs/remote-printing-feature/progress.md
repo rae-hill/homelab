@@ -97,13 +97,27 @@ registered in AGENTS.md + effect-services skill tables.
 1. **Commit the working tree** (skill/doc updates + `application/pdf` contentType tweak —
    re-run `yarn lint`/`yarn typecheck` first; the contentType change is in
    `packages/homelab-api/src/homelab/resume/print.ts`).
-2. **User-driven deploy**: `nixos-rebuild switch` augustus (kanidm provisioning applies
-   resume.printing group + claim map; homelab-api gets CHROME_EXECUTABLE), then resume
-   GH Pages deploy (push triggers `resume-deploy.yml` — user pushes; agents never push).
+2. **User-driven deploy**: resume GH Pages rollout ✅ DONE 2026-11-04 (live at
+   https://resume.rae-hill.dev with print-ready signal + import param). Still pending:
+   `nixos-rebuild switch` augustus (kanidm provisioning applies resume.printing group +
+   claim map + callbacks; homelab-api gets CHROME_EXECUTABLE), which needs a push first
+   (user's yubikey; agents never push).
 3. **e2e run (USER runs watch mode — agents must not start the server)**: dev server needs
    in `.env-local`: `CHROME_EXECUTABLE=$(which google-chrome || which chromium)` and
    `RESUME_SITE_URL=http://localhost:5173` (+ `yarn workspace resume dev` running, or use
    the deployed site once live). Success test needs chrome on the machine; asserts `%PDF`.
+   **VERIFIED 2026-11-04:** full suite green (14 files / 108 tests) against a throwaway
+   backend on :3100 (env-prefixed `yarn exec tsx --env-file=.env-local src/main.ts`, NO
+   `--watch` so it's one killable PID) with
+   `CHROME_EXECUTABLE=/nix/store/bnpw53y1w97ap7yvvr6livnkswgijif0-chromium-156.0.8078.79/bin/chromium`
+   (`nix build nixpkgs#chromium`; the machine has no chrome on PATH) and
+   `RESUME_SITE_URL=https://resume.rae-hill.dev` (LIVE site — user deployed it; bundle
+   confirmed to contain `data-print-ready` + `importPrintSettings`). The success test
+   rendered a real `%PDF` through the live site in ~4.6s. `E2E_BASE_URL` env override on
+   `BASE_URL` (test-utils/api-client.ts) enables running against an alternate port
+   without disturbing the :3000 dev server. NOTE: `yarn workspace <ws> exec` runs from
+   the repo ROOT — cd into `packages/homelab-server` first or `--env-file=.env-local`
+   won't resolve.
 4. **Manual verification checklist** (user, on tailnet):
    - resume.rae-hill.dev shows Sign in (header) after the reachability probe
    - login → kanidm → /oauth-callback → back home signed in (email shown)

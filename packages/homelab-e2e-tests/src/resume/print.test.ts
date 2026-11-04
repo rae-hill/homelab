@@ -1,5 +1,6 @@
 import { assert, describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
+import { HttpBody, HttpClient } from "effect/http"
 import { ApiErrors } from "homelab-services"
 import { PrintConfig } from "shared"
 import {
@@ -7,6 +8,7 @@ import {
   createToken,
   E2ETestLayer,
   getToken,
+  makeAccessTokenDPoP,
   makeApiClient,
   TEST_API_KEY,
   TEST_LIMITED_API_KEY,
@@ -123,6 +125,22 @@ describe("POST /resume/print", () => {
           `Expected AuthorizationError, got ${result._tag ?? result}`,
         )
       }).pipe(Effect.provide(E2ETestLayer)))
+
+    it.live("rejects an unauthenticated (guest) request", () =>
+      Effect.gen(function*() {
+        const client = yield* makeApiClient
+        const result = yield* Effect.flip(
+          client.resume.print({
+            payload: { config: fixtureBase64 },
+            query: { theme: "light" },
+            headers: {},
+          }),
+        )
+        assert(
+          result instanceof ApiErrors.AuthorizationError,
+          `Expected AuthorizationError, got ${result._tag ?? result}`,
+        )
+      }).pipe(Effect.provide(E2ETestLayer)))
   })
 
   describe("validation", () => {
@@ -149,8 +167,28 @@ describe("POST /resume/print", () => {
         // The exact client-side error type for schema rejections varies (declared
         // BadRequest vs. transport-level schema error); the contract we care about is
         // that the request never succeeds. Strict codec behavior is unit-tested in
-        // packages/shared/test/print-config.test.ts.
+        // packages/shared/test/print-config.test.ts. NOTE: the typed client runs the
+        // ConfigBase64String check while ENCODING, so this rejection may happen
+        // client-side — the raw test below covers the server-side path.
         expect(result).toBeDefined()
+      }).pipe(Effect.provide(E2ETestLayer)))
+
+    it.live("server-side rejects a base64-valid blob whose JSON does not match the schema", () =>
+      Effect.gen(function*() {
+        const { access_token, nonce, token_type } = yield* getToken(TEST_API_KEY)
+        const dpopProof = yield* makeAccessTokenDPoP(access_token, nonce, ENDPOINT_URL, "POST")
+        // Valid base64, valid JSON — but NOT a PersistedPrintConfig. The typed client
+        // would refuse to encode this, so go raw to exercise the server's decoding.
+        const blob = Buffer.from(JSON.stringify({ toggles: {} }), "utf-8").toString("base64")
+        const response = yield* HttpClient.post(`${BASE_URL}/resume/print`, {
+          urlParams: { theme: "light" },
+          headers: {
+            authorization: `${token_type} ${access_token}`,
+            dpop: dpopProof,
+          },
+          body: HttpBody.jsonUnsafe({ config: blob }),
+        })
+        expect(response.status).toBe(400)
       }).pipe(Effect.provide(E2ETestLayer)))
   })
 
