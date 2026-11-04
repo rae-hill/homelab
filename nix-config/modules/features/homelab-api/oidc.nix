@@ -26,6 +26,9 @@ in
         callbackPath = [
           "/oauth/callback" # appended to originBase -> https://homelab…/oauth/callback
           "http://localhost:4321/oauth/callback" # ABSOLUTE literal, used verbatim
+          # Resume SPA (GitHub Pages) — remote-printing feature OIDC login.
+          "https://resume.rae-hill.dev/oauth-callback" # ABSOLUTE literal, used verbatim
+          "http://localhost:5173/oauth-callback" # resume vite dev server
         ];
         landingPath = ""; # originLanding == originBase (NO trailing slash)
 
@@ -36,6 +39,11 @@ in
             "email"
           ];
           "homelab.access" = [
+            "openid"
+            "profile"
+            "email"
+          ];
+          "resume.printing" = [
             "openid"
             "profile"
             "email"
@@ -59,6 +67,9 @@ in
               "Config_DNS"
               "Status_Self"
               "OAuth_ClaimCheck"
+            ];
+            "resume.printing" = [
+              "Resume_Print"
             ];
           };
         };

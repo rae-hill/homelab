@@ -66,6 +66,9 @@ in
     originUrl = "https://homelab-api.plato-splunk.media";
     privateKeySecretPath = config.sops.secrets.homelab_api_jwk_password.path;
     serialNumbersFile = config.sops.templates."serial-numbers-file".path;
+    # Headless chrome for POST /resume/print (remote-printing feature). Chrome makes the
+    # best PDFs; the wrapper resolves its own runtime deps via absolute store paths.
+    chromeExecutable = "${pkgs.google-chrome}/bin/google-chrome-stable";
     apiKeys = {
       jacob = {
         apiKeyFile = config.sops.secrets.homelab_api_key_jacob.path;

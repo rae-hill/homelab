@@ -78,6 +78,9 @@ in
             "homelab.admins" = { };
             "homelab.access" = { };
 
+            # Remote-printing for the resume SPA (claim-map → Resume_Print role).
+            "resume.printing" = { };
+
             "habitsync.access" = { };
 
             "grafana.access" = { };
@@ -143,6 +146,8 @@ in
 
                 "homelab.admins"
 
+                "resume.printing"
+
                 "grafana.access"
                 "grafana.admins"
 
@@ -175,6 +180,8 @@ in
                 "step-ca.access"
 
                 "homelab.admins"
+
+                "resume.printing"
 
                 "habitsync.access"
 

@@ -129,6 +129,16 @@ in
           description = "Path to a JSON file mapping IP addresses to device serial numbers";
           default = null;
         };
+
+        chromeExecutable = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          description = ''
+            Absolute path to the chrome/chromium executable used by the resume PDF print
+            service (POST /resume/print → puppeteer-core). Exported as CHROME_EXECUTABLE.
+            Leave null on deployments where the resume group stays dark (e.g. praeconinus).
+          '';
+          default = null;
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -188,6 +198,7 @@ in
             ACME_KEY_TYPE=ECSECPrimeRandom
             ACME_KEY_SIZE=256
             ${if cfg.serialNumbersFile != null then "SERIAL_NUMBERS_FILE=${cfg.serialNumbersFile}" else ""}
+            ${if cfg.chromeExecutable != null then "CHROME_EXECUTABLE=${cfg.chromeExecutable}" else ""}
             ${
               if config.services.tempo.enable then
                 "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}"
