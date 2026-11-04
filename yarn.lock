@@ -8327,6 +8327,7 @@ __metadata:
     homelab-services: "workspace:*"
     homelab-services-node: "workspace:*"
     jose: "npm:^5.x"
+    shared: "workspace:*"
     utf-8-validate: "npm:^6.0.6"
     vitest: "npm:^5.x"
   languageName: unknown

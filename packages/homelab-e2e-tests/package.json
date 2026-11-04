@@ -19,6 +19,7 @@
     "homelab-services": "workspace:*",
     "homelab-services-node": "workspace:*",
     "jose": "^5.x",
+    "shared": "workspace:*",
     "utf-8-validate": "^6.0.6"
   },
   "devDependencies": {

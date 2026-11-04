@@ -1,8 +1,8 @@
 import { Array, DateTime, Effect, Layer, Option, pipe, Schema } from "effect"
 import { ApiErrors, Config, Identity, Schemas, Services } from "homelab-services"
-import { Constants } from "shared"
 import { decodeJwt, SignJWT } from "jose"
 import * as Crypto from "node:crypto"
+import { Constants } from "shared"
 
 export const TokenIssuerServiceLive = Layer.effect(
   Services.TokenIssuerService.TokenIssuerService,

@@ -1,6 +1,5 @@
 import { Effect, Layer, pipe, Schema } from "effect"
 import { ApiErrors, Identity, Schemas, Services } from "homelab-services"
-import { Constants } from "shared"
 import type { JWTVerifyGetKey } from "jose"
 import { jwtVerify } from "jose"
 import {
@@ -11,6 +10,7 @@ import {
   JWTExpired,
   JWTInvalid,
 } from "jose/errors"
+import { Constants } from "shared"
 
 export const OIDCAuthenticationServiceLive = Layer.effect(
   Services.OIDCAuthenticationService.OIDCAuthenticationService,

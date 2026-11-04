@@ -114,6 +114,7 @@ in
                       "Status_Self"
                       "OAuth_Token"
                       "OAuth_ClaimCheck"
+                      "Resume_Print"
                     ]
                   );
                 };

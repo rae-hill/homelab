@@ -31,7 +31,7 @@ const initialState = {
     status: "unknown" as AuthStatus,
     email: null as string | null,
     name: null as string | null,
-    roles: [] as string[],
+    roles: [] as Array<string>,
     expiresAt: null as number | null,
   },
   error: null as string | null,

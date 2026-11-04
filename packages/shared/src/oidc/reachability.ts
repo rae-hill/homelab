@@ -1,4 +1,5 @@
-import { Duration, Effect } from "effect"
+import type { Duration } from "effect"
+import { Effect } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/http"
 
 /**
