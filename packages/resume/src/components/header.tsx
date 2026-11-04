@@ -1,14 +1,16 @@
 import { HStack, IconButton, Link, Spacer } from "@chakra-ui/react"
 import { VscGithub } from "react-icons/vsc"
 
+import { HomelabAuthButton } from "./homelab-auth-button"
 import { ColorModeButton } from "./ui/color-mode"
 
 const GITHUB_URL = "https://github.com/rae-hill"
 
 /**
- * Minimal site header: a GitHub link and the light/dark toggle, right-aligned. Sticky and
- * glassy (matching the résumé container's `bg.panel/60` + blur). It slides up out of view
- * on scroll-down and slides back in on scroll-up (see `useHideOnScroll`). Hidden in print.
+ * Minimal site header: the homelab sign-in control (visible only on-tailnet), a GitHub
+ * link and the light/dark toggle, right-aligned. Sticky and glassy (matching the résumé
+ * container's `bg.panel/60` + blur). It slides up out of view on scroll-down and slides
+ * back in on scroll-up (see `useHideOnScroll`). Hidden in print.
  */
 export function Header() {
   return (
@@ -23,6 +25,7 @@ export function Header() {
       css={{ "@media print": { display: "none" } }}
     >
       <Spacer />
+      <HomelabAuthButton />
       <Link
         href={GITHUB_URL}
         aria-label="GitHub"

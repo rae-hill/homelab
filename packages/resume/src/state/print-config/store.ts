@@ -1,17 +1,20 @@
 import { configureStore } from "@reduxjs/toolkit"
 import { useDispatch, useSelector } from "react-redux"
 
+import { homelabReducer } from "../homelab/slice"
 import { printConfigReducer } from "./slice"
 
 /**
- * The app store. A single `printConfig` slice today; `configureStore` leaves room to add
- * slices later. Each `PrintConfigProvider` instance builds its own store (see provider),
- * which keeps SSR isolated and makes the store trivially recreatable on the client.
+ * The app store: the `printConfig` slice plus the `homelab` slice (network reachability +
+ * OIDC auth for the remote-printing feature). Each `PrintConfigProvider` instance builds
+ * its own store (see provider), which keeps SSR isolated and makes the store trivially
+ * recreatable on the client.
  */
 export function makeStore() {
   return configureStore({
     reducer: {
       printConfig: printConfigReducer,
+      homelab: homelabReducer,
     },
   })
 }

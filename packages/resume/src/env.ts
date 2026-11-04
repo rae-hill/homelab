@@ -15,6 +15,26 @@ export const printFooterRevision = commitHash !== "" ? ` (rev: ${commitHash.subs
 /** Localized date string shown in the print footer / resume metadata. */
 export const todaysDate = new Date().toLocaleDateString()
 
+/* ---- Homelab integration -------------------------------------------------------------- */
+
+const homelabApiUrl = (import.meta.env.VITE_HOMELAB_API_URL ?? "") as string
+const oidcAuthority = (import.meta.env.VITE_OIDC_AUTHORITY ?? "") as string
+const oidcClientId = (import.meta.env.VITE_OIDC_CLIENT_ID ?? "homelab") as string
+
+/**
+ * Build-time homelab config (all values public — they ship in the bundle). When the
+ * build didn't bake these in, `enabled` is false and the whole homelab integration
+ * (reachability probe, login, remote printing) stays dark.
+ */
+export const homelabEnv = {
+  /** Base URL of the tailscale-only homelab API (e.g. https://homelab-api.plato-splunk.media). */
+  apiUrl: homelabApiUrl,
+  /** Kanidm client-scoped OIDC discovery base (…/oauth2/openid/homelab). */
+  oidcAuthority,
+  oidcClientId,
+  enabled: homelabApiUrl !== "" && oidcAuthority !== "",
+} as const
+
 /**
  * Mirror these onto globals so modules that read them loosely (e.g. the Chakra theme's
  * `getTodaysDate` / `getPrintFooterRevision`, which look at `window`/`globalThis`) keep
