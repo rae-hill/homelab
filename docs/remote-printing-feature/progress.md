@@ -133,6 +133,16 @@ registered in AGENTS.md + effect-services skill tables.
 
 ### Gotchas for the next agent
 
+- **Double-scrollbar / scroll-past-footer regression (fixed 2026-11-04):** the theme set
+  `overflowX: hidden` on both `html` and `body`; since a hidden axis computes the other
+  axis to `auto`, body became a second scroll container and — with the toaster mounted —
+  gained its own scrollbar on narrower viewports, letting the page scroll past the footer
+  (user-observed, headless chromium with overlay scrollbars did NOT reproduce it). Fix:
+  `body { @media screen: overflow: hidden }` in `src/theme/theme.ts` globalCss, so only
+  the root element scrolls (verified: root scrolls, footer lands at viewport bottom,
+  body scroll range 0, print untouched). Do not "fix" this by making html/body both
+  scrollable again.
+
 - Run node/yarn ONLY via `nix develop . --command yarn …` (no node/yarn on PATH).
   `yarn workspaces foreach -At run lint` per-workspace fails (eslint not in PATH);
   use root `yarn lint` (`-Apt`).

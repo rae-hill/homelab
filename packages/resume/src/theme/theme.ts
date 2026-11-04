@@ -31,6 +31,13 @@ export const theme = createSystem(defaultConfig, {
       overflowX: "hidden",
       margin: 0,
       zIndex: -2,
+      // Only the root element (html) should scroll. `overflow-x: hidden` alone computes
+      // overflow-y to `auto`, making body a second scroll container — with the toaster
+      // mounted, real browsers gave body its own scrollbar on narrower viewports and let
+      // the page scroll past the footer. Screen-only so print pagination is untouched.
+      "@media screen": {
+        overflow: "hidden",
+      },
     },
   },
   theme: {
