@@ -9108,6 +9108,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"jwt-decode@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "jwt-decode@npm:4.0.0"
+  checksum: 10c0/de75bbf89220746c388cf6a7b71e56080437b77d2edb29bae1c2155048b02c6b8c59a3e5e8d6ccdfd54f0b8bda25226e491a4f1b55ac5f8da04cfbadec4e546c
+  languageName: node
+  linkType: hard
+
 "keyv@npm:^4.5.4":
   version: 4.5.4
   resolution: "keyv@npm:4.5.4"
@@ -10516,6 +10523,15 @@ __metadata:
   version: 2.0.11
   resolution: "ohash@npm:2.0.11"
   checksum: 10c0/d07c8d79cc26da082c1a7c8d5b56c399dd4ed3b2bd069fcae6bae78c99a9bcc3ad813b1e1f49ca2f335292846d689c6141a762cf078727d2302a33d414e69c79
+  languageName: node
+  linkType: hard
+
+"oidc-client-ts@npm:^3.5.0":
+  version: 3.5.0
+  resolution: "oidc-client-ts@npm:3.5.0"
+  dependencies:
+    jwt-decode: "npm:^4.0.0"
+  checksum: 10c0/93cbb62adbfeee4bf705199a94e5790217f211b85dd988827e555481d4e605a5263292b740f29765ac01528b99486f57bbd96679ffca53d7ef76d8f7f7c9f979
   languageName: node
   linkType: hard
 
@@ -12080,6 +12096,7 @@ __metadata:
     "@types/node": "npm:^24"
     effect: "npm:^4.1.x"
     madge: "npm:^8.0.0"
+    oidc-client-ts: "npm:^3.5.0"
     type-fest: "npm:^5.4.4"
     vitest: "npm:^5.x"
   languageName: unknown

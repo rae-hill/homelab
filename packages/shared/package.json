@@ -16,6 +16,9 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./oidc": {
+      "import": "./src/oidc/index.ts"
     }
   },
   "scripts": {
@@ -29,6 +32,7 @@
   },
   "dependencies": {
     "effect": "^4.1.x",
+    "oidc-client-ts": "^3.5.0",
     "type-fest": "^5.4.4"
   },
   "effect": {
