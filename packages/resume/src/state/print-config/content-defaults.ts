@@ -1,4 +1,8 @@
-import type { ContentState, ExperienceContent, ProjectContent } from "./content-types"
+import type { PrintConfig } from "shared"
+
+type ContentState = PrintConfig.ContentState
+type ExperienceContent = PrintConfig.ExperienceContent
+type ProjectContent = PrintConfig.ProjectContent
 
 function bullets(entryId: string, texts: ReadonlyArray<string>) {
   return texts.map((text, i) => ({

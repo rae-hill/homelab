@@ -11552,6 +11552,7 @@ __metadata:
     react-dom: "npm:^18.3.1"
     react-icons: "npm:^5.7.0"
     react-redux: "npm:9.1.2"
+    shared: "workspace:*"
     vite: "npm:8.3.5"
   languageName: unknown
   linkType: soft

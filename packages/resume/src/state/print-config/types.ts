@@ -1,40 +1,40 @@
 /**
- * Print-configuration types. State shapes are **derived from the Effect schemas** in
- * `schema.ts` (the single source of truth); only the action union (which is never
- * persisted) and the initial-state value are hand-written here.
+ * Print-configuration types for the resume app. The schema-derived types come from the
+ * `shared` package (single source of truth for schemas + wire codecs, shared with the
+ * homelab backend); this file adds the app-specific pieces: the action union (never
+ * persisted), the UI target unions, and the initial state value.
  */
 
-import type { Schema } from "effect"
+import type { PrintConfig } from "shared"
 
 import { initialContentState } from "./content-defaults"
-import type { ContentState } from "./content-types"
-import type * as S from "./schema"
 
 export { initialContentState } from "./content-defaults"
-export type { BulletPoint, ContentState, ExperienceContent, ProjectContent } from "./content-types"
 
-/* ---- Types derived from the schemas -------------------------------------------------- */
+/* ---- Schema-derived types (re-exported from shared) ----------------------------------- */
 
-export type AlignValue = Schema.Schema.Type<typeof S.AlignValue>
-export type BlockAlign = Schema.Schema.Type<typeof S.BlockAlign>
-export type TextAlign = Schema.Schema.Type<typeof S.TextAlign>
-export type TagDisplay = Schema.Schema.Type<typeof S.TagDisplay>
-export type IconTextSize = Schema.Schema.Type<typeof S.IconTextSize>
-export type FeaturedMode = Schema.Schema.Type<typeof S.FeaturedMode>
-export type LayoutSection = Schema.Schema.Type<typeof S.LayoutSection>
-export type DescriptionRatio = Schema.Schema.Type<typeof S.DescriptionRatio>
-export type DescriptionGap = Schema.Schema.Type<typeof S.DescriptionGap>
-export type SectionLayout = Schema.Schema.Type<typeof S.SectionLayout>
-export type HeaderDescription = Schema.Schema.Type<typeof S.HeaderDescription>
-export type PrintToggleKey = Schema.Schema.Type<typeof S.PrintToggleKey>
-export type SectionConfig = Schema.Schema.Type<typeof S.SectionConfig>
-export type HeadingConfig = Schema.Schema.Type<typeof S.HeadingConfig>
-export type PrintConfigState = Schema.Schema.Type<typeof S.PrintConfigState>
-
-/** The layout `kind` discriminant (for the UI). */
-export type LayoutKind = SectionLayout["kind"]
-/** The header-description `kind` discriminant (for the UI). */
-export type HeaderDescriptionKind = HeaderDescription["kind"]
+export type AlignValue = PrintConfig.AlignValue
+export type BlockAlign = PrintConfig.BlockAlign
+export type BulletPoint = PrintConfig.BulletPoint
+export type ContentState = PrintConfig.ContentState
+export type DescriptionGap = PrintConfig.DescriptionGap
+export type DescriptionRatio = PrintConfig.DescriptionRatio
+export type ExperienceContent = PrintConfig.ExperienceContent
+export type FeaturedMode = PrintConfig.FeaturedMode
+export type HeaderDescription = PrintConfig.HeaderDescription
+export type HeaderDescriptionKind = PrintConfig.HeaderDescriptionKind
+export type HeadingConfig = PrintConfig.HeadingConfig
+export type IconTextSize = PrintConfig.IconTextSize
+export type LayoutKind = PrintConfig.LayoutKind
+export type LayoutSection = PrintConfig.LayoutSection
+export type PersistedConfig = PrintConfig.PersistedConfig
+export type PrintConfigState = PrintConfig.PrintConfigState
+export type PrintToggleKey = PrintConfig.PrintToggleKey
+export type ProjectContent = PrintConfig.ProjectContent
+export type SectionConfig = PrintConfig.SectionConfig
+export type SectionLayout = PrintConfig.SectionLayout
+export type TagDisplay = PrintConfig.TagDisplay
+export type TextAlign = PrintConfig.TextAlign
 
 /** Which heading spacing a `SetHeadingGap` action targets. */
 export type HeadingGapTarget = "header" | "contact" | "skillList"
