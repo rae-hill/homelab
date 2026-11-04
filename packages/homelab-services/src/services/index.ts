@@ -16,6 +16,7 @@ export * as FineGrainedAuthorizationService from "./fine-grained-authorization-s
 export * as HMACService from "./hmac-service.js"
 export * as NonceService from "./nonce-service.js"
 export * as OIDCAuthenticationService from "./oidc-authentication-service.js"
+export * as PdfPrintService from "./pdf-print-service.js"
 export * as RootPayloadService from "./root-payload-service.js"
 export * as TokenIssuerService from "./token-issuer-service.js"
 export * as UuidService from "./uuid-service.js"

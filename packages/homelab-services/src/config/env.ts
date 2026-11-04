@@ -67,6 +67,15 @@ export interface EnvDef {
 
   /** Filesystem path to the serial numbers JSON file. */
   readonly serialNumbersFile: Option.Option<string>
+
+  /**
+   * Filesystem path to the Chrome/Chromium executable used for headless PDF rendering
+   * (the resume print service). Unset on deployments where the `resume` group is dark.
+   */
+  readonly chromeExecutable: Option.Option<string>
+
+  /** Base URL of the resume site that the PDF print service navigates to. */
+  readonly resumeSiteUrl: URL
 }
 
 export class Env extends Context.Service<Env, EnvDef>()("homelab-api/config/env/Env") {}
@@ -127,3 +136,9 @@ export const intermediateCertCrtPath = Env.pipe(Effect.map((_) => _.intermediate
 
 /** {@inheritDoc EnvDef.serialNumbersFile} */
 export const serialNumbersFile = Env.pipe(Effect.map((_) => _.serialNumbersFile))
+
+/** {@inheritDoc EnvDef.chromeExecutable} */
+export const chromeExecutable = Env.pipe(Effect.map((_) => _.chromeExecutable))
+
+/** {@inheritDoc EnvDef.resumeSiteUrl} */
+export const resumeSiteUrl = Env.pipe(Effect.map((_) => _.resumeSiteUrl))

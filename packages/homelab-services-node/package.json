@@ -26,6 +26,7 @@
     "homelab-data": "workspace:*",
     "homelab-services": "workspace:*",
     "jose": "^6.2.1",
+    "puppeteer-core": "^25.16.0",
     "shared": "workspace:*",
     "utf-8-validate": "^6.0.6"
   },

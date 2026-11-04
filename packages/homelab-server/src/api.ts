@@ -5,6 +5,7 @@ import { Homelab } from "homelab-api"
 import { CertApiLive } from "./handlers/cert/index.js"
 import { MobileConfigApiLive } from "./handlers/mobile-config/index.js"
 import { OAuthApiLive } from "./handlers/oauth/index.js"
+import { ResumeApiLive } from "./handlers/resume/index.js"
 import { StatusApiLive } from "./handlers/status/index.js"
 import { WellKnownApiLive } from "./handlers/well-known/index.js"
 import { AuthMiddlewareLive, BasicAuthMiddlewareLive } from "./middleware/index.js"
@@ -13,6 +14,7 @@ export const ApiLive = HttpApiBuilder.layer(Homelab.HomelabApi, { openapiPath: "
   Layer.provide(CertApiLive),
   Layer.provide(MobileConfigApiLive),
   Layer.provide(OAuthApiLive),
+  Layer.provide(ResumeApiLive),
   Layer.provide(StatusApiLive),
   Layer.provide(WellKnownApiLive),
   Layer.provide(AuthMiddlewareLive),

@@ -23,6 +23,7 @@ const Server = HttpRouter.serve(Routes).pipe(
   Layer.provide(Shell.Authentication.Aggregate),
   Layer.provide(Shell.Authorization.Aggregate),
   Layer.provide(Shell.Crypto.Aggregate),
+  Layer.provide(Shell.Printing.Aggregate),
   Layer.provide(Shell.ProfilePayload.Aggregate),
   Layer.provide(Layers.CertificateService.CertificateServiceLive),
   Layer.provide(Layers.UuidService.UuidServiceLive),

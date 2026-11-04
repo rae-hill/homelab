@@ -448,6 +448,7 @@ function setupParams<Res extends ResourceURIs.ResourceURIs>(
     "Status_Self": {},
     "OAuth_Token": {},
     "OAuth_ClaimCheck": {},
+    "Resume_Print": {},
   }
 
   return defaults[resource]

@@ -22,5 +22,10 @@ export const EnvLive = Layer.effect(
     rootCertCrtPath: Config.String("ROOT_CERT_CRT"),
     intermediateCertCrtPath: Config.String("INTERMEDIATE_CERT_CRT"),
     serialNumbersFile: Config.option(Config.String("SERIAL_NUMBERS_FILE")),
+    chromeExecutable: Config.option(Config.String("CHROME_EXECUTABLE")),
+    resumeSiteUrl: Config.withDefault(
+      Config.schema(Schema.URLFromString, "RESUME_SITE_URL"),
+      new URL("https://resume.rae-hill.dev"),
+    ),
   }),
 )
