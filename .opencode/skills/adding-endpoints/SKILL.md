@@ -77,49 +77,70 @@ packages/homelab-api/src/homelab/<group>/<endpoint>.ts
 
 ### Endpoint File Template
 
-```typescript
-import { HttpApiEndpoint } from "@effect/platform"
-import type { Types } from "effect"
-import { ApiErrors, Schemas } from "homelab-services"
+**Effect v4:** endpoints are defined with an options object (no `.addSuccess`/`.addError`
+chain), and the HTTP-api constructors come from `effect/http-api` (not `@effect/platform`).
+Verify current patterns against `packages/homelab-api/src/homelab/` and
+`repos/effect/packages/effect/src/http-api/`.
 
-export const MyEndpoint = HttpApiEndpoint.get("my-endpoint")`/my-endpoint`
-  .addSuccess(Schemas.MySchema.MyResponseSchema)
-  .addError(ApiErrors.AuthorizationError)
-  .setHeaders(Schemas.Token.TokenHeaders)
+```typescript
+import type { Types } from "effect"
+import { HttpApiEndpoint } from "effect/http-api"
+import { ApiErrors, Middleware, type ResourceURIs, Schemas } from "homelab-services"
+
+export const URI = "MyGroup_MyEndpoint" satisfies ResourceURIs.ResourceURIs
+export type URI = typeof URI
+
+export const MyEndpoint = HttpApiEndpoint.get("my-endpoint", "/my-group/my-endpoint", {
+  success: Schemas.MySchema.MyResponseSchema,
+  error: [
+    ApiErrors.AuthorizationError,
+    ApiErrors.AuthenticationError,
+    ApiErrors.HttpApiEncodeError,
+  ],
+  headers: Schemas.Token.TokenHeaders,
+}).middleware(Middleware.AuthMiddleware)
 
 export type MyEndpoint = typeof MyEndpoint
 
 export type MyEndpointHandlerArgs = Types.Simplify<
-  HttpApiEndpoint.HttpApiEndpoint.Request<MyEndpoint>
+  HttpApiEndpoint.Request<MyEndpoint>
 >
+
+declare module "homelab-services/resource-uris" {
+  interface URIToParams {
+    [URI]: MyEndpointHandlerArgs
+  }
+}
 ```
 
-### Endpoint API
+The full endpoint path (including the group prefix) is the second argument — there is no
+group-level `.prefix()`. The `declare module` augmentation wires the endpoint's handler
+args into `ResourceURIs.URIToParams`, which the fine-grained authorization matcher keys on
+(a missing entry is a type error in `fine-grained-authorization-service.ts`).
 
-| Method                  | Purpose                              |
-| ----------------------- | ------------------------------------ |
-| `HttpApiEndpoint.get`   | GET endpoint                         |
-| `HttpApiEndpoint.post`  | POST endpoint                        |
-| `HttpApiEndpoint.put`   | PUT endpoint                         |
-| `.addSuccess(schema)`   | Set the success response schema      |
-| `.addError(errorClass)` | Add a typed error response           |
-| `.setHeaders(schema)`   | Define expected request headers      |
-| `.setPayload(schema)`   | Set request body/query params schema |
-| `.middleware(mw)`       | Attach endpoint-level middleware     |
+### Endpoint options
+
+| Option        | Purpose                                                  |
+| ------------- | -------------------------------------------------------- |
+| `params`      | Path params: `{ ssid: Schema.String }` for `/:ssid`      |
+| `query`       | Query params schema (`args.query` in the handler)        |
+| `payload`     | Request body schema (`args.payload` in the handler)      |
+| `success`     | Success response schema                                  |
+| `error`       | Array of typed error classes                             |
+| `headers`     | Expected request headers schema                          |
+| `.middleware` | Attach endpoint-level middleware (e.g. `AuthMiddleware`) |
 
 ### Path Parameters
 
-Use `HttpApiSchema.param` for path params in template literal paths:
+Declare the path with `:param` placeholders and provide their schemas via `params`:
 
 ```typescript
-import { HttpApiSchema } from "@effect/platform"
-import { Schema } from "effect"
-
-export const IdParam = HttpApiSchema.param("id", Schema.String)
-
-export const MyEndpoint = HttpApiEndpoint.get(
-  "my-endpoint",
-)`/my-endpoint/${IdParam}`
+export const MyEndpoint = HttpApiEndpoint.get("my-endpoint", "/my-group/my-endpoint/:id", {
+  params: { id: Schema.String },
+  success: Schemas.MySchema.MyResponseSchema,
+  error: [ApiErrors.AuthorizationError],
+  headers: Schemas.Token.TokenHeaders,
+}).middleware(Middleware.AuthMiddleware)
 ```
 
 ### Register in Group Index
@@ -128,18 +149,18 @@ Add the endpoint to the group's `index.ts`:
 
 ```typescript
 // packages/homelab-api/src/homelab/<group>/index.ts
-import { HttpApiGroup } from "@effect/platform"
-import { Middleware } from "homelab-services"
+import { HttpApiGroup } from "effect/http-api"
 import * as MyEndpoint from "./my-endpoint.js"
 
 export const MyGroupApi = HttpApiGroup.make("<group>")
   .add(MyEndpoint.MyEndpoint)
-  // ... existing endpoints
-  .prefix("/<group>")
-  .middleware(Middleware.AuthMiddleware) // if group-level auth
+// ... existing endpoints
 
 export * as MyEndpoint from "./my-endpoint.js"
 ```
+
+Per-endpoint middleware (`.middleware(Middleware.AuthMiddleware)`) is the house pattern;
+group-level `.middleware(...)` also exists but is unused here.
 
 ### If Creating a New Group
 
@@ -149,7 +170,7 @@ export * as MyEndpoint from "./my-endpoint.js"
 
 ```typescript
 // packages/homelab-api/src/homelab/index.ts
-import { HttpApi } from "@effect/platform"
+import { HttpApi } from "effect/http-api"
 import { NewGroupApi } from "./new-group/index.js"
 
 export const HomelabApi = HttpApi.make("homelab")
@@ -217,7 +238,7 @@ export const handleMyEndpoint = Effect.fn("handleMyEndpoint")(
 
 ```typescript
 // packages/homelab-server/src/handlers/<group>/index.ts
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/http-api"
 import { Homelab } from "homelab-api"
 import { handleMyEndpoint } from "./my-endpoint.js"
 
@@ -239,11 +260,19 @@ Register the new group layer in `api.ts`:
 // packages/homelab-server/src/api.ts
 import { NewGroupApiLive } from "./handlers/new-group/index.js"
 
-export const ApiLive = HttpApiBuilder.api(Homelab.HomelabApi).pipe(
-  Layer.provide(NewGroupApiLive),
-  // ... existing group layers
-)
+export const ApiLive = HttpApiBuilder.layer(Homelab.HomelabApi, { openapiPath: "/openapi.json" })
+  .pipe(
+    Layer.provide(NewGroupApiLive),
+    // ... existing group layers
+    Layer.provide(AuthMiddlewareLive),
+    Layer.provide(BasicAuthMiddlewareLive),
+    Layer.provide(HttpRouter.cors()),
+  )
 ```
+
+> **CORS note:** `HttpRouter.cors()` with no options defaults to
+> `access-control-allow-origin: *` (reflecting requested headers). Pass
+> `{ allowedOrigins: [...] }` to restrict.
 
 ### Wire Dependencies in `main.ts`
 
@@ -570,42 +599,46 @@ For endpoints that serve binary file downloads:
 
 ### Encoding
 
-Use `HttpApiSchema.Uint8Array()` for binary response bodies:
+Use `Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array())` for binary response bodies
+(v4 optionally takes `{ contentType }`):
 
 ```typescript
-import { HttpApiEndpoint, HttpApiSchema } from "@effect/platform"
+import { Schema } from "effect"
+import { HttpApiEndpoint, HttpApiSchema } from "effect/http-api"
 
-export const MyDownload = HttpApiEndpoint.get("my-download")`/my-download`
-  .addSuccess(HttpApiSchema.Uint8Array())
+export const MyDownload = HttpApiEndpoint.get("my-download", "/my-group/my-download", {
+  success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+  // or: HttpApiSchema.asUint8Array({ contentType: "application/pdf" })
+})
 ```
 
-For text responses with a custom content-type (e.g. XML), use `HttpApiSchema.withEncoding`:
+For text responses with a custom content-type (e.g. XML), use `HttpApiSchema.asText`:
 
 ```typescript
 Schema.String.pipe(
-  HttpApiSchema.withEncoding({ kind: "Text", contentType: "application/xml" }),
+  HttpApiSchema.asText({ contentType: "application/xml" }),
 )
 ```
 
-> **Note:** `HttpApiSchema.Uint8Array()` does not support custom `contentType` — it always serves as `application/octet-stream`. Use `HttpApiSchema.Text(...)` for text with a custom content-type.
+(See `packages/homelab-services/src/schemas/XML.ts` for the live example.)
 
 ### Content-Disposition (Download Header)
 
-To trigger a browser download with a filename, use `HttpApp.appendPreResponseHandler`:
+To trigger a browser download with a filename, use `HttpEffect.appendPreResponseHandler`:
 
 ```typescript
-import { HttpApp, HttpServerResponse } from "@effect/platform"
+import { HttpEffect, HttpServerResponse } from "effect/http"
 import { Effect } from "effect"
 
-yield* HttpApp.appendPreResponseHandler(
+yield* HttpEffect.appendPreResponseHandler(
   (_, res) =>
     Effect.succeed(
-      HttpServerResponse.setHeaders(res, {
-        "Content-Disposition": `attachment; filename="my-file.ext"`,
-      }),
+      HttpServerResponse.setHeader(res, "Content-Disposition", `attachment; filename="my-file.ext"`),
     ),
 )
 ```
+
+(The oauth/token handler uses the same mechanism for its `DPoP-Nonce` header.)
 
 ---
 

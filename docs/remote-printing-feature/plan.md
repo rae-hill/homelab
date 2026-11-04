@@ -3,10 +3,31 @@
 Phased plan for server-side resume PDF printing. Work top-to-bottom; each phase ends in a
 committable state. Update [`progress.md`](./progress.md) after every phase/session.
 
+## Status (2026-11-03, session 1)
+
+| Phase | Scope                                             | State                                                                |
+| ----- | ------------------------------------------------- | -------------------------------------------------------------------- |
+| 0     | Planning docs                                     | ✅ done                                                              |
+| 1a    | Rename homelab-shared → shared                    | ✅ done (commit 0a30f89)                                             |
+| 1b    | Extract print-config schemas/codecs → shared      | ✅ done (commit f1a298c)                                             |
+| 1c    | OIDC Effect services in shared (`shared/oidc`)    | ✅ done (commit 2cf271e) — oidc-client-ts wrapped in Effect          |
+| 2     | resume: network check + OIDC login                | ✅ code done (commit 6169dc) — needs kanidm/nix deploy + manual test |
+| 3     | resume: importPrintSettings + theme + print-ready | ✅ code done (commit 6169dc) — needs deploy + puppeteer e2e          |
+| 4     | homelab-api: POST /resume/print definition        | ✅ done (commit 7b080e6)                                             |
+| 5     | homelab-server: puppeteer PdfPrintService         | ✅ done (commit 7b080e6) — unit tests green (5)                      |
+| 6     | resume: download FAB                              | ✅ code done (commit ea839c8 + toaster 3539d54)                      |
+| 7     | NixOS infra (env, kanidm, hash refresh)           | ✅ code done (commits 98d7e6a, ddb9aee) — needs deploy               |
+| 8     | e2e tests                                         | ✅ written (commit ddb9aee) — **user runs them in watch mode**       |
+
+Remaining: deploy (nix switch augustus + resume GH Pages rollout), kanidm group/claim-map
+apply, manual verification, and running the e2e suite against a live server. See
+`progress.md` for the handoff checklist.
+
 **Effect v4 note:** the monorepo was just upgraded to Effect 4 (`repos/effect` @ 4.1.2).
-The `adding-endpoints` skill still shows v3 style (`.addSuccess`/`.addError` chains,
-`@effect/platform` imports). Current v4 style — verified against
-`packages/homelab-api/src/homelab/` — is:
+The `adding-endpoints` and `effect-services` skills were showing v3 style and have been
+**updated in this work** (v4 endpoint options object, `effect/http-api` imports,
+`Context.Service`, `Effect.gen({ self: this }, …)`, `asUint8Array({ contentType })`).
+Current v4 endpoint style — verified against `packages/homelab-api/src/homelab/`:
 
 ```ts
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/http-api"
@@ -150,7 +171,7 @@ New `packages/resume/src/state/homelab/`:
   Placement: `Header` (right side, next to color-mode toggle) — hidden in print
   (`@media print { display: none }`). When signed in: show avatar/email + logout, and
   gate the download FAB (Phase 6).
-- **Callback route**: `src/routes/oauth-callback.tsx` (path `/oauth/callback`, matching
+- **Callback route**: `src/routes/oauth-callback.tsx` (path `/oauth-callback`, matching
   the kanidm redirect URI) — completes the PKCE flow via shared `AuthService`, then
   navigates back to `/`.
 
@@ -169,9 +190,9 @@ only; nothing secret):
 ### 2d. Server-side prerequisites (nix + kanidm) — “adopt homelab server callbacks”
 
 - `nix-config/modules/features/homelab-api/oidc.nix`:
-  - `callbackPath`: add absolute literal `"https://resume.rae-hill.dev/oauth/callback"`
+  - `callbackPath`: add absolute literal `"https://resume.rae-hill.dev/oauth-callback"`
     (absolute entries are used verbatim, like the localhost one). Add dev URL
-    `http://localhost:5173/oauth/callback` (vite dev port) for local testing.
+    `http://localhost:5173/oauth-callback` (vite dev port) for local testing.
   - `scopeMaps`: add `"resume.printing" = [ "openid" "profile" "email" ];` so group
     members can complete the flow.
   - `claimMaps.roles.valuesByGroup`: add `"resume.printing" = [ "Resume_Print" ];`.
@@ -365,26 +386,21 @@ New group `resume` (prefix baked into paths, per current style):
 ## Phase 7 — NixOS infrastructure
 
 - `nix-config/modules/features/homelab-api/systemd-service.nix`:
-  - sops template `homelab-api-env`: add `CHROME_EXECUTABLE=${cfg.chromePackage}/bin/…`
-    (non-secret; could also be plain `Environment=`). Add option
-    `services.homelab-api.chromePackage` (default `pkgs.google-chrome`).
-  - Add `cfg.chromePackage` to the unit's `path` (runtime deps: fonts, libs).
-  - **Hardening relaxations for chrome** (currently blocks it):
-    - `RestrictAddressFamilies = [ ]` → `[ "AF_UNIX" "AF_INET" "AF_INET6" ]` (chrome
-      needs loopback/egress; server itself only needs localhost but the unit-wide empty
-      list forbids all).
-    - `NoNewPrivileges=true` + `RestrictNamespaces=true` break chrome's sandboxes →
-      launch with `--no-sandbox` (already in 5b args).
-    - `PrivateDevices=true` → no `/dev/shm` → `--disable-dev-shm-usage` (already in
-      5b args).
-    - `ProtectSystem="strict"` + `PrivateTmp=true` are fine (chrome uses tmpdir);
-      consider `ReadWritePaths` for a chrome profile dir if needed — prefer
-      `--user-data-dir` under `/tmp` (PrivateTmp gives an isolated one).
-    - `MemoryDenyWriteExecute` is NOT set (good — chrome JIT needs W^X exceptions).
-    - `ProcSubset = "pid"` + `ProtectProc = "invisible"` may break chrome's zygote →
-      test; relax to `ProtectProc = "default"` / `ProcSubset = "all"` if needed.
-  - augustus egress to `resume.rae-hill.dev` (public internet) — verify augustus has
-    outbound HTTPS (it does; caddy/ACME etc.).
+  - New option `services.homelab-api.chromeExecutable` (`nullOr str`, default `null` —
+    praeconinus leaves it null): absolute path to the chrome binary. When set, the sops
+    template `homelab-api-env` gains `CHROME_EXECUTABLE=<path>`. Non-secret; the google-chrome
+    wrapper resolves its own runtime deps via absolute store paths, so no unit `path` change.
+  - augustus sets `chromeExecutable = "${pkgs.google-chrome}/bin/google-chrome-stable"`.
+  - **Hardening vs chrome** (verified against the unit + implemented launch args):
+    - `RestrictAddressFamilies = [ ]` serializes to an empty assignment, which systemd
+      treats as _reset to default (allow all)_ — chrome networking already works; left as is.
+    - `NoNewPrivileges` + `RestrictNamespaces` forbid chrome's sandboxes → launch args
+      `--no-sandbox --disable-setuid-sandbox` (in `PdfPrintServiceLive`).
+    - `PrivateDevices` → no `/dev/shm` → `--disable-dev-shm-usage`; GPU off → `--disable-gpu`.
+    - `PrivateTmp` gives an isolated `/tmp` for puppeteer's profile dir; `ProtectSystem=strict`
+    - `MemoryDenyWriteExecute` is NOT set (chrome JIT needs it) — no change needed.
+    - If the zygote still misbehaves under `ProtectProc=invisible`/`ProcSubset=pid` in
+      practice, relax those two first (deployment-time observation; see progress.md).
 - Kanidm changes from Phase 2d land here if not done earlier (oidc.nix callback +
   claim map + group provisioning).
 - Feature flags: augustus defaults `["*"]` → `Resume_Print` enabled automatically.

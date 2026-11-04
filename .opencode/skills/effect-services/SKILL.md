@@ -25,6 +25,7 @@ Upstream monorepos are vendored at `./repos/` as read-only reference material vi
 | `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                                                                      |
 | `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`)                                                    |
 | `repos/home-manager/`         | https://github.com/nix-community/home-manager.git   | home-manager modules (`release-26.05`, matches the flake input)                                   |
+| `repos/puppeteer/`            | https://github.com/puppeteer/puppeteer.git          | puppeteer-core source (tag `puppeteer-core-v25.16.0`, matches the npm pin)                        |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`
@@ -136,7 +137,7 @@ A service definition file contains:
 1. A **URI constant** (path-based): `"homelab-api/services/<domain>/<ServiceName>"`
 2. **Tagged errors** (if any): `class FooError extends Data.TaggedError("FooError")<{...}>()`
 3. An **interface** with suffix `Def`: `interface FooServiceDef { ... }`
-4. A **Context tag** class: `class FooService extends Context.Tag(FooServiceId)<FooService, FooServiceDef>()`
+4. A **Context tag** class (Effect v4): `class FooService extends Context.Service<FooService, FooServiceDef>()(FooServiceId)`
 5. **Accessor functions** that lift methods into Effect (with `{@inheritDoc}` JSDoc)
 
 ```typescript
@@ -150,7 +151,8 @@ export interface FooServiceDef {
   readonly doSomething: (input: string) => Effect.Effect<string, FooError>
 }
 
-export class FooService extends Context.Tag(FooServiceId)<FooService, FooServiceDef>() {}
+export class FooService extends Context.Service<FooService, FooServiceDef>()(FooServiceId) {
+}
 
 /** {@inheritDoc FooServiceDef.doSomething} */
 export function doSomething(
@@ -160,6 +162,11 @@ export function doSomething(
 }
 ```
 
+> **Effect v4 note:** the tag is `Context.Service<Self, Def>()(Id)` — the v3
+> `Context.Tag(Id)<Self, Def>()` form is gone. `.Service` (the Def type) is still
+> reachable as `typeof FooService.Service` for constructor annotations.
+
+````
 For services with multiple methods, use spread params for accessor functions:
 
 ```typescript
@@ -170,7 +177,7 @@ export function authenticate(
     Effect.flatMap((_) => _.authenticate(...params)),
   )
 }
-```
+````
 
 ## Service Implementation Pattern (`homelab-services-node`)
 
@@ -220,7 +227,7 @@ class FooServiceImpl implements Services.FooService.FooServiceDef {
   ) {}
 
   doSomething(input: string) {
-    return Effect.gen(this, function*() {
+    return Effect.gen({ self: this }, function*() {
       // use this.env, this.bar, etc.
       return input
     })
@@ -233,7 +240,8 @@ Key rules:
 - The Impl class is **never exported**
 - Dependencies are `yield*`'d in the layer effect and passed via constructor
 - Type constructor params with `typeof Services.Foo.Foo.Service`
-- Use `Effect.gen(this, function*() { ... })` in methods that reference `this`
+- Use `Effect.gen({ self: this }, function*() { ... })` in methods that reference `this`
+  (Effect v4 — the v3 `Effect.gen(this, ...)` form is gone)
 - Inter-layer dependencies are wired in shell aggregates, not inline with `Layer.provide`
 
 ## Shell Aggregates (`homelab-services-node/src/shell/`)
@@ -294,7 +302,7 @@ export interface EnvDef {
   readonly hmacSecretFilePath: Option.Option<string>
 }
 
-export class Env extends Context.Tag("homelab-api/config/env/Env")<Env, EnvDef>() {}
+export class Env extends Context.Service<Env, EnvDef>()("homelab-api/config/env/Env") {}
 
 export const originUrl = Env.pipe(Effect.map((_) => _.originUrl))
 ```

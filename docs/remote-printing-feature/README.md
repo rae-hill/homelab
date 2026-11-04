@@ -63,14 +63,18 @@ readiness signal.
    (`packages/shared`, npm name `shared`) rather than creating a parallel package. Its
    unused node-only deps (`@effect/platform-node`, `bufferutil`, `utf-8-validate`) are
    dropped so `resume` (browser) can consume it.
-2. **Authorization**: a dedicated kanidm group (e.g. `resume.printing`) is mapped through
-   the existing `claimMaps.roles` in `nix-config/modules/features/homelab-api/oidc.nix` to
-   the role value `Resume_Print`. The auth middleware picks the `roles` claim up into the
-   `OIDCIdentity` permission set automatically; the handler checks
-   `AuthorizationService.canCreate(identity, "Resume_Print", …)`. No code-level allowlists.
-3. **OIDC library**: prefer a maintained browser OIDC/PKCE library (candidate:
-   `oidc-client-ts`) wrapped in Effect services in `shared` — not a hand-rolled PKCE
-   implementation. Not redux-specific; redux state is derived from the service.
+2. **Authorization**: a dedicated kanidm group `resume.printing` (members: jacob, rae) is
+   mapped through the existing `claimMaps.roles` in
+   `nix-config/modules/features/homelab-api/oidc.nix` to the role value `Resume_Print`.
+   The auth middleware picks the `roles` claim up into the `OIDCIdentity` permission set
+   automatically; the handler checks `AuthorizationService.canCreate(identity,
+   "Resume_Print", …)`. No code-level allowlists.
+3. **OIDC library**: `oidc-client-ts` (v3) wrapped in Effect services in `shared`, exposed
+   via the `shared/oidc` subpath export (browser-only code stays out of node bundles).
+   Reusable for a future homelab-frontend (vite/react) rewrite. **No browser DPoP is
+   needed**: homelab-server skips DPoP validation for remote (kanidm) issuers — the
+   kanidm **id_token** is sent as the Bearer credential (it carries the `aud: homelab` +
+   `email` + `roles` claims the server requires).
 4. **Chrome distribution**: `google-chrome` from nixpkgs (best PDF output); executable path
    passed to homelab-server via `CHROME_EXECUTABLE` env var (sops template) so the puppeteer
    launch config points into the nix store. Puppeteer npm dep is `puppeteer-core` (no

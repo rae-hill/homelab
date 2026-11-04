@@ -13,7 +13,7 @@ export type URI = typeof URI
 export const ResumePrint = HttpApiEndpoint.post("print", "/resume/print", {
   payload: Schemas.Resume.ResumePrintRequest,
   query: Schemas.Resume.ResumePrintQuery,
-  success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+  success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array({ contentType: "application/pdf" })),
   error: [
     ApiErrors.AuthorizationError,
     ApiErrors.AuthenticationError,

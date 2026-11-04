@@ -4,80 +4,137 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
-## 2026-11-03 — Session 1 (planning + research)
+## 2026-11-03 — Session 1 (planning + Phases 1–8 implemented; deployment pending)
 
-### Done
+### Commits this session (all on `main`, NOT pushed)
 
-- Created this docs directory: `README.md` (vision/architecture/decisions), `plan.md`
-  (8 phases with file-level checklists), `progress.md`.
-- Researched the codebase (details baked into plan.md):
-  - resume print-config domain: `packages/resume/src/state/print-config/` — Effect v4
-    schemas (`schema.ts`), base64 codec (`persistence.ts`: `StringFromBase64 ∘
-    fromJsonString ∘ PersistedPrintConfig`), redux slice/store/provider/hooks,
-    import/export UI (`config-io.tsx`), settings FAB (`print-config-fab.tsx`, gated by
-    Konami `editingEnabled`).
-  - resume deploy: GitHub Pages (`public/CNAME` = `resume.rae-hill.dev`), workflows
-    `.github/workflows/resume-deploy{,-manual}.yml`, vite 8 + TanStack Router +
-    Chakra v3 + next-themes (color mode via `data-theme`/`class` attr).
-  - auth model: kanidm OIDC client `homelab` (PKCE public client,
-    `nix-config/modules/features/homelab-api/oidc.nix`) with `claimMaps.roles`
-    group→role values; `roles` claim (`Constants.JWT_ROLES_KEY`) → `OIDCIdentity`
-    permission HashSet; `AuthorizationService` checks `hasPermission(resource) ||
-    hasPermission(resource.operation)`; fine-grained matcher per resource in
-    `homelab-services-node/src/layers/fine-grained-authorization-service.ts`.
-  - Effect v4 endpoint style: `HttpApiEndpoint.post(name, path, { payload, query,
-    success, error, headers }).middleware(…)` from `effect/http-api` — the
-    `adding-endpoints` skill is stale (v3 chains + `@effect/platform` imports);
-    update it in Phase 4.
-  - env plumbing: `EnvDef` (homelab-services) + `EnvLive` (homelab-server/src/env.ts) +
-    sops template `homelab-api-env` (systemd-service.nix). Feature flags default `*`
-    on augustus; praeconinus restricted.
-  - systemd hardening on homelab-api unit will fight headless chrome
-    (`RestrictAddressFamilies=[]`, `RestrictNamespaces`, `PrivateDevices`,
-    `ProtectProc=invisible`) — plan Phase 7 lists relaxations + chrome args.
-  - nixpkgs pattern for puppeteer: `puppeteer-cli` uses
-    `PUPPETEER_EXECUTABLE_PATH=${chromium}/bin/chromium`; we'll use `google-chrome` +
-    `CHROME_EXECUTABLE` env + `puppeteer-core` npm dep.
-  - `homelab-shared` deps `@effect/platform-node`, `bufferutil`, `utf-8-validate` are
-    **unused in src** — safe to drop during the rename → browser-safe `shared`.
+| Commit                                | What                                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `0a30f89`                             | rename `homelab-shared` → `shared` (browser-safe: dropped unused node deps)             |
+| `f1a298c`                             | extract print-config schemas + base64 codecs → `shared/src/print-config/` (+11 tests)   |
+| `2cf271e`                             | `shared/oidc` subpath: oidc-client-ts wrapped in Effect (AuthService, checkReachable)   |
+| `7b080e6`                             | POST /resume/print: API def + PdfPrintService (puppeteer-core) + handler + 5 unit tests |
+| `6169dc`                              | resume: reachability + OIDC login + `importPrintSettings`/`theme` params + print-ready  |
+| `ea839c8`                             | resume: download FAB (typed HttpApiClient → blob download)                              |
+| `3539d54`                             | resume: Chakra toaster (FAB feedback + homelab error bridge)                            |
+| `98d7e6a`                             | nix: kanidm resume.printing group/claim-map/callbacks, CHROME_EXECUTABLE, hash refresh  |
+| `ddb9aee`                             | e2e: resume/print tests, Resume_Print on test API key, enum + hash refresh              |
+| (uncommitted → commit at session end) | skill docs v4 refresh, plan/progress updates, `application/pdf` content-type            |
 
-### User decisions (authoritative)
+Plus: `repos/puppeteer` subtree added at tag `puppeteer-core-v25.16.0` (merge `415d44d`),
+registered in AGENTS.md + effect-services skill tables.
 
-1. Rename existing `packages/homelab-shared` → `packages/shared` (npm name `shared`);
-   do NOT create a parallel package.
-2. Authorization: new kanidm group dedicated to resume-printing, mapped via
-   `claimMaps.roles` (features/homelab-api/oidc.nix) → `roles` claim → permissions.
-3. OIDC: prefer a library (`oidc-client-ts` candidate) wrapped in Effect services in
-   `shared`; reusable for a future homelab-frontend rewrite.
-4. Delegate to subagents where sensible; use lighter models
-   (e.g. `qwencloud-token-plan-personal/qwen3.8-flash#low`, free `opencode/*` models)
-   for exploration/simple tasks; user runs e2e watch mode themselves; commit with
-   `--no-verify`, never push.
+### Validation state (all green at session end)
 
-### In flight
+- `yarn lint` ✓, `yarn typecheck` ✓, `yarn test` ✓ (676 tests: shared 11, services-node
+  600, server 55, + others)
+- `nix build .#homelab-api` ✓ (fetchYarnBerryDeps hash:
+  `sha256-frMthV2h9fUDKk2u9XRZrMX0oZooZ07FYFQSZajMk0w=` in BOTH
+  `nix-config/modules/features/homelab-api/package.nix` and `homelab-ui/package.nix`)
+- `nix eval` augustus + praeconinus toplevels ✓; shellcheck gate ✓
+- `yarn workspace resume build` ✓ (vite bundles homelab-api + oidc-client-ts fine)
+- e2e tests written but NOT run (user runs them in watch mode — see below)
 
-- Background explore subagent (sessionID `ses_e5d7dd9f8ffevi9Hz1AH7ic5lC`) mapping:
-  homelab-frontend OIDC flow (token exchange w/ homelab-server, DPoP in browser?),
-  homelab-server `/oauth/token` + `/oauth/claim-check` semantics, CORS config
-  location, `/status/health` guest accessibility, auth-middleware header expectations,
-  kanidm client nix wiring. **When it lands:** fold findings into plan.md Phase 1c/2
-  (resolve the "Open questions" callout) and record a summary here.
+### Key architecture facts discovered (authoritative — re-verify if stale)
 
-### Next steps (ordered)
+- **Auth for resume → homelab-server**: kanidm id_token as `Authorization: Bearer`.
+  `AuthenticationService` skips DPoP for remote (kanidm) issuers; server `jwtVerify`
+  requires `aud: "homelab"` + `email` + `roles` claims — those live on the **id_token**
+  (that's why homelab-frontend also sends id_token). DPoP is only for the API-key
+  `/oauth/token` automation path (e2e tests use it).
+- **Roles → permissions**: kanidm `claimMaps.roles.valuesByGroup` (per OIDC client) →
+  `roles` claim → `OIDCIdentity` permission HashSet → `AuthorizationService` checks
+  `hasPermission(resource) || hasPermission(resource.operation)`.
+- **CORS**: `HttpRouter.cors()` (api.ts) with no options = `access-control-allow-origin: *`
+  with reflected request headers. resume.rae-hill.dev calls already work — no change was
+  needed. (Tightening = env-driven allowedOrigins; deliberately skipped to not break
+  unknown consumers.)
+- **Systemd hardening**: `RestrictAddressFamilies = [ ]` serializes empty → systemd resets
+  to allow-all (that's why the server can bind sockets today). Chrome runs with
+  `--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu` under the
+  existing unit hardening; no unit relaxation was needed. Watch
+  `ProtectProc=invisible`/`ProcSubset=pid` if the zygote misbehaves in practice.
+- **Effect v4 gotchas** (bit me; skills now updated): `HttpApiEndpoint.post(name, path,
+  { payload, query, success, error, headers })` from `effect/http-api`; `Context.Service<Self,
+  Def>()(id)`; `Effect.gen({ self: this }, …)`; `Effect.catch` (NOT `catchAll`);
+  `Option.fromNullishOr` (NOT `fromNullable`); `Duration.Input` for durations;
+  `Schema.check(Schema.makeFilter(...))` for refinements; `asUint8Array({ contentType })`
+  supported; query params land in `args.query`; client calls:
+  `client.resume.print({ payload, query, headers })`; DPoP `htu` excludes query strings
+  (matches wifi-download e2e precedent).
+- **Immer + RTK**: drafts need mutable arrays — homelab slice keeps `roles: string[]`
+  internally (castDraft for payload assignment); interface stays ReadonlyArray for
+  consumers.
+- resume is **CSR-only vite SPA on GitHub Pages** (`public/CNAME` = resume.rae-hill.dev;
+  workflows copy dist/index.html → 404.html). Route tree is generated — after adding route
+  files run `yarn workspace resume build` (or dev) once and commit `routeTree.gen.ts`.
+- TanStack root search params must be whitelisted in `__root.tsx validateSearch` or the
+  router strips them.
+- Provider effect order: PrintConfigProvider (localStorage hydrate → importPrintSettings
+  apply → fonts.ready → `html[data-print-ready]`) runs BEFORE RootComponent's parent
+  effect that strips `importPrintSettings` via router navigate. Don't reorder.
 
-1. Incorporate explore report → finalize Phase 1c/2 design (OIDC/DPoP/token exchange).
-2. Phase 1a: rename homelab-shared → shared (+ nix-hashes after yarn.lock change).
-3. Phase 1b: extract print-config schemas/codecs → shared; re-point resume; tests.
-4. Phase 1c: OIDC Effect services in shared (oidc-client-ts + DPoP via Web Crypto).
-5. Then Phases 2–8 per plan.md.
+### Env/config surface added
 
-### Gotchas
+- Server: `CHROME_EXECUTABLE` (optional; nix option `services.homelab-api.chromeExecutable`,
+  set on augustus to `${pkgs.google-chrome}/bin/google-chrome-stable`), `RESUME_SITE_URL`
+  (optional, default `https://resume.rae-hill.dev` — point at `http://localhost:5173` for
+  local e2e). Both also in BOTH test-utils testing layers.
+- resume (vite, build-time, public): `VITE_HOMELAB_API_URL`,
+  `VITE_OIDC_AUTHORITY` (kanidm client-scoped discovery base:
+  `https://idm.plato-splunk.media/oauth2/openid/homelab`), `VITE_OIDC_CLIENT_ID` —
+  committed `.env.production` + `.env.development`. `homelabEnv.enabled` gates everything;
+  unset env = integration stays dark (no crash).
+- kanidm (oidc.nix): callbacks `https://resume.rae-hill.dev/oauth-callback` +
+  `http://localhost:5173/oauth-callback`; scopeMap + claimMap for group `resume.printing`
+  → role `Resume_Print`; group provisioned in features/kanidm/service.nix with jacob + rae
+  as members.
+- e2e: `Resume_Print` added to `test-api-key-1` in `packages/homelab-server/private/api-keys.json`
+  and to the nix apiKeys permissions enum.
 
-- `git add` new `.nix` files before `nix eval`/`nix build` (flake reads git tree).
-- yarn.lock changes ⇒ update `fetchYarnBerryDeps` hashes (`nix-hashes` skill) in
-  `nix-config/modules/features/homelab-api/package.nix` + `homelab-ui/package.nix`.
-- resume tsconfig is standalone (Bundler resolution, not the NodeNext base) — importing
-  workspace `shared` source (exports map → `./src/index.ts`) works via vite; verify
-  typecheck.
-- Do not run e2e tests against a self-started server.
-- Vivaldi printing is the motivating pain point; chrome PDFs are the goal.
+### What remains (ordered)
+
+1. **Commit the working tree** (skill/doc updates + `application/pdf` contentType tweak —
+   re-run `yarn lint`/`yarn typecheck` first; the contentType change is in
+   `packages/homelab-api/src/homelab/resume/print.ts`).
+2. **User-driven deploy**: `nixos-rebuild switch` augustus (kanidm provisioning applies
+   resume.printing group + claim map; homelab-api gets CHROME_EXECUTABLE), then resume
+   GH Pages deploy (push triggers `resume-deploy.yml` — user pushes; agents never push).
+3. **e2e run (USER runs watch mode — agents must not start the server)**: dev server needs
+   in `.env-local`: `CHROME_EXECUTABLE=$(which google-chrome || which chromium)` and
+   `RESUME_SITE_URL=http://localhost:5173` (+ `yarn workspace resume dev` running, or use
+   the deployed site once live). Success test needs chrome on the machine; asserts `%PDF`.
+4. **Manual verification checklist** (user, on tailnet):
+   - resume.rae-hill.dev shows Sign in (header) after the reachability probe
+   - login → kanidm → /oauth-callback → back home signed in (email shown)
+   - purple download FAB appears above the settings FAB for `resume.printing` members
+   - click → spinner → PDF downloads; dark mode prints dark when the site is in dark mode
+   - off-tailnet: no login button, no FAB, no console noise beyond the failed probe
+5. **Optional polish** (not blocking): silent token renew (oidc-client-ts
+   `automaticSilentRenew` is off; sessions expire with the id_token), IdP-side logout
+   (`signoutRedirect` — needs post-logout URI registered), browser pooling in
+   PdfPrintService if print volume ever warrants, `RESUME_SITE_URL` per-deployment in nix
+   (currently the code default), praeconinus sanity (resume group dark there: feature
+   flags omit Resume_Print → 404/403 via FeatureFlagService — verify gracefully).
+
+### Gotchas for the next agent
+
+- Run node/yarn ONLY via `nix develop . --command yarn …` (no node/yarn on PATH).
+  `yarn workspaces foreach -At run lint` per-workspace fails (eslint not in PATH);
+  use root `yarn lint` (`-Apt`).
+- `git add` new files before ANY `nix eval`/`nix build` (flake reads the git tree;
+  homelab-api derivation even requires a CLEAN tree — commit before eval).
+- yarn.lock changes ⇒ redo the `nix-hashes` dance for BOTH package.nix files (fakeHash →
+  `nix build .#homelab-api` → paste `got:` hash). Happens on ANY dependency add.
+- The harness auto-formats files after write/edit — if an edit tool call fails to match,
+  re-read the file first.
+- `Effect.runPromise` boundaries in resume live in `state/homelab/{runtime,print}.ts` and
+  hooks — keep effectful code as Effects; dispatch at the boundary only.
+- Test scoping trap: `@effect/vitest` `it.effect(name, () => Effect…)` — variables used in
+  the `.pipe(Effect.provide(...))` section must be declared OUTSIDE the generator.
+- Commits: `git commit --no-verify`; NEVER push (user's yubikey).
+- Subagents: use lighter models (e.g. `qwencloud-token-plan-personal/qwen3.8-flash` —
+  NO variant suffix, it errors) for exploration; they work well.
+- The FIRST exploration subagent (`ses_e5d7dd9f8ffevi9Hz1AH7ic5lC`) never reported; a
+  duplicate on the flash model (`ses_e5bff9f59ffeX3IVhXEs9qtdPt`) delivered the findings
+  summarized in plan.md Phase 1c/2d. Neither is needed anymore.
