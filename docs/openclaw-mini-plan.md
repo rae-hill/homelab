@@ -348,11 +348,11 @@ password + 2FA material: bigger blast radius, ToS-gray).
 
 **Phase 1 — OpenClaw gateway + Kagi on mini:**
 
-1. [ ] Wire `pkgs-unstable` specialArgs into `hosts/mini.nix`; verify openclaw builds/caches for
+1. [x] Wire `pkgs-unstable` specialArgs into `hosts/mini.nix`; verify openclaw builds/caches for
        aarch64-darwin; read bundled docs (`result/lib/openclaw/docs/`) to lock the exact config
        schema: `mcp.servers` shape (stdio + streamable-http), `toolFilter`, `${VAR}` substitution
        in headers/env, OpenRouter provider/model ids, MCP protocol version compatibility.
-2. [ ] Create `features/openclaw/{complete,service}.nix` per plan sketch (launchd.user.agents,
+2. [x] Create `features/openclaw/{complete,service}.nix` per plan sketch (launchd.user.agents,
        etc-rendered JSON5 config, sops wiring, auto-login, `OPENCLAW_SERVICE_REPAIR_POLICY=external`);
        register `darwin.openclaw` in `hosts/mini.nix`. `git add` new .nix files before nix eval.
 3. [ ] jacob: add sops keys to `secrets/mini.yaml` (`openclaw_gateway_token`, `kagi_api_key`,
@@ -360,7 +360,7 @@ password + 2FA material: bigger blast radius, ToS-gray).
 4. [ ] Render config skeleton (gateway loopback+token, OpenRouter model, kagi `mcp.servers`
        entry); deploy `darwin-rebuild switch --flake .#mini` on mini; smoke-test Control UI +
        a Kagi search round-trip.
-5. [ ] Update `docs/port-assignments.md` (Mini: 18789 OpenClaw gateway, 127.0.0.1); run
+5. [x] Update `docs/port-assignments.md` (Mini: 18789 OpenClaw gateway, 127.0.0.1); run
        validation; commit `--no-verify`.
 
 **Phase 2 — first-party Proton Mail MCP server:**

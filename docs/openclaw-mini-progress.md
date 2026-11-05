@@ -5,6 +5,103 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-05 — Session 1 (part 3): PHASE 1 IMPLEMENTED (nix side) — committed `9c80ee28b`
+
+Commits: `de93c1ced` (plan+log docs), `9c80ee28b` (phase 1: mini.nix pkgs-unstable wiring +
+`features/openclaw/{complete,service}.nix` + port doc). Worktree is detached-HEAD (opencode
+convention — same as the other worktrees).
+
+### What landed
+
+- `hosts/mini.nix`: `pkgs-unstable` specialArg (aarch64-darwin, allowUnfree +
+  **`allowInsecurePredicate = x: getName x == "openclaw"`** — nixpkgs marks openclaw insecure via
+  `knownVulnerabilities`; predicate keys on pname so version bumps don't break eval;
+  `permittedInsecurePackages` would need exact name-version). Module list += `darwin.openclaw`.
+- `features/openclaw/service.nix` (`flake.modules.darwin.openclaw-service`):
+  - `environment.etc."openclaw/openclaw.json"` — JSON5 skeleton: `gateway {mode local, port
+    18789, bind loopback, auth token, reload off}`, `logging.file` → `~/Library/Logs/openclaw/
+    gateway.log`, `agents.defaults.model.primary: "openrouter/auto"`, `mcp.servers.kagi`
+    (streamable-http, `Bearer ''${KAGI_API_KEY}` header — literal `${}` via `''${` escape,
+    toolFilter include kagi_search_fetch/kagi_extract). Secrets NEVER in config text.
+  - Wrapper (`writeShellScript`): waits ≤120s for the 3 sops secret files (boot race with
+    `sops-install-secrets` daemon), copies /etc render → **real file** `~/.openclaw/openclaw.json`
+    (openclaw avoids symlinked config layouts even read-only), broadens PATH (plist `path=[coreutils]`
+    alone is too narrow), exports `OPENCLAW_CONFIG_PATH`, **`OPENCLAW_NIX_MODE=1`** (immutable
+    config + NIX_PROFILES PATH discovery), `OPENCLAW_SERVICE_REPAIR_POLICY=external`,
+    `OPENCLAW_GATEWAY_TOKEN`/`OPENROUTER_API_KEY`/`KAGI_API_KEY` from `/run/secrets`, execs
+    `openclaw gateway run`.
+  - `sops.secrets.{openclaw_gateway_token,openrouter_api_key,kagi_api_key}` owner jacob, group
+    staff, mode 0400.
+  - `system.defaults.loginwindow.autoLoginUser = "jacob"` (FileVault caveat — plan D2).
+  - `system.activationScripts.openclawLogDir` pre-creates the log dir (launchd opens
+    StandardOutPath before the wrapper's mkdir can run).
+  - `launchd.user.agents.openclaw`: KeepAlive + RunAtLoad, logs → `~/Library/Logs/openclaw/
+    gateway.{out,err}.log`. Label `org.nixos.openclaw`.
+- `docs/port-assignments.md`: Mini 18789 row + date bump.
+
+### Schema research (subagent `ses_e52709038ffeCX6s4gciFA8OCf`, docs tag v2026.10.3)
+
+Verified facts used above: strict schema (unknown keys → exit 78); `${UPPER_VAR}` substitution in
+ANY string value incl. mcp headers/provider apiKey (uppercase regex, `$${}` escape, missing var =
+warn+visible); `$include` confined to config dir; gateway.bind enum auto|loopback|lan|tailnet|
+custom; OpenAI-compat chatCompletions endpoint OFF by default; `openrouter` is a builtin provider
+id, model ref `openrouter/<org>/<model>`, `OPENROUTER_API_KEY` auto-pickup; `mcp.servers` stdio
+keys command/args/env/cwd, remote keys url/transport(streamable-http|sse)/headers/auth/sslVerify/
+requestTimeoutMs(default 60s; 10s initial tool list)/connectionTimeoutMs, `toolFilter.include/
+exclude` (globs ok), stdio env safety filter drops NODE_OPTIONS/DYLD_*; stdio server stderr →
+gateway log prefixed `bundle-mcp:<name>:`; `tools.allow/deny` deny-wins, `tools.profile`
+minimal|coding|messaging|full; sandbox modes off|non-main|all, backends docker|podman|ssh|
+openshell|crabbox — **no macOS seatbelt backend** (skipped phase 1; revisit if Docker lands on
+mini); with sandbox on, MCP tools need `"bundle-mcp"` in `tools.sandbox.tools.alsoAllow`;
+`OPENCLAW_NIX_MODE=1` ⇒ writers (onboard/doctor --fix/config set/plugin install) refuse and print
+redacted merge patches; state dir must stay writable; default logs /tmp/openclaw pruned 24h ⇒
+`logging.file`; `openclaw config schema` / `openclaw config validate` exist for offline checks;
+upstream reference impl: `openclaw/nix-openclaw` Home Manager module.
+
+### Deployment facts discovered
+
+- Locked nixpkgs-unstable ships openclaw **2026.10.5** (vendored docs/subtree = 2026.10.3;
+  patch skew — re-validate schema on mini; `allowInsecurePredicate` already version-proof).
+- **No binary cache for openclaw on aarch64-darwin** (insecure-marked ⇒ Hydra skips) ⇒ first
+  `darwin-rebuild` on mini builds from source (pnpm install+build+ui:build — expect tens of
+  minutes, one-time).
+- sops-nix darwin (rev `ee48786`, read from store): secrets → `/run/secrets/<name>` via
+  `launchd.daemons.sops-install-secrets` (RunAtLoad) + postActivation; owner/group/mode
+  supported; `neededForUsers` is a no-op on macOS. **sops-install-secrets FAILS if a declared key
+  is missing from mini.yaml ⇒ jacob must add the 3 keys BEFORE first switch** (or the activation
+  errors — recoverable, but let's not).
+- Verified on linux (eval-only): toplevel drvPath ✓, rendered config text ✓ (literal
+  `${KAGI_API_KEY}` ✓), plist ✓ (Label/KeepAlive/RunAtLoad/wait4path/StandardOutPath), wrapper
+  shell syntax ✓. No Linux host configs touched (openclaw feature is darwin-only data).
+
+### jacob: phase-1 deploy checklist
+
+1. Add secrets (workstation, your age key): `sops nix-config/secrets/mini.yaml` →
+   ```yaml
+   openclaw_gateway_token: <openssl rand -hex 32>
+   openrouter_api_key: <sk-or-...>
+   kagi_api_key: <key from kagi.com/api/keys — needs API credits enabled>
+   ```
+2. On mini: `darwin-rebuild switch --flake <repo>#mini` (first build = source build, see above).
+3. Smoke test: `openclaw gateway status` (or `launchctl print gui/501/org.nixos.openclaw | head`)
+   → `openclaw config validate` → `tail ~/Library/Logs/openclaw/gateway.log` → Control UI at
+   `http://127.0.0.1:18789/` (token = gateway_token value) → ask it something that uses
+   `kagi_search_fetch`.
+4. Append results (esp. any schema drift at 2026.10.5) to this log.
+
+### Phase 2 research in flight (launched this session)
+
+- `ses_e5262a4a9ffehwu4f2peQ9cj7k` — Effect `McpServer` exact API extraction (import paths,
+  layerStdio/Tool/Toolkit signatures, runnable example from tests, error handling, middleware).
+- `ses_e52624c0cffehoCb7XrgdxRcS2` — Proton Bridge IMAP semantics (labels-as-folders?, MOVE/COPY,
+  SEARCH support, TLS/ports, macOS GUI requirement) + ImapFlow/mailparser API patterns.
+- Design consequence to verify from research: Proton "labels" are likely IMAP **folders**
+  (Labels/*), so `mail_add_label` = COPY/MOVE into a whitelisted label folder — the whitelist
+  env semantics may shift from flags to folder names. Resolve when research lands, BEFORE writing
+  the tools layer.
+
+---
+
 ## 2026-11-05 — Session 1 (part 2): decisions received; Effect MCP + monorepo research
 
 ### User decisions (ALL open questions resolved)
