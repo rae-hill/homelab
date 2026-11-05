@@ -4,6 +4,95 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
+## 2026-11-05 — Session 2 wrap → handoff (live-verified, `mask` root-caused, new e2e workflow)
+
+### Verified live by the user
+
+- **OIDC login flow works end-to-end** against deployed augustus + live resume
+  (kanidm `resume.printing` group/claim-map/callbacks applied by the user's deploy).
+- Body double-scrollbar fix (`c3828673`) confirmed fixed by the user.
+
+### User commits since session 1
+
+- `12d32a54` — `packages/homelab-services-node/src/layers/pdf-print-service.ts`: refined
+  the Effect implementation (`Effect.acquireUseRelease` around launch, `signal` wired into
+  `puppeteer.launch`) and added **puppeteer page-console log bubbling**: page console
+  events (log/info/warn/error/trace + group/count/time families) are captured via
+  `Stream.callback` + `Queue.offerUnsafe`, mapped onto `Effect.log*` with
+  console.group/count/time tracking (Refs), so browser-side logs land in server logs/otel.
+  This is what surfaced the `mask` stack trace below.
+- `8a70e6a2` — flake.nix devshell command **`e2e`** (+ `serve:test` script, missing yarn
+  deps): `yarn workspace homelab-server build` (rolldown **bundle**) → starts
+  `yarn workspace homelab-server serve:test` (dotenvx with the gitignored
+  `packages/homelab-server/.env-serve-test`) on **port 54328**, exporting
+  `PORT`/`HOMELAB_ORIGIN_URL`/`E2E_BASE_URL` → waits for `/status/health` (30 × 0.5s) →
+  runs the FULL e2e suite → EXIT trap kills the server. Server logs land in
+  `.e2e-log-dump.txt` at the repo root (gitignored). Flake TODO: no test-file filter yet.
+  - **ENV GAP:** `.env-serve-test` contains NO `CHROME_EXECUTABLE` (and no
+    `RESUME_SITE_URL` — the code default, the live site, is fine). So `e2e` only exercises
+    the print success path when the caller exports `CHROME_EXECUTABLE` in their shell
+    (or adds it to their local `.env-serve-test`). Current chromium on this machine:
+    `nix build nixpkgs#chromium --no-link --print-out-paths` →
+    `<storepath>/bin/chromium` (was `…bnpw53y1w97ap7yvvr6livnkswgijif0-chromium-156.0.8078.79`).
+
+### The `mask` bug — ROOT-CAUSED, fix NOT yet applied
+
+- **Symptom:** `POST /resume/print` → 500. `.e2e-log-dump.txt`:
+  `TypeError: Cannot read properties of undefined (reading 'mask')`
+  `at module.exports.mask (…/dist/bundle/NodeWebSocketTransport-DioQX_mY.js:123:20)`.
+- **Root cause — our bundle, not puppeteer:** bundled `ws` buffer-util does
+  `if (!process.env.WS_NO_BUFFER_UTIL) try { bufferUtil = require_bufferutil(); …
+  module.exports.mask = (… ) => { length < 48 ? _mask(…) : bufferUtil.mask(…) } } catch {}`.
+  The rolldown `stubOptionalNative` plugin (`packages/homelab-server/rolldown.config.ts`)
+  stubs `bufferutil`/`utf-8-validate` as `module.exports = undefined;` — the require
+  "succeeds" with `undefined`, so `bufferUtil.mask(...)` throws on CDP websocket frames
+  ≥ 48 bytes (i.e. every real puppeteer↔chrome session). Same latent crash via
+  `utf-8-validate` (`WS_NO_UTF_8_VALIDATE`). Bundle-only: under tsx `dev` the real
+  `require` throws → catch → pure-JS fallback, which is why dev never showed it.
+  (Session-1's code-splitting hypothesis was WRONG — chunk refs are self-contained.)
+- **Recommended fix (small):** make ws skip the native requires entirely — set
+  `process.env.WS_NO_BUFFER_UTIL = "1"` and `process.env.WS_NO_UTF_8_VALIDATE = "1"`
+  before ws loads. Cleanest: new `packages/homelab-server/src/ws-native-env.ts` with
+  those two `??=` assignments, imported as the FIRST import of `src/main.ts` (ESM
+  evaluates imports in order). Rejected alternatives: teach the stub pure-JS
+  mask/unmask (duplicates ws internals); externalize puppeteer-core + ship node_modules
+  in the nix derivation (large).
+- **Verify:** export CHROME_EXECUTABLE, run `e2e` → resume suite green incl. `%PDF`
+  success test; grep `.e2e-log-dump.txt` for absence of the TypeError; then
+  `nix build .#homelab-api` (bundle changed → derivation rebuild; hashes unchanged).
+
+### Next steps (ordered, for the next agent)
+
+1. Apply the `WS_NO_*` fix; run `e2e` (with `CHROME_EXECUTABLE` exported) until the
+   resume suite — success test included — and then the full suite are green; commit.
+2. **Effect.fn refactor (user-assigned):** convert every exported accessor function in
+   `packages/homelab-services/src/services/*.ts` (~21 functions / 14 files) from
+   `Service.pipe(Effect.flatMap((_) => _.method(...)))` to
+   `Effect.fn("ServiceName.method")(function*(…) { const svc = yield* Service; return yield* svc.method(…) })`
+   so every call carries an otel span. Keep JSDoc `{@inheritDoc}`, signatures, and
+   spread-param forms (`...params: Parameters<Def["m"]>`, e.g. authorization-service's
+   canView/canModify/canCreate/canDelete, authentication-service's authenticate).
+   Verify: `yarn typecheck`, `yarn test` (services-node ~600, server ~55), `yarn lint`;
+   update the accessor-pattern section of `.opencode/skills/effect-services/SKILL.md`.
+3. Optional polish (session-1 list): silent token renew (`automaticSilentRenew` off),
+   IdP-side logout, browser pooling in PdfPrintService, test-file filter for the `e2e`
+   flake command (user's own TODO).
+
+### Gotchas (new / refreshed)
+
+- `e2e` (devshell) is now the sanctioned e2e path — builds the BUNDLE, so it catches
+  bundle-only bugs like `mask`. Don't hand-roll servers unless debugging; if you do,
+  track PIDs and re-check ports afterwards (session-1 recipe below still valid).
+- `.env-serve-test` + `.e2e-log-dump.txt` are gitignored, machine-local.
+- When something works under `dev` (tsx) but fails under `serve`/deployed: suspect the
+  rolldown bundle (stubOptionalNative stubs, CJS interop, chunks) and read the stack
+  frames in `.e2e-log-dump.txt` (`dist/bundle/…`).
+- All session-1 gotchas still apply: nix fakeHash dance on yarn.lock changes, `git add`
+  before nix eval, clean tree required by the homelab-api derivation, `--no-verify`
+  commits, never push, light subagent models WITHOUT variant suffixes.
+
+---
+
 ## 2026-11-03 — Session 1 (planning + Phases 1–8 implemented; deployment pending)
 
 ### Commits this session (all on `main`, NOT pushed)

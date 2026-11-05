@@ -3,25 +3,28 @@
 Phased plan for server-side resume PDF printing. Work top-to-bottom; each phase ends in a
 committable state. Update [`progress.md`](./progress.md) after every phase/session.
 
-## Status (2026-11-03, session 1)
+## Status (updated 2026-11-05, session-2 handoff)
 
-| Phase | Scope                                             | State                                                                |
-| ----- | ------------------------------------------------- | -------------------------------------------------------------------- |
-| 0     | Planning docs                                     | ✅ done                                                              |
-| 1a    | Rename homelab-shared → shared                    | ✅ done (commit 0a30f89)                                             |
-| 1b    | Extract print-config schemas/codecs → shared      | ✅ done (commit f1a298c)                                             |
-| 1c    | OIDC Effect services in shared (`shared/oidc`)    | ✅ done (commit 2cf271e) — oidc-client-ts wrapped in Effect          |
-| 2     | resume: network check + OIDC login                | ✅ code done (commit 6169dc) — needs kanidm/nix deploy + manual test |
-| 3     | resume: importPrintSettings + theme + print-ready | ✅ code done (commit 6169dc) — needs deploy + puppeteer e2e          |
-| 4     | homelab-api: POST /resume/print definition        | ✅ done (commit 7b080e6)                                             |
-| 5     | homelab-server: puppeteer PdfPrintService         | ✅ done (commit 7b080e6) — unit tests green (5)                      |
-| 6     | resume: download FAB                              | ✅ code done (commit ea839c8 + toaster 3539d54)                      |
-| 7     | NixOS infra (env, kanidm, hash refresh)           | ✅ code done (commits 98d7e6a, ddb9aee) — needs deploy               |
-| 8     | e2e tests                                         | ✅ written (commit ddb9aee) — **user runs them in watch mode**       |
+| Phase | Scope                                             | State                                                             |
+| ----- | ------------------------------------------------- | ----------------------------------------------------------------- |
+| 0     | Planning docs                                     | ✅ done                                                           |
+| 1a    | Rename homelab-shared → shared                    | ✅ done (commit 0a30f89)                                          |
+| 1b    | Extract print-config schemas/codecs → shared      | ✅ done (commit f1a298c)                                          |
+| 1c    | OIDC Effect services in shared (`shared/oidc`)    | ✅ done (commit 2cf271e) — oidc-client-ts wrapped in Effect       |
+| 2     | resume: network check + OIDC login                | ✅ deployed + **live-verified by user** (augustus + GH Pages)     |
+| 3     | resume: importPrintSettings + theme + print-ready | ✅ deployed + exercised by the e2e success test                   |
+| 4     | homelab-api: POST /resume/print definition        | ✅ done (commit 7b080e6)                                          |
+| 5     | homelab-server: puppeteer PdfPrintService         | ✅ done (7b080e6) + user's log-bubbling refactor (12d32a54)       |
+| 6     | resume: download FAB                              | ✅ done (ea839c8 + toaster 3539d54)                               |
+| 7     | NixOS infra (env, kanidm, hash refresh)           | ✅ deployed by user; OIDC flow verified live                      |
+| 8     | e2e tests                                         | ✅ written + verified; workflow is now the devshell `e2e` command |
+| 9     | `mask` bundle fix (`WS_NO_*` envs)                | ❌ **root-caused, NOT applied** — see progress.md session 2       |
+| 10    | Effect.fn spans for all service accessors         | ❌ not started (user-assigned spec in progress.md)                |
 
-Remaining: deploy (nix switch augustus + resume GH Pages rollout), kanidm group/claim-map
-apply, manual verification, and running the e2e suite against a live server. See
-`progress.md` for the handoff checklist.
+Remaining work is tracked in `progress.md` → "Next steps (ordered, for the next
+agent)": (9) the ws/bufferutil bundle fix + green `e2e`, (10) the Effect.fn accessor
+refactor + skill update, then optional polish (silent renew, IdP logout, browser
+pooling, e2e file filter).
 
 **Effect v4 note:** the monorepo was just upgraded to Effect 4 (`repos/effect` @ 4.1.2).
 The `adding-endpoints` and `effect-services` skills were showing v3 style and have been
@@ -422,8 +425,11 @@ New group `resume` (prefix baked into paths, per current style):
   (DPoP) for success; `TEST_LIMITED_API_KEY` → `AuthorizationError`; build a valid
   config blob using **`shared`'s `encodeBase64Config`** over a fixture (this is the
   payoff of the shared schemas); assert response starts with `%PDF` magic bytes.
-  Invalid base64/garbage config → schema `BadRequest`. **Do not start the server —
-  the user runs e2e in watch mode.**
+  Invalid base64/garbage config → schema `BadRequest`. Run via the devshell **`e2e`**
+  command (flake.nix): it builds the bundle, serves it on :54328 via `serve:test`
+  (`.env-serve-test`), runs the suite, kills the server, and dumps server logs to
+  `.e2e-log-dump.txt`. **Export `CHROME_EXECUTABLE` in your shell first** — it is not in
+  `.env-serve-test` (see progress.md session 2). Never hand-start servers for e2e.
 - Unit tests: Phase 1b (shared codecs), 5c (handler + service).
 - Full validation sweep: `yarn lint --fix && yarn lint && yarn typecheck && yarn test`,
   `nix build .#checks.x86_64-linux.shellcheck`.
