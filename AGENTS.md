@@ -149,7 +149,13 @@ yarn test
 nix build .#checks.x86_64-linux.shellcheck    # ShellCheck gate for shell scripts
 ```
 
-Do NOT run e2e tests (`homelab-e2e-tests`) — they require the backend to be running.
+e2e tests (`homelab-e2e-tests`): use the devshell `e2e` command (wraps `scripts/e2e.sh`) —
+it bootstraps the machine-local fixtures (`scripts/stage-e2e-secrets.mjs`), builds the
+rolldown bundle, starts its own server on :54328, runs the suite, and kills the server
+afterwards. Args pass through to vitest as test-file filters (`e2e src/resume` runs just
+the resume tests; no args = full suite). Server logs land in `.e2e-log-dump.txt`. Do NOT
+hand-roll backend servers for e2e. The live resume-print success test only runs where
+`CHROME_EXECUTABLE` is set (devshell provides it; CI skips it).
 To target a specific package or test: `yarn workspace <package-name> <command> <args>`
 (do NOT use `--` to separate args).
 
