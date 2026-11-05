@@ -1,0 +1,29 @@
+{
+  "name": "proton-mail-mcp",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "MCP stdio server for Proton Mail via the local Proton Mail Bridge — env-whitelisted read + label tools",
+  "scripts": {
+    "circular": "yarn madge --circular ./src/main.ts",
+    "build": "rolldown -c",
+    "lint": "eslint src",
+    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "test": "vitest run --pass-with-no-tests",
+    "test:watch": "vitest watch"
+  },
+  "dependencies": {
+    "@effect/platform-node": "^4.1.x",
+    "effect": "^4.1.x",
+    "imapflow": "^2.10.0",
+    "postal-mime": "^4.2.0"
+  },
+  "devDependencies": {
+    "@effect/vitest": "^4.1.x",
+    "@types/node": "^24",
+    "madge": "^8.0.0",
+    "rolldown": "^1.0.0-rc.7",
+    "vite": "^8.3.5",
+    "vitest": "^5.x"
+  }
+}

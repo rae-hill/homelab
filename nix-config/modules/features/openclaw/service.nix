@@ -16,6 +16,7 @@
 {
   flake.modules.darwin.openclaw-service =
     {
+      inputs,
       pkgs,
       pkgs-unstable,
       config,
@@ -23,11 +24,14 @@
     }:
     let
       openclaw = pkgs-unstable.openclaw;
+      protonMailMcp = inputs.self.packages.aarch64-darwin.proton-mail-mcp;
 
       secretNames = [
         "openclaw_gateway_token"
         "openrouter_api_key"
         "kagi_api_key"
+        "proton_bridge_username"
+        "proton_bridge_password"
       ];
       secretPath = name: config.sops.secrets.${name}.path;
 
@@ -63,12 +67,19 @@
         export OPENCLAW_GATEWAY_TOKEN="$(cat "${secretPath "openclaw_gateway_token"}")"
         export OPENROUTER_API_KEY="$(cat "${secretPath "openrouter_api_key"}")"
         export KAGI_API_KEY="$(cat "${secretPath "kagi_api_key"}")"
+        # Proton Mail Bridge mailbox creds (Bridge GUI → "Mailbox details"); consumed by the
+        # proton-mail-mcp stdio server via ''${PROTON_*} substitution in the rendered config.
+        export PROTON_BRIDGE_USERNAME="$(cat "${secretPath "proton_bridge_username"}")"
+        export PROTON_BRIDGE_PASSWORD="$(cat "${secretPath "proton_bridge_password"}")"
 
         exec ${openclaw}/bin/openclaw gateway run
       '';
     in
     {
-      environment.systemPackages = [ openclaw ];
+      environment.systemPackages = [
+        openclaw
+        protonMailMcp
+      ];
 
       # JSON5 skeleton. Secrets are NEVER rendered here — only ${VAR} env substitution
       # (uppercase names; wrapper exports them). ''${ escapes Nix interpolation.
@@ -100,8 +111,20 @@
                 requestTimeoutMs: 20000,
                 toolFilter: { include: ["kagi_search_fetch", "kagi_extract"] },
               },
-              // Phase 2: protonmail stdio server (packages/proton-mail-mcp) lands here with
-              // Bridge creds via ''${PROTON_*} substitution + toolFilter mirroring its env policy.
+              protonmail: {
+                command: "${protonMailMcp}/bin/proton-mail-mcp",
+                env: {
+                  PROTON_BRIDGE_USERNAME: "''${PROTON_BRIDGE_USERNAME}",
+                  PROTON_BRIDGE_PASSWORD: "''${PROTON_BRIDGE_PASSWORD}",
+                  # Read-only by default. To enable labeling: set "read,label" AND list the
+                  # exact label names allowed (comma-separated), e.g. "Receipts,Important".
+                  # The server hides label tools entirely unless "label" is enabled, and
+                  # rejects non-whitelisted labels (policy_denied) — see
+                  # packages/proton-mail-mcp + docs/openclaw-mini-plan.md.
+                  PROTON_MCP_OPERATIONS: "read",
+                },
+                toolFilter: { include: ["mail_*"] },
+              },
             },
           },
         }
