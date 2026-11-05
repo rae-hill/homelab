@@ -1,4 +1,4 @@
-import { Chunk, DateTime, Effect, flow, Layer, MutableHashMap, Option, Queue, Random, Ref, Stream, Tuple } from "effect"
+import { Chunk, DateTime, Effect, flow, Layer, MutableHashMap, Option, Queue, Random, Ref, Tuple } from "effect"
 import { Config, type Schemas, Services } from "homelab-services"
 import puppeteer from "puppeteer-core"
 
@@ -48,6 +48,13 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
        */
       const timerRef = yield* Ref.make(MutableHashMap.empty<string | symbol, DateTime.Utc>())
       const groupListRef = yield* Ref.make(Chunk.empty<string | symbol>())
+      /**
+       * Page console events are captured as ready-to-run log effects and drained
+       * during cleanup (after `browser.close()`, so no further events can fire).
+       * NOTE: this must NOT be a `Stream.runCollect` over a `Stream.callback` —
+       * a callback stream never terminates, so collecting it hangs the request.
+       */
+      const logQueue = yield* Queue.unbounded<Effect.Effect<void>>()
 
       return yield* Effect.acquireUseRelease(
         Effect.tryPromise(
@@ -67,133 +74,128 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
 
               const page = await browser.newPage()
 
-              const logStream = Stream.callback<Effect.Effect<void>>(
-                (queue) =>
-                  Effect.sync(() =>
-                    page.on(
-                      "console",
-                      (msg) =>
-                        Queue.offerUnsafe(
-                          queue,
-                          Effect.gen(function*() {
-                            const type = msg.type()
-                            const groups = yield* Ref.get(groupListRef)
+              page.on(
+                "console",
+                (msg) =>
+                  Queue.offerUnsafe(
+                    logQueue,
+                    Effect.gen(function*() {
+                      const type = msg.type()
+                      const groups = yield* Ref.get(groupListRef)
 
-                            switch (type) {
-                              case "log":
-                              case "dir":
-                              case "table":
-                                yield* Effect.log(...msg.args()).pipe(withSpans(groups))
-                                break
-                              case "info":
-                                yield* Effect.logInfo(...msg.args()).pipe(withSpans(groups))
-                                break
-                              case "debug":
-                              case "verbose":
-                                yield* Effect.logDebug(...msg.args()).pipe(withSpans(groups))
-                                break
-                              case "error":
-                              case "assert":
-                                yield* Effect.logError(...msg.args()).pipe(withSpans(groups))
-                                break
-                              case "trace":
-                                yield* Effect.logTrace(...msg.args()).pipe(withSpans(groups))
-                                break
-                              case "warn":
-                                yield* Effect.logWarning(...msg.args()).pipe(withSpans(groups))
-                                break
-                              case "startGroup":
-                              case "startGroupCollapsed": {
-                                const msgArgs = msg.args()
-                                const newGroupName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
+                      switch (type) {
+                        case "log":
+                        case "dir":
+                        case "table":
+                          yield* Effect.log(...msg.args()).pipe(withSpans(groups))
+                          break
+                        case "info":
+                          yield* Effect.logInfo(...msg.args()).pipe(withSpans(groups))
+                          break
+                        case "debug":
+                        case "verbose":
+                          yield* Effect.logDebug(...msg.args()).pipe(withSpans(groups))
+                          break
+                        case "error":
+                        case "assert":
+                          yield* Effect.logError(...msg.args()).pipe(withSpans(groups))
+                          break
+                        case "trace":
+                          yield* Effect.logTrace(...msg.args()).pipe(withSpans(groups))
+                          break
+                        case "warn":
+                          yield* Effect.logWarning(...msg.args()).pipe(withSpans(groups))
+                          break
+                        case "startGroup":
+                        case "startGroupCollapsed": {
+                          const msgArgs = msg.args()
+                          const newGroupName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
 
-                                yield* Ref.getAndUpdate(
-                                  groupListRef,
-                                  Chunk.prepend(newGroupName),
-                                )
+                          yield* Ref.getAndUpdate(
+                            groupListRef,
+                            Chunk.prepend(newGroupName),
+                          )
 
-                                break
-                              }
-                              case "endGroup": {
-                                yield* Ref.getAndUpdate(
-                                  groupListRef,
-                                  Chunk.drop(1),
-                                )
+                          break
+                        }
+                        case "endGroup": {
+                          yield* Ref.getAndUpdate(
+                            groupListRef,
+                            Chunk.drop(1),
+                          )
 
-                                break
-                              }
-                              case "count": {
-                                const msgArgs = msg.args()
-                                const countName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
-                                const friendlyName = typeof countName === "string" ? countName : "default"
+                          break
+                        }
+                        case "count": {
+                          const msgArgs = msg.args()
+                          const countName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
+                          const friendlyName = typeof countName === "string" ? countName : "default"
 
-                                const newCount = yield* Ref.getAndUpdate(
-                                  countsRef,
-                                  MutableHashMap.modifyAt(
-                                    countName,
-                                    flow(Option.map((n) => n + 1), Option.orElseSome(() => 1)),
-                                  ),
-                                ).pipe(
-                                  Effect.map(flow(MutableHashMap.get(countName), Option.getOrElse(() => 1))),
-                                )
+                          const newCount = yield* Ref.getAndUpdate(
+                            countsRef,
+                            MutableHashMap.modifyAt(
+                              countName,
+                              flow(Option.map((n) => n + 1), Option.orElseSome(() => 1)),
+                            ),
+                          ).pipe(
+                            Effect.map(flow(MutableHashMap.get(countName), Option.getOrElse(() => 1))),
+                          )
 
-                                yield* Effect.logInfo(friendlyName + ": " + newCount)
+                          yield* Effect.logInfo(friendlyName + ": " + newCount)
 
-                                break
-                              }
-                              // @ts-expect-error --- time isn't included for some reason
-                              case "time":
-                              // including profile to trigger this path in case puppeteer
-                              // genuinely doesn't emit time events
-                              case "profile": {
-                                const msgArgs = msg.args()
-                                const timerName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
-                                const now = yield* DateTime.now
-                                yield* Ref.getAndUpdate(
-                                  timerRef,
-                                  MutableHashMap.set(timerName, now),
-                                )
-                                break
-                              }
-                              // Note: this will treat time/profile as identical (one controlling the other)
-                              // this is fine for now, not many browsers support profile anyway
-                              case "timeEnd":
-                              case "profileEnd": {
-                                const msgArgs = msg.args()
-                                const timerName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
-                                const timerNameFriendly = typeof timerName === "string" ? timerName : "default"
-                                const now = yield* DateTime.now
-                                const timers = yield* Ref.get(timerRef)
-                                const startTime = MutableHashMap.get(timers, timerName)
+                          break
+                        }
+                        // @ts-expect-error --- time isn't included for some reason
+                        case "time":
+                        // including profile to trigger this path in case puppeteer
+                        // genuinely doesn't emit time events
+                        case "profile": {
+                          const msgArgs = msg.args()
+                          const timerName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
+                          const now = yield* DateTime.now
+                          yield* Ref.getAndUpdate(
+                            timerRef,
+                            MutableHashMap.set(timerName, now),
+                          )
+                          break
+                        }
+                        // Note: this will treat time/profile as identical (one controlling the other)
+                        // this is fine for now, not many browsers support profile anyway
+                        case "timeEnd":
+                        case "profileEnd": {
+                          const msgArgs = msg.args()
+                          const timerName = msgArgs.length > 0 ? msg.text() : defaultArgNameSymbol
+                          const timerNameFriendly = typeof timerName === "string" ? timerName : "default"
+                          const now = yield* DateTime.now
+                          const timers = yield* Ref.get(timerRef)
+                          const startTime = MutableHashMap.get(timers, timerName)
 
-                                yield* startTime.pipe(
-                                  Option.map(
-                                    (start) => DateTime.toEpochMillis(now) - DateTime.toEpochMillis(start),
-                                  ),
-                                  Option.map(
-                                    Effect.fnUntraced(function*(diff) {
-                                      yield* Effect.logInfo(timerNameFriendly + ": " + diff + "ms")
+                          yield* startTime.pipe(
+                            Option.map(
+                              (start) => DateTime.toEpochMillis(now) - DateTime.toEpochMillis(start),
+                            ),
+                            Option.map(
+                              Effect.fnUntraced(function*(diff) {
+                                yield* Effect.logInfo(timerNameFriendly + ": " + diff + "ms")
 
-                                      MutableHashMap.remove(timers, timerName)
-                                    }),
-                                  ),
-                                  Effect.transposeOption,
-                                )
-                                break
-                              }
-                              default: {
-                                const msgArgs = msg.args()
+                                MutableHashMap.remove(timers, timerName)
+                              }),
+                            ),
+                            Effect.transposeOption,
+                          )
+                          break
+                        }
+                        default: {
+                          const msgArgs = msg.args()
 
-                                yield* Effect.logWarning("Unsupported log type: " + type, ...msgArgs)
-                              }
-                            }
-                          }),
-                        ),
-                    )
+                          yield* Effect.logWarning("Unsupported log type: " + type, ...msgArgs)
+                        }
+                      }
+                    }),
                   ),
               )
 
-              return Tuple.make(browser, page, logStream)
+              return Tuple.make(browser, page)
             },
             catch(error) {
               return new Services.PdfPrintService.PdfPrintError({
@@ -224,7 +226,7 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
             },
           })
         }),
-        Effect.fn("pupeteer-cleanup")(function*([browser, , logStream]) {
+        Effect.fn("pupeteer-cleanup")(function*([browser]) {
           yield* Effect.tryPromise({
             try() {
               return browser.close()
@@ -237,7 +239,11 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
             },
           })
 
-          yield* Stream.runCollect(logStream)
+          // Drain the captured page-console log effects and run them so
+          // browser-side logs land in the server logs/otel.
+          const pendingLogs = yield* Queue.takeAll(logQueue)
+          yield* Effect.forEach(pendingLogs, (logEffect) => logEffect)
+          yield* Queue.shutdown(logQueue)
         }),
       )
     })
