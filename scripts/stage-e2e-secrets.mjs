@@ -9,6 +9,8 @@
  * - packages/homelab-server/private/jwk.pub.json  — token-issuer public JWK (ES256)
  * - packages/homelab-server/private/jwk-secret    — PBES2 passphrase for jwk.json
  * - packages/homelab-server/private/hmac-secret   — nonce HMAC secret (64 hex chars)
+ * - packages/homelab-server/private/serial-numbers.json — IP → serial map for the
+ *   EAP-TLS wifi fine-grained-authorization tests (recognized-IP contract)
  *
  * Also runs stage-test-secrets.mjs (homelab-services-node unit-test fixtures),
  * since the e2e workspace transitively imports that package's test-utils.
@@ -132,6 +134,17 @@ const generateIssuerKeys = async () => {
 }
 
 /**
+ * IP → device-serial map consumed by the fine-grained authorization service
+ * for EAP-TLS wifi requests (x-forwarded-for lookup). Contract with the e2e
+ * suite: src/mobile-config/wifi.test.ts expects 192.168.1.10 to be RECOGNIZED
+ * and 10.0.0.99 to be unrecognized (absent here). Non-secret test values.
+ */
+const serialNumbers = {
+  "192.168.1.10": "TEST-SERIAL-001",
+  "100.64.0.1": "TEST-SERIAL-002",
+}
+
+/**
  * Env for `yarn workspace homelab-server serve:test` (dotenvx, CWD =
  * packages/homelab-server). PORT / HOMELAB_ORIGIN_URL / E2E_BASE_URL are NOT
  * set here — scripts/e2e.sh exports them and dotenvx never overrides existing
@@ -150,6 +163,7 @@ HOMELAB_SECRET_FILE=./private/hmac-secret
 FEATURE_FLAGS=*
 KANIDM_OPENID_PROVIDER_URL=https://idm.plato-splunk.media/oauth2/openid/homelab/.well-known/openid-configuration
 API_KEYS_FILE=./private/api-keys.json
+SERIAL_NUMBERS_FILE=./private/serial-numbers.json
 ROOT_CERT_DER=../../certs/alford-root.der
 INTERMEDIATE_CERT_DER=../../certs/intermediate_ca_2.der
 ROOT_CERT_CRT=../../certs/alford-root.crt
@@ -165,4 +179,5 @@ await stage(path.join(privateDir, "jwk.json"), async () => jwe)
 await stage(path.join(privateDir, "jwk.pub.json"), async () => publicJwk)
 await stage(path.join(privateDir, "jwk-secret"), async () => jwkSecret)
 await stage(path.join(privateDir, "hmac-secret"), async () => randomBytes(32).toString("hex"))
+await stage(path.join(privateDir, "serial-numbers.json"), async () => JSON.stringify(serialNumbers, null, 2))
 await stage(path.join(serverDir, ".env-serve-test"), async () => envServeTest)
