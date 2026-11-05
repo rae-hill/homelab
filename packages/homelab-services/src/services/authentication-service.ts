@@ -28,16 +28,13 @@ export class AuthenticationService
 }
 
 /** {@inheritDoc AuthenticationServiceDef.authenticate} */
-export function authenticate(
+export const authenticate = Effect.fn("AuthenticationService.authenticate")(function*(
   ...params: Parameters<AuthenticationServiceDef["authenticate"]>
-): Effect.Effect<
+): Effect.fn.Return<
   Identity,
   AuthenticationError | BadRequest | InternalServerError | NonceValidationError | HMACDigestError,
   AuthenticationService
 > {
-  return AuthenticationService.pipe(
-    Effect.flatMap(
-      (_) => _.authenticate(...params),
-    ),
-  )
-}
+  const svc = yield* AuthenticationService
+  return yield* svc.authenticate(...params)
+})

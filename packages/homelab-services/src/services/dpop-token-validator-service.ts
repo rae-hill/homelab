@@ -38,16 +38,13 @@ export class DPoPTokenValidatorService
 }
 
 /** {@inheritDoc DPoPTokenValidatorServiceDef.validateDPoPToken} */
-export function validateDPoPToken(
+export const validateDPoPToken = Effect.fn("DPoPTokenValidatorService.validateDPoPToken")(function*(
   ...params: Parameters<DPoPTokenValidatorServiceDef["validateDPoPToken"]>
-): Effect.Effect<
+): Effect.fn.Return<
   DPoPValidationResult,
   AuthenticationError | BadRequest | NonceValidationError | HMACDigestError | InternalServerError,
   DPoPTokenValidatorService
 > {
-  return DPoPTokenValidatorService.pipe(
-    Effect.flatMap(
-      (_) => _.validateDPoPToken(...params),
-    ),
-  )
-}
+  const svc = yield* DPoPTokenValidatorService
+  return yield* svc.validateDPoPToken(...params)
+})

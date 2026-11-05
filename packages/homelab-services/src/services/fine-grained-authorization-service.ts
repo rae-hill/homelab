@@ -1,4 +1,4 @@
-import { Context, Effect, pipe } from "effect"
+import { Context, Effect } from "effect"
 import type { AuthorizationError, InternalServerError } from "../errors/http-errors.js"
 import type { Identity } from "../identity.js"
 import type { Operation } from "../operation.js"
@@ -36,10 +36,10 @@ export function refine<E, R>(
 ): (
   effect: Effect.Effect<true, E, R>,
 ) => Effect.Effect<true, E | AuthorizationError | InternalServerError, R | FineGrainedAuthorizationService> {
-  return (effect) =>
-    FineGrainedAuthorizationService.pipe(
-      Effect.flatMap(
-        (_) => pipe(effect, _.refine(operation, identity, resource, fgaParams)),
-      ),
-    )
+  return Effect.fn("FineGrainedAuthorizationService.refine")(function*(
+    effect: Effect.Effect<true, E, R>,
+  ): Effect.fn.Return<true, E | AuthorizationError | InternalServerError, R | FineGrainedAuthorizationService> {
+    const svc = yield* FineGrainedAuthorizationService
+    return yield* svc.refine<E, R>(operation, identity, resource, fgaParams)(effect)
+  })
 }

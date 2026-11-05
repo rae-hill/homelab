@@ -29,46 +29,37 @@ export class WifiProfileService
 }
 
 /** {@inheritDoc WifiProfileServiceDef.wpaPersonalWifi} */
-export function wpaPersonalWifi(
+export const wpaPersonalWifi = Effect.fn("WifiProfileService.wpaPersonalWifi")(function*(
   ...args: Parameters<WifiProfileServiceDef["wpaPersonalWifi"]>
-): Effect.Effect<
+): Effect.fn.Return<
   Schemas.RootPayload.RootPayloadWire,
   WifiConfigGenerationError | ApiErrors.HttpApiEncodeError,
   WifiProfileService
 > {
-  return WifiProfileService.pipe(
-    Effect.andThen(
-      (_) => _.wpaPersonalWifi(...args),
-    ),
-  )
-}
+  const svc = yield* WifiProfileService
+  return yield* svc.wpaPersonalWifi(...args)
+})
 
 /** {@inheritDoc WifiProfileServiceDef.wpa3EnterprisePeapWifi} */
-export function wpa3EnterprisePeapWifi(
+export const wpa3EnterprisePeapWifi = Effect.fn("WifiProfileService.wpa3EnterprisePeapWifi")(function*(
   ...args: Parameters<WifiProfileServiceDef["wpa3EnterprisePeapWifi"]>
-): Effect.Effect<
+): Effect.fn.Return<
   Schemas.RootPayload.RootPayloadWire,
   WifiConfigGenerationError | ApiErrors.HttpApiEncodeError,
   WifiProfileService
 > {
-  return WifiProfileService.pipe(
-    Effect.andThen(
-      (_) => _.wpa3EnterprisePeapWifi(...args),
-    ),
-  )
-}
+  const svc = yield* WifiProfileService
+  return yield* svc.wpa3EnterprisePeapWifi(...args)
+})
 
 /** {@inheritDoc WifiProfileServiceDef.wpa3EnterpriseEAPTLSWifi} */
-export function wpa3EnterpriseEAPTLSWifi(
+export const wpa3EnterpriseEAPTLSWifi = Effect.fn("WifiProfileService.wpa3EnterpriseEAPTLSWifi")(function*(
   ...args: Parameters<WifiProfileServiceDef["wpa3EnterpriseEAPTLSWifi"]>
-): Effect.Effect<
+): Effect.fn.Return<
   Schemas.RootPayload.RootPayloadWire,
   WifiConfigGenerationError | ApiErrors.HttpApiEncodeError,
   WifiProfileService
 > {
-  return WifiProfileService.pipe(
-    Effect.andThen(
-      (_) => _.wpa3EnterpriseEAPTLSWifi(...args),
-    ),
-  )
-}
+  const svc = yield* WifiProfileService
+  return yield* svc.wpa3EnterpriseEAPTLSWifi(...args)
+})

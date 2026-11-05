@@ -17,12 +17,9 @@ export class HMACService extends Context.Service<HMACService, HMACServiceDef>()(
 }
 
 /** {@inheritDoc HMACServiceDef.hmacDigest} */
-export function hmacDigest(
+export const hmacDigest = Effect.fn("HMACService.hmacDigest")(function*(
   data: string,
-): Effect.Effect<string, HMACDigestError, HMACService> {
-  return HMACService.pipe(
-    Effect.flatMap(
-      (_) => _.hmacDigest(data),
-    ),
-  )
-}
+): Effect.fn.Return<string, HMACDigestError, HMACService> {
+  const svc = yield* HMACService
+  return yield* svc.hmacDigest(data)
+})

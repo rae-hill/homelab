@@ -27,10 +27,9 @@ export class PdfPrintService extends Context.Service<PdfPrintService, PdfPrintSe
 }
 
 /** {@inheritDoc PdfPrintServiceDef.printResume} */
-export function printResume(
+export const printResume = Effect.fn("PdfPrintService.printResume")(function*(
   ...params: Parameters<PdfPrintServiceDef["printResume"]>
-): Effect.Effect<Uint8Array, PdfPrintError, PdfPrintService> {
-  return PdfPrintService.pipe(
-    Effect.flatMap((_) => _.printResume(...params)),
-  )
-}
+): Effect.fn.Return<Uint8Array, PdfPrintError, PdfPrintService> {
+  const svc = yield* PdfPrintService
+  return yield* svc.printResume(...params)
+})

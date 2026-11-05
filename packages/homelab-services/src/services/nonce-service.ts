@@ -23,23 +23,17 @@ export class NonceService extends Context.Service<NonceService, NonceServiceDef>
 }
 
 /** {@inheritDoc NonceServiceDef.withTime} */
-export function withTime(
+export const withTime = Effect.fn("NonceService.withTime")(function*(
   time: DateTime.DateTime,
-): Effect.Effect<string, HMACDigestError, NonceService> {
-  return NonceService.pipe(
-    Effect.flatMap(
-      (_) => _.withTime(time),
-    ),
-  )
-}
+): Effect.fn.Return<string, HMACDigestError, NonceService> {
+  const svc = yield* NonceService
+  return yield* svc.withTime(time)
+})
 
 /** {@inheritDoc NonceServiceDef.validateNonce} */
-export function validateNonce(
+export const validateNonce = Effect.fn("NonceService.validateNonce")(function*(
   nonce: string,
-): Effect.Effect<DateTime.DateTime, NonceValidationError | HMACDigestError, NonceService> {
-  return NonceService.pipe(
-    Effect.flatMap(
-      (_) => _.validateNonce(nonce),
-    ),
-  )
-}
+): Effect.fn.Return<DateTime.DateTime, NonceValidationError | HMACDigestError, NonceService> {
+  const svc = yield* NonceService
+  return yield* svc.validateNonce(nonce)
+})

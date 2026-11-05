@@ -138,7 +138,8 @@ A service definition file contains:
 2. **Tagged errors** (if any): `class FooError extends Data.TaggedError("FooError")<{...}>()`
 3. An **interface** with suffix `Def`: `interface FooServiceDef { ... }`
 4. A **Context tag** class (Effect v4): `class FooService extends Context.Service<FooService, FooServiceDef>()(FooServiceId)`
-5. **Accessor functions** that lift methods into Effect (with `{@inheritDoc}` JSDoc)
+5. **Accessor functions** that lift methods into Effect (with `{@inheritDoc}` JSDoc), built
+   with `Effect.fn("<ServiceName>.<method>")` so every call carries an otel span
 
 ```typescript
 import { Context, Data, Effect } from "effect"
@@ -155,11 +156,12 @@ export class FooService extends Context.Service<FooService, FooServiceDef>()(Foo
 }
 
 /** {@inheritDoc FooServiceDef.doSomething} */
-export function doSomething(
+export const doSomething = Effect.fn("FooService.doSomething")(function*(
   input: string,
-): Effect.Effect<string, FooError, FooService> {
-  return FooService.pipe(Effect.flatMap((_) => _.doSomething(input)))
-}
+): Effect.fn.Return<string, FooError, FooService> {
+  const svc = yield* FooService
+  return yield* svc.doSomething(input)
+})
 ```
 
 > **Effect v4 note:** the tag is `Context.Service<Self, Def>()(Id)` — the v3
@@ -170,13 +172,21 @@ export function doSomething(
 For services with multiple methods, use spread params for accessor functions:
 
 ```typescript
-export function authenticate(
+export const authenticate = Effect.fn("AuthenticationService.authenticate")(function*(
   ...params: Parameters<AuthenticationServiceDef["authenticate"]>
-): Effect.Effect<Identity, AuthenticationError, AuthenticationService> {
-  return AuthenticationService.pipe(
-    Effect.flatMap((_) => _.authenticate(...params)),
-  )
-}
+): Effect.fn.Return<Identity, AuthenticationError, AuthenticationService> {
+  const svc = yield* AuthenticationService
+  return yield* svc.authenticate(...params)
+})
+```
+
+Annotate the generator's return type with `Effect.fn.Return<A, E, R>` — same `A/E/R`
+as the old `Effect.Effect<A, E, R>` accessor signature — so the public type stays exact.
+For methods that return plain values (not Effects), just `return svc.method(...params)`
+without `yield*`. For accessors of **generic** Def methods (e.g.
+`FineGrainedAuthorizationService.refine<E, R>`), keep the outer `export function` with
+its generics and return `Effect.fn(...)(function*(...) {...})` from it, passing the
+generic params explicitly (`svc.refine<E, R>(...)(effect)`).
 ````
 
 ## Service Implementation Pattern (`homelab-services-node`)

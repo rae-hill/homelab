@@ -20,12 +20,9 @@ export class OIDCAuthenticationService
 }
 
 /** {@inheritDoc OIDCAuthenticationServiceDef.authorizeOIDC} */
-export function authorizeOIDC(
+export const authorizeOIDC = Effect.fn("OIDCAuthenticationService.authorizeOIDC")(function*(
   ...params: Parameters<OIDCAuthenticationServiceDef["authorizeOIDC"]>
-): Effect.Effect<Identity, AuthenticationError | InternalServerError, OIDCAuthenticationService> {
-  return OIDCAuthenticationService.pipe(
-    Effect.flatMap(
-      (_) => _.authorizeOIDC(...params),
-    ),
-  )
-}
+): Effect.fn.Return<Identity, AuthenticationError | InternalServerError, OIDCAuthenticationService> {
+  const svc = yield* OIDCAuthenticationService
+  return yield* svc.authorizeOIDC(...params)
+})

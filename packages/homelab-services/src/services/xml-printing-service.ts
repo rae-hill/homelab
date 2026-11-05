@@ -18,12 +18,9 @@ export class XmlPrintingService
 {}
 
 /** {@inheritDoc XmlPrintingServiceImpl.printXml} */
-export function printXml(
+export const printXml = Effect.fn("XmlPrintingService.printXml")(function*(
   ...args: Parameters<XmlPrintingServiceImpl["printXml"]>
-): Effect.Effect<Schemas.XML.XML, XmlPrintingError, XmlPrintingService> {
-  return XmlPrintingService.pipe(
-    Effect.andThen(
-      (_) => _.printXml(...args),
-    ),
-  )
-}
+): Effect.fn.Return<Schemas.XML.XML, XmlPrintingError, XmlPrintingService> {
+  const svc = yield* XmlPrintingService
+  return yield* svc.printXml(...args)
+})

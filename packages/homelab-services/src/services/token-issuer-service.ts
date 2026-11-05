@@ -36,16 +36,13 @@ export class TokenIssuerService
 }
 
 /** {@inheritDoc TokenIssuerServiceDef.issueToken} */
-export function issueToken(
+export const issueToken = Effect.fn("TokenIssuerService.issueToken")(function*(
   ...params: Parameters<TokenIssuerServiceDef["issueToken"]>
-): Effect.Effect<
+): Effect.fn.Return<
   TokenIssueResult,
   AuthenticationError | BadRequest | InternalServerError | NonceValidationError | HMACDigestError,
   TokenIssuerService
 > {
-  return TokenIssuerService.pipe(
-    Effect.flatMap(
-      (_) => _.issueToken(...params),
-    ),
-  )
-}
+  const svc = yield* TokenIssuerService
+  return yield* svc.issueToken(...params)
+})

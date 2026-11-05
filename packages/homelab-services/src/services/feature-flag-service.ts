@@ -15,14 +15,13 @@ export class FeatureFlagService
 }
 
 /** {@inheritDoc FeatureFlagServiceDef.enabled} */
-export function enabled(...params: Parameters<FeatureFlagServiceDef["enabled"]>): Effect.Effect<
+export const enabled = Effect.fn("FeatureFlagService.enabled")(function*(
+  ...params: Parameters<FeatureFlagServiceDef["enabled"]>
+): Effect.fn.Return<
   boolean,
   never,
   FeatureFlagService
 > {
-  return FeatureFlagService.pipe(
-    Effect.map(
-      (_) => _.enabled(...params),
-    ),
-  )
-}
+  const svc = yield* FeatureFlagService
+  return svc.enabled(...params)
+})

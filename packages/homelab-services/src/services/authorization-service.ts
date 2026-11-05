@@ -24,45 +24,33 @@ export class AuthorizationService
 }
 
 /** Checks whether the identity is authorized to view the given resource. */
-export function canView(
+export const canView = Effect.fn("AuthorizationService.canView")(function*(
   ...params: Parameters<AuthorizationServiceDef["canView"]>
-): Effect.Effect<true, AuthorizationError | InternalServerError, AuthorizationService> {
-  return AuthorizationService.pipe(
-    Effect.flatMap(
-      (_) => _.canView(...params),
-    ),
-  )
-}
+): Effect.fn.Return<true, AuthorizationError | InternalServerError, AuthorizationService> {
+  const svc = yield* AuthorizationService
+  return yield* svc.canView(...params)
+})
 
 /** Checks whether the identity is authorized to modify the given resource. */
-export function canModify(
+export const canModify = Effect.fn("AuthorizationService.canModify")(function*(
   ...params: Parameters<AuthorizationServiceDef["canModify"]>
-): Effect.Effect<true, AuthorizationError | InternalServerError, AuthorizationService> {
-  return AuthorizationService.pipe(
-    Effect.flatMap(
-      (_) => _.canModify(...params),
-    ),
-  )
-}
+): Effect.fn.Return<true, AuthorizationError | InternalServerError, AuthorizationService> {
+  const svc = yield* AuthorizationService
+  return yield* svc.canModify(...params)
+})
 
 /** Checks whether the identity is authorized to create the given resource. */
-export function canCreate(
+export const canCreate = Effect.fn("AuthorizationService.canCreate")(function*(
   ...params: Parameters<AuthorizationServiceDef["canCreate"]>
-): Effect.Effect<true, AuthorizationError | InternalServerError, AuthorizationService> {
-  return AuthorizationService.pipe(
-    Effect.flatMap(
-      (_) => _.canCreate(...params),
-    ),
-  )
-}
+): Effect.fn.Return<true, AuthorizationError | InternalServerError, AuthorizationService> {
+  const svc = yield* AuthorizationService
+  return yield* svc.canCreate(...params)
+})
 
 /** Checks whether the identity is authorized to delete the given resource. */
-export function canDelete(
+export const canDelete = Effect.fn("AuthorizationService.canDelete")(function*(
   ...params: Parameters<AuthorizationServiceDef["canDelete"]>
-): Effect.Effect<true, AuthorizationError | InternalServerError, AuthorizationService> {
-  return AuthorizationService.pipe(
-    Effect.flatMap(
-      (_) => _.canDelete(...params),
-    ),
-  )
-}
+): Effect.fn.Return<true, AuthorizationError | InternalServerError, AuthorizationService> {
+  const svc = yield* AuthorizationService
+  return yield* svc.canDelete(...params)
+})

@@ -19,16 +19,13 @@ export class AcmeProfileService
 }
 
 /** {@inheritDoc AcmeProfileServiceDef.acmeProfile} */
-export function acmeProfile(
+export const acmeProfile = Effect.fn("AcmeProfileService.acmeProfile")(function*(
   ...args: Parameters<AcmeProfileServiceDef["acmeProfile"]>
-): Effect.Effect<
+): Effect.fn.Return<
   Schemas.RootPayload.RootPayloadWire,
   ApiErrors.HttpApiEncodeError,
   AcmeProfileService
 > {
-  return AcmeProfileService.pipe(
-    Effect.andThen(
-      (_) => _.acmeProfile(...args),
-    ),
-  )
-}
+  const svc = yield* AcmeProfileService
+  return yield* svc.acmeProfile(...args)
+})

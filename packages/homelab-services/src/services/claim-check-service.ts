@@ -30,31 +30,25 @@ export class ClaimCheckService extends Context.Service<ClaimCheckService, ClaimC
 }
 
 /** {@inheritDoc ClaimCheckServiceDef.issue} */
-export function issue(
+export const issue = Effect.fn("ClaimCheckService.issue")(function*(
   ...params: Parameters<ClaimCheckServiceDef["issue"]>
-): Effect.Effect<
+): Effect.fn.Return<
   string,
   InternalServerError,
   ClaimCheckService
 > {
-  return ClaimCheckService.pipe(
-    Effect.flatMap(
-      (_) => _.issue(...params),
-    ),
-  )
-}
+  const svc = yield* ClaimCheckService
+  return yield* svc.issue(...params)
+})
 
 /** {@inheritDoc ClaimCheckServiceDef.validate} */
-export function validate(
+export const validate = Effect.fn("ClaimCheckService.validate")(function*(
   ...params: Parameters<ClaimCheckServiceDef["validate"]>
-): Effect.Effect<
+): Effect.fn.Return<
   Identity,
   AuthenticationError,
   ClaimCheckService
 > {
-  return ClaimCheckService.pipe(
-    Effect.flatMap(
-      (_) => _.validate(...params),
-    ),
-  )
-}
+  const svc = yield* ClaimCheckService
+  return yield* svc.validate(...params)
+})
