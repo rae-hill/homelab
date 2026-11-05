@@ -4,6 +4,80 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
+## 2026-11-05 — Session 3b (e2e infra: standalone script, CI job, pre-commit guard, fixture bootstrap)
+
+### Commits
+
+| Commit     | What                                                                                                                                                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `3de6691f` | e2e extraction: `scripts/e2e.sh` + `scripts/stage-e2e-secrets.mjs`, devshell command execs the script, shellcheck-gate registration, CI `E2E` job, lint-staged e2e guard, resume success-test chrome gate, AGENTS.md refresh |
+| `48f0d668` | bootstrap fix: stage `private/serial-numbers.json` + `SERIAL_NUMBERS_FILE` (EAP-TLS wifi FGA test's IP→serial map)                                                                                                           |
+
+### How e2e works now
+
+- **`scripts/e2e.sh`** (executable, ShellCheck-linted via `flake.lintedShellScripts` →
+  `checks.x86_64-linux.shellcheck`; the devshell `e2e` command just `exec`s it).
+  - Args pass through to vitest as test-file filters; path args are normalized
+    (anything matching `*packages/homelab-e2e-tests/<rel>` becomes `<rel>` — vitest
+    filters match paths RELATIVE TO THE WORKSPACE ROOT, not absolute or
+    repo-root-relative). Flags (`-*`) pass through untouched. No args = full suite.
+  - Runs `node scripts/stage-e2e-secrets.mjs` first, then builds the bundle, starts
+    the server on :54328 (`E2E_PORT` overrides), waits for health (30s, aborts early
+    if the server PID dies, dumps a log tail on failure), runs the suite, kills the
+    server via EXIT trap. Logs: `.e2e-log-dump.txt`.
+  - Mirrors `CHROME_EXECUTABLE` from `.env-serve-test` into the shell when unset, so
+    the test-side chrome gate matches what the server will see.
+- **`scripts/stage-e2e-secrets.mjs`** — idempotently generates the machine-local
+  NON-SECRET fixtures (existing files are NEVER overwritten; delete to regenerate):
+  `packages/homelab-server/.env-serve-test`, `private/api-keys.json` (the three test
+  keys matching e2e `testing-layer.ts`), `private/jwk.json` (fresh ES256 private key
+  as a flattened PBES2-HS256+A128KW JWE — exactly what `IssuerJwkResolver` decrypts;
+  jose only exports compact encryption, so the script re-maps the five compact
+  parts), `private/jwk.pub.json`, `private/jwk-secret`, `private/hmac-secret`,
+  `private/serial-numbers.json` (contract: `192.168.1.10` recognized, `10.0.0.99`
+  NOT — `wifi.test.ts` asserts both), and delegates to `stage-test-secrets.mjs` for
+  the services-node unit fixtures. `KANIDM_OPENID_PROVIDER_URL` points at the real
+  IDM URL but the startup fetch degrades gracefully (`Effect.option` in
+  `oidc-config-remote.ts`) — CI passes without tailnet access.
+- **CI** (`.github/workflows/ci.yml` job `E2E`): plain node/yarn via the existing
+  `setup` composite action — deliberately NO Nix and NO chrome. `CHROME_EXECUTABLE`
+  unset ⇒ the live resume-print success test self-skips via the `describeWithChrome`
+  gate in `print.test.ts`; puppeteer never launches a browser. Everything else runs
+  against the real bundled server. NOTE: CI's `nix flake check --no-build` never
+  BUILDS checks — the shellcheck gate only runs locally (or via
+  `nix build .#checks.x86_64-linux.shellcheck`); actually running the e2e suite
+  inside a nix check derivation is not viable (needs a live localhost server,
+  network, machine-local fixtures), hence the separate CI job.
+- **pre-commit** (`lint-staged.config.js`, `"*"` function): staged changes under
+  `packages/{homelab-server,homelab-services,homelab-services-node,homelab-api,shared}/`
+  or `yarn.lock` ⇒ full `e2e` (the bundle-bug guard that would have caught `mask`);
+  e2e-workspace-only changes ⇒ `e2e <touched test files>`; anything else ⇒ no e2e.
+  Assumes commits happen inside the devshell (`e2e`/`yarn` on PATH) — the same
+  assumption the existing `fmt .` entry already makes. Agents still use `--no-verify`.
+
+### Verification (all green)
+
+- `nix flake check --no-build` ✓; `nix build .#checks.x86_64-linux.shellcheck` ✓ (lints e2e.sh).
+- Main checkout: `e2e packages/homelab-e2e-tests/src/status` → filter normalized, 8 tests;
+  full `e2e` → 14 files / 108 tests (chrome present ⇒ success test RAN).
+- **Fresh-worktree CI simulation** (no node_modules, no fixtures, `CHROME_EXECUTABLE`
+  unset via `env -u`, `yarn install --mode=skip-build`): bootstrap generated all
+  fixtures → 107 passed + 1 skipped. This is the exact path the GitHub Actions job takes.
+- `yarn typecheck` ✓, `yarn lint` ✓ (4 pre-existing resume warnings only), lint-staged
+  config function outputs verified for server-side / e2e-only / docs-only staged sets.
+
+### Gotchas
+
+- The generated `.env-serve-test` omits options with server-side defaults (CA_URL,
+  ACME_*, LOG_STYLE, CHROME_EXECUTABLE, RESUME_SITE_URL) and PORT/HOMELAB_ORIGIN_URL —
+  the script exports those and dotenvx never overrides existing process env.
+- `api-keys.json` / `serial-numbers.json` in the generator are the e2e contract — if
+  tests grow new keys or recognized IPs, update `scripts/stage-e2e-secrets.mjs` too.
+- vitest positional filters match RELATIVE-to-workspace paths — hence e2e.sh's
+  normalization; pass flags as separate args.
+
+---
+
 ## 2026-11-05 — Session 3 (`mask` FIXED, cleanup-hang FIXED, Effect.fn refactor DONE)
 
 ### Commits this session (all on `main`, NOT pushed)
