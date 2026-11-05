@@ -2835,6 +2835,57 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@redis/bloom@npm:6.3.1":
+  version: 6.3.1
+  resolution: "@redis/bloom@npm:6.3.1"
+  peerDependencies:
+    "@redis/client": ^6.3.1
+  checksum: 10c0/5aca0feb05fe054f3dcd3435f06c3876fd7c16cc364e68396da7d90b45dfb745f868623ff39fc2b6bd63ffb6dea294f5185ca461a34a66c0ef3b3d05af85fc0c
+  languageName: node
+  linkType: hard
+
+"@redis/client@npm:6.3.1":
+  version: 6.3.1
+  resolution: "@redis/client@npm:6.3.1"
+  peerDependencies:
+    "@node-rs/xxhash": ^1.1.0
+    "@opentelemetry/api": ">=1 <2"
+  peerDependenciesMeta:
+    "@node-rs/xxhash":
+      optional: true
+    "@opentelemetry/api":
+      optional: true
+  checksum: 10c0/7955b42a5c55174f262e3b6b65d87fb72219ed0300734f7ce0fc155d1052285d5513fc81bf510461efc00a04f7471885d2cd7e568fa874d968b3a52ba9fe0c50
+  languageName: node
+  linkType: hard
+
+"@redis/json@npm:6.3.1":
+  version: 6.3.1
+  resolution: "@redis/json@npm:6.3.1"
+  peerDependencies:
+    "@redis/client": ^6.3.1
+  checksum: 10c0/dca78d82a99960dd8c5a7346ede96c39e969798d1ad410b0feba60c9d6083d746da2044fd9eb89bae9b4e6e053482a692b2e03a1d618dc94038736e6c1478e42
+  languageName: node
+  linkType: hard
+
+"@redis/search@npm:6.3.1":
+  version: 6.3.1
+  resolution: "@redis/search@npm:6.3.1"
+  peerDependencies:
+    "@redis/client": ^6.3.1
+  checksum: 10c0/9fe60ede0dd3df293647b54d99271d57f0a892b62e06b55f41d446115cec465d336b6b9e98708f63d6e0ad032ccd8297e216c6e099b6e4ece05681c862571bb6
+  languageName: node
+  linkType: hard
+
+"@redis/time-series@npm:6.3.1":
+  version: 6.3.1
+  resolution: "@redis/time-series@npm:6.3.1"
+  peerDependencies:
+    "@redis/client": ^6.3.1
+  checksum: 10c0/7960a21985364ef65f0fe0043ca9dd8b8e2f5fbdd92fc2e9cb713f27d7c23b3a038acabbe2910cf9ff6d7cb93cd29c2a7dac2c1e9752623af28cc1b8ac23d1f1
+  languageName: node
+  linkType: hard
+
 "@reduxjs/toolkit@npm:2.3.0":
   version: 2.3.0
   resolution: "@reduxjs/toolkit@npm:2.3.0"
@@ -4092,6 +4143,15 @@ __metadata:
   dependencies:
     "@types/yargs-parser": "npm:*"
   checksum: 10c0/609557826a6b85e73ccf587923f6429850d6dc70e420b455bab4601b670bfadf684b09ae288bccedab042c48ba65f1666133cf375814204b544009f57d6eef63
+  languageName: node
+  linkType: hard
+
+"@types/yauzl@npm:^3":
+  version: 3.4.0
+  resolution: "@types/yauzl@npm:3.4.0"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/9992cf7bf129466016baa4e99e05ad524afe2ff6e5d84e7408f2a7123bc4af3b4bfb639237308574b80e7e435571b6e1af6113910d166e8ea8b80da422ba8ecb
   languageName: node
   linkType: hard
 
@@ -8295,6 +8355,7 @@ __metadata:
     homelab-services: "workspace:*"
     madge: "npm:^8.x"
     shared: "workspace:*"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
   languageName: unknown
   linkType: soft
@@ -8309,6 +8370,7 @@ __metadata:
     effect: "npm:^4.1.x"
     madge: "npm:^8.0.0"
     utf-8-validate: "npm:^6.0.6"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
   languageName: unknown
   linkType: soft
@@ -8327,8 +8389,10 @@ __metadata:
     homelab-services: "workspace:*"
     homelab-services-node: "workspace:*"
     jose: "npm:^5.x"
+    redis: "npm:^6.3.1"
     shared: "workspace:*"
     utf-8-validate: "npm:^6.0.6"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
   languageName: unknown
   linkType: soft
@@ -8371,6 +8435,7 @@ __metadata:
     "@opentelemetry/sdk-trace-web": "npm:^2.9.0"
     "@opentelemetry/semantic-conventions": "npm:^1.41.x"
     "@types/node": "npm:^24"
+    "@types/yauzl": "npm:^3"
     bufferutil: "npm:^4.1.0"
     effect: "npm:^4.1.x"
     homelab-api: "workspace:*"
@@ -8378,12 +8443,15 @@ __metadata:
     homelab-services-node: "workspace:*"
     jose: "npm:^6.x"
     madge: "npm:^8.0.0"
+    redis: "npm:^6.3.1"
     rolldown: "npm:^1.0.0-rc.7"
     shared: "workspace:*"
     ts-pattern: "npm:^5.9.0"
     tsx: "npm:^4.21.0"
     utf-8-validate: "npm:^6.0.6"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
+    yauzl: "npm:^3.4.0"
   languageName: unknown
   linkType: soft
 
@@ -8402,9 +8470,11 @@ __metadata:
     jose: "npm:^6.2.1"
     madge: "npm:^8.0.0"
     puppeteer-core: "npm:^25.16.0"
+    redis: "npm:^6.3.1"
     shared: "workspace:*"
     type-fest: "npm:^4.x"
     utf-8-validate: "npm:^6.0.6"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
   languageName: unknown
   linkType: soft
@@ -8419,6 +8489,7 @@ __metadata:
     jose: "npm:^6.2.1"
     madge: "npm:^8.0.0"
     shared: "workspace:*"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
   languageName: unknown
   linkType: soft
@@ -10887,6 +10958,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pend@npm:~1.2.0":
+  version: 1.2.0
+  resolution: "pend@npm:1.2.0"
+  checksum: 10c0/8a87e63f7a4afcfb0f9f77b39bb92374afc723418b9cb716ee4257689224171002e07768eeade4ecd0e86f1fa3d8f022994219fb45634f2dbd78c6803e452458
+  languageName: node
+  linkType: hard
+
 "perfect-freehand@npm:^1.2.3":
   version: 1.2.3
   resolution: "perfect-freehand@npm:1.2.3"
@@ -11342,6 +11420,19 @@ __metadata:
     tiny-invariant: "npm:^1.3.3"
     tslib: "npm:^2.0.1"
   checksum: 10c0/45b520a8f0868a5a24ecde495be9de3c48e69a54295d82a7331106554b75cfba75d16c909959d056e9ceed47a1be5e061e2db8b9ecbcd6ba44c2f3ef9a47bd18
+  languageName: node
+  linkType: hard
+
+"redis@npm:^6.3.1":
+  version: 6.3.1
+  resolution: "redis@npm:6.3.1"
+  dependencies:
+    "@redis/bloom": "npm:6.3.1"
+    "@redis/client": "npm:6.3.1"
+    "@redis/json": "npm:6.3.1"
+    "@redis/search": "npm:6.3.1"
+    "@redis/time-series": "npm:6.3.1"
+  checksum: 10c0/db78bc84fac4fa5ce8d72ba22178c65f1e5b8b2284077564990531504ec42398f925501205c0bc19227aeaca7424743b249e754d37421c122fe9ab1f17278212
   languageName: node
   linkType: hard
 
@@ -12100,6 +12191,7 @@ __metadata:
     madge: "npm:^8.0.0"
     oidc-client-ts: "npm:^3.5.0"
     type-fest: "npm:^5.4.4"
+    vite: "npm:^8.3.5"
     vitest: "npm:^5.x"
   languageName: unknown
   linkType: soft
@@ -13548,7 +13640,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vite@npm:8.3.5":
+"vite@npm:8.3.5, vite@npm:^8.3.5":
   version: 8.3.5
   resolution: "vite@npm:8.3.5"
   dependencies:
@@ -14075,6 +14167,15 @@ __metadata:
     y18n: "npm:^5.0.5"
     yargs-parser: "npm:^22.0.0"
   checksum: 10c0/7419338c3c00f9143ec6b6ab168335061c6f5342d161642aec23ff119e28cac1c417e0eca1d7dc82fd084f07207cc5d34c7d8315f605c0e3dbf12c350e405f3f
+  languageName: node
+  linkType: hard
+
+"yauzl@npm:^3.4.0":
+  version: 3.4.0
+  resolution: "yauzl@npm:3.4.0"
+  dependencies:
+    pend: "npm:~1.2.0"
+  checksum: 10c0/17a98c42c0065e8af429eb8a61f7a0e4562181ed54080366b838f34f741b6829f167f804787c86b7646bb042707f35871739f053de0548285e405a2eae4da025
   languageName: node
   linkType: hard
 

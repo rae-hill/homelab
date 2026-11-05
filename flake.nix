@@ -72,6 +72,11 @@
             pluginArgs = builtins.concatStringsSep " " pluginPaths;
           in
           {
+            _module.args.pkgs = import inputs.nixpkgs {
+              inherit system;
+              config.allowUnfree = true;
+            };
+
             formatter = pkgs.dprint;
 
             # Expose the pinned nixfmt so git hooks / CI format Nix with the SAME
@@ -95,6 +100,7 @@
             };
 
             devshells.default = {
+
               packages = with pkgs; [
                 # NixOS tooling
                 sops
@@ -118,8 +124,68 @@
                   name = "DPRINT_CACHE_DIR";
                   value = "/home/jacob/.cache/dprint";
                 }
+                {
+                  name = "CHROME_EXECUTABLE";
+                  value = "${pkgs.google-chrome}/bin/google-chrome";
+                }
               ];
               commands = [
+                {
+                  name = "e2e";
+                  help = "Runs homelab-e2e-tests";
+                  command = ''
+                    #!/usr/bin/env bash
+                    set -uo pipefail
+
+                    # TODO: capture specific test files to run
+                    # files=$("$@")
+
+                    port=54328
+                    origin="http://localhost:$port"
+
+                    server_pid=""
+
+                    cleanup() {
+                      local exit_code=$?
+                      trap - EXIT INT TERM 
+                      if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
+                        kill "$server_pid"
+                        wait "$server_pid"
+                      fi
+                      exit "$exit_code"
+                    }
+
+                    trap cleanup EXIT
+                    trap 'exit 130' INT
+                    trap 'exit 143' TERM
+
+                    export HOMELAB_ORIGIN_URL=$origin
+                    export PORT=$port
+
+                    export E2E_BASE_URL=$origin
+
+                    # build server
+                    yarn workspace homelab-server build
+
+                    export HOMELAB_COMMIT_HASH=$(git rev-parse HEAD)
+
+                    # start dev server in background - saving logs to dump file
+                    yarn workspace homelab-server serve:test > .e2e-log-dump.txt 2>&1 &
+
+                    server_pid=$!
+
+                    echo "Started: $server_pid"
+
+                    for _ in {1..30}; do
+                      curl -sf $origin/status/health >/dev/null 2>&1 && break
+                      sleep 0.5
+                    done
+
+                    # Run e2e tests
+                    yarn workspace homelab-e2e-tests test:e2e 
+                    exit $?
+                  '';
+                }
                 {
                   name = "fmt";
                   help = "Format code with dprint using Nix store plugins";

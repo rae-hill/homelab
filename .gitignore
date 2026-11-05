@@ -11,6 +11,8 @@ build/
 .direnv/
 .idea/
 private/
+.env-serve-test
+.e2e-log-dump.txt
 
 .pnp.*
 .yarn/*

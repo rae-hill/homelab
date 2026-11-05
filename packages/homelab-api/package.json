@@ -51,6 +51,7 @@
     "@vitest/coverage-v8": "^5.x",
     "fast-xml-parser": "^5.5.11",
     "madge": "^8.x",
+    "vite": "^8.3.5",
     "vitest": "^5.x"
   }
 }
