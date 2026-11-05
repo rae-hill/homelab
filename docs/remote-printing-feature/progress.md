@@ -4,6 +4,103 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
+## 2026-11-05 — Session 3 (`mask` FIXED, cleanup-hang FIXED, Effect.fn refactor DONE)
+
+### Commits this session (all on `main`, NOT pushed)
+
+| Commit     | What                                                                                                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `d0874d86` | **`mask` crash + print hang fixed.** (a) rolldown `stubOptionalNative` now stubs `bufferutil`/`utf-8-validate` with a **throw** instead of `module.exports = undefined`; (b) pdf-print-service log capture reworked (see below)         |
+| `51246774` | nix: refresh `fetchYarnBerryDeps` hash → `sha256-ybqsSNJijqPiFj45uVb92xC+pXXIVwEtuBawSQNxSb8=` in BOTH package.nix files (was stale since `8a70e6a2` changed yarn.lock — session 2's "hashes unchanged" note was WRONG)                 |
+| `5a06830c` | **Effect.fn refactor complete**: all 21 accessors / 14 files in `homelab-services/src/services/*.ts` now `Effect.fn("ServiceName.method")(function*(…) { const svc = yield* Service; return yield* svc.method(…) })`; skill doc updated |
+
+### What was actually wrong with `mask` (supersedes session-2's recommended fix)
+
+- Session 2's recommended `WS_NO_BUFFER_UTIL` env fix **does not work**: the ws code lives in
+  the `NodeWebSocketTransport-*.js` chunk, a STATIC import of `main.js` — ESM evaluates all
+  static imports before the importing module's body, so any env assignment in `main.ts` runs
+  AFTER the chunk's `if (!process.env.WS_NO_BUFFER_UTIL)` check. (Verified empirically.)
+- Applied fix instead: the stub in `packages/homelab-server/rolldown.config.js` now does
+  `throw new Error(...)`. ws requires the optional natives INSIDE try/catch
+  (`require_bufferutil()` is a lazy `__commonJSMin` factory called at the require site), so
+  throwing reproduces dev/tsx behavior exactly: catch → pure-JS `_mask`/`_unmask`. Order-
+  independent; fixes both the chunk copy and main.js's copy of ws.
+- **Second bug uncovered once launch succeeded:** every print request then HUNG (test timed
+  out at 120s; `puppeteer-run` span completed OK in ~1.3s). Cause: release step did
+  `Stream.runCollect(logStream)` over a `Stream.callback` — a callback stream never
+  terminates. Also latent: the stream's elements were `Effect<void>` values that runCollect
+  would merely COLLECT (never execute), so session 2's console-log bubbling never actually
+  logged anything. Fix in `pdf-print-service.ts` (services-node): unbounded `Queue` of log
+  effects created per request; `page.on("console", …)` offers directly (acquire); release
+  runs `browser.close()`, then `Queue.takeAll` + `Effect.forEach` to execute the captured
+  log effects, then `Queue.shutdown`.
+
+### Verification state (all green, this machine)
+
+- `e2e` devshell command (bundled server on :54328) with
+  `CHROME_EXECUTABLE=/nix/store/bnpw53y1w97ap7yvvr6livnkswgijif0-chromium-156.0.8078.79/bin/chromium`:
+  **14 files / 108 tests green**, incl. the live `%PDF` resume-print success test (~1.6s
+  round trip against the live site). Run TWICE: after the mask/hang fix, and again after the
+  Effect.fn refactor. `.e2e-log-dump.txt`: 0 `TypeError`s; new accessor spans confirmed in
+  traces (`AuthorizationService.canCreate/canView`, `ClaimCheckService.issue`,
+  `PdfPrintService.printResume`, `TokenIssuerService.issueToken`,
+  `WifiProfileService.wpaPersonalWifi`, `XmlPrintingService.printXml`).
+- `yarn lint` (0 errors; 4 pre-existing warnings in packages/resume), `yarn typecheck`,
+  `yarn test` (600 services-node + 55 server + 11 + 10 + others) ✓
+- `nix build .#homelab-api` ✓ with the refreshed hash (clean tree).
+
+### Effect.fn refactor details (for reviewers / next agents)
+
+- Public types preserved exactly via `Effect.fn.Return<A, E, R>` generator-return
+  annotations (same A/E/R as the old `Effect.Effect<A, E, R>` signatures); `{@inheritDoc}`
+  JSDoc and spread-param forms (`...params: Parameters<Def["m"]>`) kept.
+- `export function foo(...)` became `export const foo = Effect.fn(...)(...)` (matching the
+  established handler style). No runtime-circular-import risk: service files only
+  type-import each other.
+- Special cases: `feature-flag-service.enabled` (sync Def method → plain `return
+  svc.enabled(...params)`, no `yield*`); `fine-grained-authorization-service.refine<E, R>`
+  stays an `export function` (it returns a transformer) whose body returns the
+  `Effect.fn`-built function, with `svc.refine<E, R>(...)(effect)` explicitly instantiated
+  (bare `svc.refine(...)` would infer `unknown` for E/R — the old `pipe(effect, _.refine(...))`
+  form got contextual inference; direct application does not).
+- Out of scope (left alone): test-utils in services-node/e2e-tests still use the old
+  `Service.pipe(Effect.flatMap(...))` form; they're not exported accessors.
+- `.opencode/skills/effect-services/SKILL.md` accessor-pattern section updated (incl. the
+  generic-Def-method note).
+
+### What remains (ordered)
+
+1. **User deploy**: push `main` (user's yubikey; agents never push) + `nixos-rebuild switch`
+   augustus — now ALSO carries the mask/hang fix and the refreshed yarn hash, so the
+   deployed bundle will actually print. praeconinus sanity check (resume group dark there)
+   still pending from session 1.
+2. **Manual verification checklist** (session 1, item 4 — still valid; re-run after deploy
+   since the server bundle changed).
+3. Optional polish (unchanged): silent token renew (`automaticSilentRenew` off), IdP-side
+   logout (`signoutRedirect` + post-logout URI), browser pooling in PdfPrintService (only if
+   print volume warrants; per-request launch currently adds ~1s), test-file filter for the
+   `e2e` flake command (user's own TODO), `RESUME_SITE_URL` per-deployment in nix.
+
+### Gotchas (new / refreshed)
+
+- **Chunk evaluation order**: anything a bundled static-import chunk reads at module-eval
+  time (like ws's env checks) CANNOT be influenced from `main.ts` code — fix it at the
+  bundler level (stub/plugin) or via real process env (systemd unit / dotenvx).
+- **`Stream.callback` never terminates** — `runCollect`/`runForEach` over it hangs. For
+  capture-then-drain patterns use a `Queue` (+ `takeAll` in cleanup), or fork a consumer
+  fiber and interrupt it.
+- The `e2e` devshell command rebuilds the bundle each run — always exercise it after
+  touching rolldown config, puppeteer/ws-adjacent code, or anything in the server graph.
+- fetchYarnBerryDeps hash went stale SILENTLY in session 2 (yarn.lock changed in `8a70e6a2`
+  without the fakeHash dance). After ANY commit touching yarn.lock: redo `nix-hashes` for
+  BOTH package.nix files.
+- Everything else from sessions 1–2 still applies: `nix develop . --command yarn …`, `git
+  add` before nix eval, clean tree for the homelab-api derivation, `--no-verify` commits,
+  never push, light subagent models WITHOUT variant suffixes, `.env-serve-test` +
+  `.e2e-log-dump.txt` are gitignored/machine-local.
+
+---
+
 ## 2026-11-05 — Session 2 wrap → handoff (live-verified, `mask` root-caused, new e2e workflow)
 
 ### Verified live by the user
