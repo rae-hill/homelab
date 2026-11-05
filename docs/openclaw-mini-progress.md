@@ -5,6 +5,130 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-05 — Session 1 (part 4): PHASE 2 IMPLEMENTED — packages/proton-mail-mcp — committed `4d5be4757`
+
+### What landed
+
+- **`packages/proton-mail-mcp`** — first-party MCP stdio server on **Effect 4.1.2 core MCP**
+  (`effect/ai/McpServer.layerStdio`, no external MCP SDK), ImapFlow 2.10 + postal-mime 4.2 over
+  Proton Bridge IMAP. Layout: `src/{env,schemas,errors,server,main}.ts`,
+  `src/services/{mail,policy}.ts` (defs), `src/layers/imap-mail.ts` (impl),
+  `src/tools/{failure,read,label}.ts`; assembly is a `makeRegistrations(mail, policy)` factory
+  (shared by main + tests).
+- **Tools** — read (5): `mail_list_folders`, `mail_list_messages` (seq-range paging, newest
+  first, pageSize clamped), `mail_get_message` (postal-mime parse, body truncation via
+  PROTON_MCP_MAX_BODY_BYTES, attachment METADATA only — never content-to-disk),
+  `mail_search_messages` (subject/text/from/since/unseen → IMAP SEARCH), `mail_get_unread_count`
+  (STATUS). Label (5, gated): `mail_list_labels` (whitelist ∩ server), `mail_add_label` (COPY
+  into `Labels/<x>`, creates folder if missing), `mail_remove_label` (conservative: resolve home
+  folder via `X-Pm-Gluon-Id` header SEARCH across non-Labels/non-"All Mail" folders; REFUSES on
+  0 or ≥2 matches), `mail_set_read`, `mail_set_starred`. **No send/delete/trash/move tools exist.**
+- **Policy enforcement (4 layers):** (1) `McpServer.visibility` gates hide whole toolkits unless
+  operation enabled (hidden = absent from listTools + calls fail not-found); (2) handler-level
+  whitelist checks → `policy_denied`; (3) service-level `assertLabelAllowed` re-validation;
+  (4) OpenClaw `toolFilter: {include: ["mail_*"]}` client-side.
+- **Env surface:** `PROTON_BRIDGE_IMAP_HOST` (default 127.0.0.1), `_PORT` (1143), `_USERNAME`,
+  `_PASSWORD`, `_TLS_MODE` (starttls|implicit), `_TLS_CA_FILE`; `PROTON_MCP_OPERATIONS` (default
+  `read`; opt-in `label`), `PROTON_MCP_ALLOWED_LABELS` (required non-empty with `label`; rejects
+  `/ \ NUL`), `PROTON_MCP_MAX_BODY_BYTES` (20k), `PROTON_MCP_MAX_LIST_MESSAGES` (25, cap 100).
+  Validation in pure `buildEnv()` (unit-tested); TLS trust relaxed ONLY for loopback hosts,
+  non-loopback requires CA pin.
+- **Errors:** `MailToolFailure` schema kind ∈ bridge_unavailable | imap_error | message_not_found
+  | policy_denied | mail_parse_error; ECONNREFUSED-class → bridge_unavailable ("is Bridge
+  running and unlocked?"); AuthenticationFailure → creds hint.
+- **Nix:** `features/openclaw/mail-mcp-package.nix` → `flake.packages.aarch64-darwin.proton-mail-mcp`
+  (homelab-api pattern: nix-filter → fetchYarnBerryDeps → `yarn workspace proton-mail-mcp build`
+  → nodejs_26 wrapper). New shared FOD hash **`sha256-5jb0LaHA0c+Icd7tmwt6/yKzU49N2MTeUQTuYnntVaA=`**
+  set in homelab-api/homelab-ui/proton-mail-mcp package.nix (yarn.lock changed: imapflow,
+  postal-mime). `missing-hashes.json` regenerated (no content change).
+- **openclaw service.nix:** `mcp.servers.protonmail` wired (command = flake package, env =
+  `${PROTON_*}` substitution, `PROTON_MCP_OPERATIONS: "read"` **read-only default**, toolFilter);
+  sops secrets += `proton_bridge_username`, `proton_bridge_password` (wrapper exports; wait-loop
+  covers all 5).
+
+### Verification (all on linux; darwin build deferred to mini)
+
+- `yarn workspace proton-mail-mcp typecheck` ✓ · `test` ✓ **18/18** (env validation, visibility
+  policy per env, tool roundtrips vs stub service, pageSize clamp, policy_denied w/o service
+  touch) · `build` (rolldown) ✓ 3.5 MB bundle.
+- **End-to-end stdio smoke test of the BUILT bundle**: piped real MCP handshake → negotiated
+  protocol 2025-11-25, serverInfo/instructions, `tools/list` showed exactly the 5 read tools
+  (default read-only policy) with JSON Schemas. ✓
+- Root `yarn lint` ✓ (0 errors, 4 pre-existing resume warnings) · root `yarn typecheck` ✓ ·
+  `nix build .#homelab-api` ✓ (validates new FOD hash + lockfile) · `nix eval` darwin package
+  drvPath ✓ · mini toplevel drvPath ✓ · rendered config protonmail entry ✓ (literal `${PROTON_*}`).
+
+### Effect v4.1.2 McpServer API lessons (for future agents — none of these are in stable docs)
+
+- Imports: `effect/ai/McpServer|Tool|Toolkit|McpProtocol|McpTest` (root `effect` barrel does NOT
+  re-export ai); `NodeStdio`/`NodeRuntime` from `@effect/platform-node`; stdio needs
+  `Layer.provide(NodeStdio.layer)`.
+- Tool `dependencies: [Tag]` declares REQUEST-level services; handlers may `yield*` exactly those;
+  discharge with `McpServer.middleware<{provides: ...}>()((effect) => Effect.provideService(...))`
+  — plain layers do NOT satisfy them. Pattern: closure built service instances into
+  `makeRegistrations(mail, policy)` + provideService middleware.
+- Assembly per toolkit: `McpServer.toolkit(kit).pipe(Layer.provide(gate.combine(services).layer),
+  Layer.provide(kit.toLayer(handlersRecord)))`; `kit.toLayer` output IS the handlers layer (don't
+  double-wrap). Multiple toolkits → `Layer.mergeAll`.
+- `McpServer.visibility(() => Effect<boolean>)` → `.layer`; false hides from listTools AND fails
+  calls not-found. Perfect for env-policy gating with static toolkits.
+- v4 gotchas: no `Either` in root barrel (use `Result` + `Effect.result`, `.failure` extraction);
+  `Schema.Literals([...])` for multi-value literals (Schema.Literal takes ONE arg); no `.asVoid`
+  property (use `.pipe(Effect.asVoid)`); `exactOptionalPropertyTypes` + `Schema.optionalKey` ⇒
+  strip undefined keys (our `compact()` helper in schemas.ts); params schemas must be Struct-rooted;
+  `McpTest.makeClient(registrations, {protocols})` = in-memory client (`.listTools()`,
+  `.callTool({name, arguments})` → `{content:[{type:"text",text:JSON}], isError?}`; declared
+  failures return isError results, visibility-hidden calls FAIL the effect).
+
+### Bridge/ImapFlow research (subagent `ses_e52624c0cffehoCb7XrgdxRcS2`) — design inputs
+
+- Bridge: 127.0.0.1:1143 IMAP (SMTP 1025), STARTTLS default (GUI toggle for implicit SSL),
+  self-signed cert; creds = GUI "Mailbox details" password (revocable, ≠ account password).
+  **macOS: GUI app required, no headless mode**; "Open on startup" default. Bridge down/locked ⇒
+  IMAP server down (ECONNREFUSED).
+- Labels = `Labels/<name>` folders, virtual multi-membership; PERMANENTFLAGS only
+  `\Answered \Deleted \Flagged \Seen` (**no KEYWORDS**); apply label = COPY (idempotent);
+  remove = MOVE-out to home folder. gluon engine: IMAP4rev1 IDLE MOVE UIDPLUS UNSELECT, **no
+  CONDSTORE/QRESYNC/SORT**; SEARCH SUBJECT/TEXT/SINCE server-side on local cache; injects stable
+  `X-Pm-Gluon-Id` header (our home-folder resolution key).
+- ImapFlow **2.x API ≠ 1.x docs**: `getMailboxLock` → `{path, release()}` (NO `.mailbox` —
+  counters via `client.status(path, {messages|unseen: true})`); `search()` → `number[] | false`;
+  use `fetchAll` (never commands inside fetch iterator); postal-mime preferred (mailparser =
+  maintenance mode). Both postalsys (Nodemailer author), MIT.
+
+### jacob: UPDATED deploy checklist (phases 1+2 together)
+
+1. sops — `sops nix-config/secrets/mini.yaml`, add FIVE keys (switch fails if any missing):
+   `openclaw_gateway_token` (e.g. `openssl rand -hex 32`), `openrouter_api_key` (sk-or-…),
+   `kagi_api_key` (kagi.com/api/keys, API credits enabled), `proton_bridge_username` (Proton
+   address), `proton_bridge_password` (Bridge GUI → Mailbox details → after step 2).
+2. Install **Proton Mail Bridge** on mini (paid plan), log in, enable "Open on startup"; copy the
+   mailbox password into sops. Note connection mode (STARTTLS default ⇒ no extra config).
+3. Deploy on mini: `darwin-rebuild switch --flake <repo>#mini` — first build compiles openclaw
+   from source (no binary cache: insecure-marked, tens of minutes) + proton-mail-mcp (fast).
+   ⚠ If proton-mail-mcp's fetchYarnBerryDeps reports a hash mismatch ON DARWIN, refresh per
+   nix-hashes skill (expected to match the linux hash — shared lockfile, platform-neutral cache).
+4. Smoke: `openclaw gateway status` · `openclaw config validate` · Control UI
+   `http://127.0.0.1:18789/` (token) · ask it to search mail (`mail_search_messages`) and run a
+   Kagi search · `tail ~/Library/Logs/openclaw/gateway.log` (MCP stderr shows as
+   `bundle-mcp:protonmail:`).
+5. **Enable labeling when ready:** edit `features/openclaw/service.nix` config →
+   `PROTON_MCP_OPERATIONS: "read,label"` + `PROTON_MCP_ALLOWED_LABELS: "<exact label names,
+   comma-separated>"` → redeploy. (Tell me the label list and I'll wire it.)
+6. Append results/gotchas here.
+
+### Remaining work
+
+- Phase 2 step 9: Bridge install + end-to-end triage test through OpenClaw (jacob, on mini).
+- Phase 3: `openclaw.plato-splunk.media` — `features/openclaw/catalog.nix` vhost + `catalogDns`
+  entry in service-registry.nix (Technitium provisioning flows via aedilis automatically).
+- OpenClaw bundled-docs verification on mini (2026.10.5 vs 2026.10.3 research: run
+  `openclaw config validate`; adjust keys if drift).
+- Optional later: IDLE/pooled connections, attachment download (path-scoped), trash/archive ops
+  (env-gated), removeLabel multi-match heuristics.
+
+---
+
 ## 2026-11-05 — Session 1 (part 3): PHASE 1 IMPLEMENTED (nix side) — committed `9c80ee28b`
 
 Commits: `de93c1ced` (plan+log docs), `9c80ee28b` (phase 1: mini.nix pkgs-unstable wiring +

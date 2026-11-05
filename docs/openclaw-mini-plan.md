@@ -365,13 +365,13 @@ password + 2FA material: bigger blast radius, ToS-gray).
 
 **Phase 2 — first-party Proton Mail MCP server:**
 
-6. [ ] Scaffold `packages/proton-mail-mcp` per blueprint (package.json/tsconfigs/vitest/eslint/
+6. [x] Scaffold `packages/proton-mail-mcp` per blueprint (package.json/tsconfigs/vitest/eslint/
        rolldown); add pinned deps (imapflow, mailparser); refresh `fetchYarnBerryDeps` hash +
        `missing-hashes.json` (nix-hashes skill).
-7. [ ] Implement env config + policy layer + IMAP service (definitions/impls split); read tools
+7. [x] Implement env config + policy layer + IMAP service (definitions/impls split); read tools
        first, label tools behind `PROTON_MCP_OPERATIONS`+`PROTON_MCP_ALLOWED_LABELS`; unit tests
        for policy gating (@effect/vitest), incl. "unpermitted tool is never registered".
-8. [ ] `mail-mcp-package.nix` derivation (homelab-api pattern, aarch64-darwin); wire
+8. [x] `mail-mcp-package.nix` derivation (homelab-api pattern, aarch64-darwin); wire
        `mcp.servers.protonmail` (stdio) into the openclaw config with `${VAR}`-substituted Bridge
        creds; add `proton_bridge_username`/`proton_bridge_password` sops keys.
 9. [ ] jacob: install + log in to Proton Mail Bridge on mini (paid plan); decide Bridge
