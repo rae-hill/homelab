@@ -2,7 +2,7 @@
 
 This document tracks all port assignments across homelab hosts to prevent conflicts.
 
-Last updated: 2026-10-31
+Last updated: 2026-11-05
 
 ---
 
@@ -95,11 +95,12 @@ Last updated: 2026-10-31
 
 ## Mini (Mac Mini - nix-darwin)
 
-| Port | Service           | Protocol | Bind Address    | Notes                       |
-| ---- | ----------------- | -------- | --------------- | --------------------------- |
-| 443  | Caddy             | TCP      | 0.0.0.0         | HTTPS reverse proxy         |
-| 5252 | Tailscale metrics | TCP      | tailscale0 only | Prometheus scrape target    |
-| 8096 | Jellyfin          | TCP      | localhost       | Media server (behind Caddy) |
+| Port  | Service           | Protocol | Bind Address    | Notes                                                               |
+| ----- | ----------------- | -------- | --------------- | ------------------------------------------------------------------- |
+| 443   | Caddy             | TCP      | 0.0.0.0         | HTTPS reverse proxy                                                 |
+| 5252  | Tailscale metrics | TCP      | tailscale0 only | Prometheus scrape target                                            |
+| 8096  | Jellyfin          | TCP      | localhost       | Media server (behind Caddy)                                         |
+| 18789 | OpenClaw gateway  | TCP      | 127.0.0.1       | AI agent gateway: WS + Control UI (phase 3: Caddy `openclaw` vhost) |
 
 ---
 
