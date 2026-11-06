@@ -14,6 +14,18 @@ import {
 } from "effect"
 import { Config, type Schemas, Services } from "homelab-services"
 import puppeteer from "puppeteer-core"
+import type { HTTPRequest, Page } from "puppeteer-core"
+
+/**
+ * The resume's index.html pulls Victor Mono from fonts.googleapis.com (CSS) and
+ * fonts.gstatic.com (woff2). Those are the only third-party hosts the print flow
+ * treats as droppable: if their requests stall in flight (observed on augustus —
+ * egress dropped upstream), `document.fonts.ready` never settles, so the app
+ * never sets `data-print-ready` — and `page.pdf()` ALSO hangs while font loads
+ * are pending. The fallback in `puppeteer-run` aborts them and lets the site
+ * render with its `display=swap` fallback faces.
+ */
+const isThirdPartyFontRequest = (url: string): boolean => /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url)
 
 /**
  * Puppeteer-backed PDF renderer for the resume site.
@@ -68,6 +80,12 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
        * a callback stream never terminates, so collecting it hangs the request.
        */
       const logQueue = yield* Queue.unbounded<Effect.Effect<void>>()
+      /**
+       * In-flight third-party font requests, tracked passively (no interception
+       * overhead on the happy path). Non-empty at a print-ready timeout = the
+       * font-stall signature that triggers the abort-and-reload fallback.
+       */
+      const pendingFontRequests = new Set<HTTPRequest>()
 
       return yield* Effect.acquireUseRelease(
         Effect.tryPromise(
@@ -85,7 +103,25 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
                 signal,
               })
 
-              const page = await browser.newPage()
+              let page: Page
+              try {
+                page = await browser.newPage()
+              } catch (error) {
+                // acquireUseRelease skips release when acquire fails — don't leak
+                // the browser process if newPage fails after a successful launch.
+                await browser.close().catch(() => {})
+                throw error
+              }
+
+              page.on("request", (request) => {
+                if (isThirdPartyFontRequest(request.url())) pendingFontRequests.add(request)
+              })
+              page.on("requestfinished", (request) => {
+                pendingFontRequests.delete(request)
+              })
+              page.on("requestfailed", (request) => {
+                pendingFontRequests.delete(request)
+              })
 
               page.on(
                 "console",
@@ -221,12 +257,51 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
           },
         ),
         Effect.fn("puppeteer-run")(function*([, page]) {
+          let fontFallbackUsed = false
+
           return yield* Effect.tryPromise({
             async try() {
-              await page.goto(url.toString(), { waitUntil: "networkidle2", timeout: 60_000 })
-              // The resume app sets `data-print-ready` on <html> once the imported config
-              // and theme are applied to the redux store and the DOM has re-rendered.
-              await page.waitForSelector("html[data-print-ready]", { timeout: 30_000 })
+              const gotoOptions = { waitUntil: "networkidle2", timeout: 60_000 } as const
+              const printReady = "html[data-print-ready]"
+
+              try {
+                await page.goto(url.toString(), gotoOptions)
+                // The resume app sets `data-print-ready` on <html> once the imported config
+                // and theme are applied to the redux store and the DOM has re-rendered.
+                await page.waitForSelector(printReady, { timeout: 30_000 })
+              } catch (firstError) {
+                // Font-stall fallback (root-caused 2026-11-06, see isThirdPartyFontRequest):
+                // the page reaches networkidle2, but stalled third-party font requests
+                // keep `document.fonts.ready` pending forever, so the print-ready flag
+                // never lands — and `page.pdf()` hangs too while font loads are in
+                // flight. Detect the signature (font requests still pending, or the
+                // FontFaceSet stuck at "loading") and reload once with font hosts
+                // aborted; failed loads settle `document.fonts.ready` and the PDF
+                // renders with the site's `display=swap` fallback faces. Anything
+                // else rethrows unchanged.
+                let fontsStalled = pendingFontRequests.size > 0
+
+                if (!fontsStalled) {
+                  const fontFaceSetStatus: unknown = await page.evaluate("document.fonts?.status").catch(
+                    () => undefined,
+                  )
+                  fontsStalled = fontFaceSetStatus === "loading"
+                }
+
+                if (!fontsStalled) throw firstError
+
+                fontFallbackUsed = true
+
+                await page.setRequestInterception(true)
+                page.on("request", (request) => {
+                  if (isThirdPartyFontRequest(request.url())) void request.abort()
+                  else void request.continue()
+                })
+
+                await page.goto(url.toString(), gotoOptions)
+                await page.waitForSelector(printReady, { timeout: 30_000 })
+              }
+
               const pdf = await page.pdf({
                 printBackground: true,
                 preferCSSPageSize: true,
@@ -235,13 +310,29 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
             },
             catch(error) {
               return new Services.PdfPrintService.PdfPrintError({
-                message: `Headless chrome failed to render the resume PDF for ${url.origin}`,
+                message: `Headless chrome failed to render the resume PDF for ${url.origin}${
+                  fontFallbackUsed ? " (after font-stall fallback reload)" : ""
+                }`,
                 error,
               })
             },
           })
         }),
         Effect.fn("pupeteer-cleanup")(function*([browser]) {
+          // Drain captured page-console logs BEFORE closing the browser: the
+          // drain cannot fail (takeAll + Effect<void> log effects), so
+          // browser-side logs always land in the server logs/otel — even when
+          // `browser.close()` below subsequently fails. Release also runs when
+          // the use step fails or is interrupted, so every acquired browser
+          // reaches this point. (No Scope/finalizer needed: a failing close was
+          // the only path that could previously skip the drain.)
+          const drainLogs = Effect.fn("drain-logs")(function*() {
+            const pendingLogs = yield* Queue.takeAll(logQueue)
+            yield* Effect.forEach(pendingLogs, (logEffect) => logEffect)
+          })
+
+          yield* drainLogs()
+
           yield* Effect.tryPromise({
             async try() {
               return await browser.close()
@@ -254,10 +345,8 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
             },
           })
 
-          // Drain the captured page-console log effects and run them so
-          // browser-side logs land in the server logs/otel.
-          const pendingLogs = yield* Queue.takeAll(logQueue)
-          yield* Effect.forEach(pendingLogs, (logEffect) => logEffect)
+          // Best-effort second pass for console events emitted during close.
+          yield* drainLogs()
           yield* Queue.shutdown(logQueue)
         }),
       )
