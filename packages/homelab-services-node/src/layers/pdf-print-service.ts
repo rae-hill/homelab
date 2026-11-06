@@ -15,6 +15,7 @@ import {
 import { Config, type Schemas, Services } from "homelab-services"
 import puppeteer from "puppeteer-core"
 import type { HTTPRequest, Page } from "puppeteer-core"
+import { PrintConfig } from "shared"
 
 /**
  * The resume's index.html pulls Victor Mono from fonts.googleapis.com (CSS) and
@@ -63,8 +64,24 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
       )
 
       const url = new URL(this.env.resumeSiteUrl)
-      url.searchParams.set("importPrintSettings", configBase64)
       url.searchParams.set("theme", theme)
+
+      // Decode the (edge-validated) base64 config into the JSON form the SPA
+      // persists in localStorage; it is seeded into the page before load in the
+      // use step below. NOT sent as an `importPrintSettings` query param:
+      // real-world configs exceed GitHub Pages' request-line limit → HTTP 414.
+      const configJson = yield* Effect.try({
+        try: () => {
+          const json = Buffer.from(configBase64, "base64").toString("utf-8")
+          JSON.parse(json) // sanity check; the API edge already schema-validates the blob
+          return json
+        },
+        catch: (error) =>
+          new Services.PdfPrintService.PdfPrintError({
+            message: "Print config base64 did not decode to JSON",
+            error,
+          }),
+      })
 
       const defaultArgNameSymbol: symbol = Symbol()
       const countsRef = yield* Ref.make(MutableHashMap.empty<string | symbol, number>())
@@ -264,6 +281,18 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
               const gotoOptions = { waitUntil: "networkidle2", timeout: 60_000 } as const
               const printReady = "html[data-print-ready]"
 
+              // Seed the print config into the site's localStorage before any page
+              // script runs — the SPA's PrintConfigProvider hydrates from localStorage
+              // on boot (same path as a returning visitor). Script-text form with
+              // JSON.stringify'd values: no DOM-lib types needed in this node package
+              // and no injection surface. Runs on EVERY navigation, so the
+              // font-stall fallback reload below re-seeds automatically.
+              await page.evaluateOnNewDocument(
+                `try { window.localStorage.setItem(${JSON.stringify(PrintConfig.PRINT_CONFIG_LOCAL_STORAGE_KEY)}, ${
+                  JSON.stringify(configJson)
+                }) } catch {}`,
+              )
+
               try {
                 await page.goto(url.toString(), gotoOptions)
                 // The resume app sets `data-print-ready` on <html> once the imported config
@@ -335,7 +364,24 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
 
           yield* Effect.tryPromise({
             async try() {
-              return await browser.close()
+              const closePromise = browser.close()
+              // Don't let a late close() rejection escape unhandled if the
+              // timeout below wins the race.
+              closePromise.catch(() => {})
+              let timer: ReturnType<typeof setTimeout> | undefined
+              try {
+                await Promise.race([
+                  closePromise,
+                  new Promise<never>((_, reject) => {
+                    timer = setTimeout(
+                      () => reject(new globalThis.Error("browser.close() timed out after 10s")),
+                      10_000,
+                    )
+                  }),
+                ])
+              } finally {
+                if (timer !== undefined) clearTimeout(timer)
+              }
             },
             catch(error) {
               return new Services.PdfPrintService.PdfPrintError({
@@ -343,7 +389,24 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
                 error,
               })
             },
-          })
+          }).pipe(
+            // Cleanup trouble must never hang the request or mask the real (use-step)
+            // result — browser.close() was observed hanging on augustus after the
+            // 414 error page. SIGKILL the chrome process as the last resort: after
+            // that the browser is definitively gone, so log and succeed.
+            Effect.catch((cleanupError) =>
+              Effect.sync(() => {
+                const chromeProcess = browser.process()
+                if (chromeProcess !== null && chromeProcess.exitCode === null) {
+                  chromeProcess.kill("SIGKILL")
+                }
+              }).pipe(
+                Effect.andThen(
+                  Effect.logWarning("Force-killed headless chrome after failed/timed-out close:", cleanupError),
+                ),
+              )
+            ),
+          )
 
           // Best-effort second pass for console events emitted during close.
           yield* drainLogs()
