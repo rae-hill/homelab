@@ -2,46 +2,47 @@
 
 This document tracks all port assignments across homelab hosts to prevent conflicts.
 
-Last updated: 2026-10-31
+Last updated: 2026-11-06
 
 ---
 
 ## Augustus (Primary Server)
 
-| Port  | Service                | Protocol | Bind Address             | Notes                                   |
-| ----- | ---------------------- | -------- | ------------------------ | --------------------------------------- |
-| 22    | OpenSSH                | TCP      | tailscale0 only          | Firewall: tailscale0 interface          |
-| 80    | Caddy                  | TCP      | 0.0.0.0                  | HTTP (ACME challenges, redirects)       |
-| 443   | Caddy                  | TCP      | 0.0.0.0                  | HTTPS reverse proxy                     |
-| 1337  | Planka                 | TCP      | 127.0.0.1 (host network) | Project management (behind Caddy)       |
-| 1812  | RADIUS (radiusd)       | TCP/UDP  | 0.0.0.0                  | 802.1X authentication                   |
-| 1813  | RADIUS accounting      | TCP/UDP  | 0.0.0.0                  | RADIUS accounting                       |
-| 2019  | Caddy metrics          | TCP      | 127.0.0.1                | Scraped by Prometheus                   |
-| 3000  | Grafana                | TCP      | 127.0.0.1                | Dashboards (behind Caddy)               |
-| 3100  | Loki                   | TCP      | 127.0.0.1                | Log aggregation                         |
-| 3200  | Tempo (HTTP)           | TCP      | 127.0.0.1                | Distributed tracing                     |
-| 4317  | Tempo (gRPC OTLP)      | TCP      | 127.0.0.1                | OpenTelemetry trace ingestion           |
-| 5201  | iperf3                 | TCP      | 0.0.0.0                  | Network speed testing                   |
-| 5252  | Tailscale metrics      | TCP      | tailscale0 only          | Prometheus scrape target                |
-| 5432  | PostgreSQL             | TCP      | 0.0.0.0 (mTLS)           | Database; tailscale0 firewall + mTLS    |
-| 6842  | HabitSync              | TCP      | 127.0.0.1 (host network) | Habit tracker (behind Caddy)            |
-| 8123  | Home Assistant         | TCP      | 127.0.0.1                | Smart home (behind Caddy)               |
-| 8443  | Kanidm                 | TCP      | 127.0.0.1                | Identity management (behind Caddy)      |
-| 9090  | Prometheus             | TCP      | 127.0.0.1                | Metrics (behind Caddy with mTLS)        |
-| 9095  | Tempo (gRPC server)    | TCP      | 127.0.0.1                | Internal Tempo gRPC                     |
-| 9096  | Loki (gRPC)            | TCP      | 127.0.0.1                | Internal Loki gRPC                      |
-| 9100  | Node Exporter          | TCP      | 127.0.0.1                | System metrics for Prometheus           |
-| 9130  | Unpoller (Prometheus)  | TCP      | 127.0.0.1                | UniFi metrics exporter                  |
-| 9187  | Postgres Exporter      | TCP      | 127.0.0.1                | PostgreSQL metrics for Prometheus       |
-| 12345 | Alloy                  | TCP      | 127.0.0.1                | Log shipper admin UI                    |
-| 19553 | Open WebUI             | TCP      | 127.0.0.1                | AI chat interface (behind Caddy)        |
-| 22378 | RADIUS ACME            | TCP      | 127.0.0.1                | ACME http-01 for radius cert            |
-| 22480 | Prometheus client ACME | TCP      | 127.0.0.1                | ACME http-01 for prometheus client cert |
-| 25565 | Minecraft              | TCP      | 0.0.0.0 (tailscale0)     | Fabric server; firewall: tailscale0     |
-| 35427 | Homelab API            | TCP      | 127.0.0.1                | Node.js API server (behind Caddy)       |
-| 41872 | PostgreSQL ACME        | TCP      | 127.0.0.1                | ACME http-01 for postgres cert          |
-| 47309 | IT Tools               | TCP      | 127.0.0.1                | Developer tools (behind Caddy)          |
-| 64073 | Kanidm ACME            | TCP      | 127.0.0.1                | ACME http-01 for kanidm cert            |
+| Port  | Service                | Protocol | Bind Address             | Notes                                                                                       |
+| ----- | ---------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------- |
+| 22    | OpenSSH                | TCP      | tailscale0 only          | Firewall: tailscale0 interface                                                              |
+| 80    | Caddy                  | TCP      | 0.0.0.0                  | HTTP (ACME challenges, redirects)                                                           |
+| 443   | Caddy                  | TCP      | 0.0.0.0                  | HTTPS reverse proxy                                                                         |
+| 1337  | Planka                 | TCP      | 127.0.0.1 (host network) | Project management (behind Caddy)                                                           |
+| 1812  | RADIUS (radiusd)       | TCP/UDP  | 0.0.0.0                  | 802.1X authentication                                                                       |
+| 1813  | RADIUS accounting      | TCP/UDP  | 0.0.0.0                  | RADIUS accounting                                                                           |
+| 2019  | Caddy metrics          | TCP      | 127.0.0.1                | Scraped by Prometheus                                                                       |
+| 3000  | Grafana                | TCP      | 127.0.0.1                | Dashboards (behind Caddy)                                                                   |
+| 3100  | Loki                   | TCP      | 127.0.0.1                | Log aggregation                                                                             |
+| 3200  | Tempo (HTTP)           | TCP      | 127.0.0.1                | Distributed tracing                                                                         |
+| 4317  | Tempo (gRPC OTLP)      | TCP      | 127.0.0.1                | OpenTelemetry trace ingestion                                                               |
+| 5201  | iperf3                 | TCP      | 0.0.0.0                  | Network speed testing                                                                       |
+| 5252  | Tailscale metrics      | TCP      | tailscale0 only          | Prometheus scrape target                                                                    |
+| 5432  | PostgreSQL             | TCP      | 0.0.0.0 (mTLS)           | Database; tailscale0 firewall + mTLS                                                        |
+| 6842  | HabitSync              | TCP      | 127.0.0.1 (host network) | Habit tracker (behind Caddy)                                                                |
+| 8123  | Home Assistant         | TCP      | 127.0.0.1                | Smart home (behind Caddy)                                                                   |
+| 8443  | Kanidm                 | TCP      | 127.0.0.1                | Identity management (behind Caddy)                                                          |
+| 9090  | Prometheus             | TCP      | 127.0.0.1                | Metrics (behind Caddy with mTLS)                                                            |
+| 9095  | Tempo (gRPC server)    | TCP      | 127.0.0.1                | Internal Tempo gRPC                                                                         |
+| 9096  | Loki (gRPC)            | TCP      | 127.0.0.1                | Internal Loki gRPC                                                                          |
+| 9100  | Node Exporter          | TCP      | 127.0.0.1                | System metrics for Prometheus                                                               |
+| 9130  | Unpoller (Prometheus)  | TCP      | 127.0.0.1                | UniFi metrics exporter                                                                      |
+| 9187  | Postgres Exporter      | TCP      | 127.0.0.1                | PostgreSQL metrics for Prometheus                                                           |
+| 12345 | Alloy                  | TCP      | 127.0.0.1                | Log shipper admin UI                                                                        |
+| 19553 | Open WebUI             | TCP      | 127.0.0.1                | AI chat interface (behind Caddy)                                                            |
+| 22378 | RADIUS ACME            | TCP      | 127.0.0.1                | ACME http-01 for radius cert                                                                |
+| 22480 | Prometheus client ACME | TCP      | 127.0.0.1                | ACME http-01 for prometheus client cert                                                     |
+| 25565 | Minecraft              | TCP      | 0.0.0.0 (tailscale0)     | Fabric server; firewall: tailscale0                                                         |
+| 35427 | Homelab API            | TCP      | 127.0.0.1                | Node.js API server (behind Caddy)                                                           |
+| 35428 | Resume print site      | TCP      | 127.0.0.1                | Static resume SPA for homelab-api PDF printing (loopback Caddy vhost, features/resume-site) |
+| 41872 | PostgreSQL ACME        | TCP      | 127.0.0.1                | ACME http-01 for postgres cert                                                              |
+| 47309 | IT Tools               | TCP      | 127.0.0.1                | Developer tools (behind Caddy)                                                              |
+| 64073 | Kanidm ACME            | TCP      | 127.0.0.1                | ACME http-01 for kanidm cert                                                                |
 
 ---
 

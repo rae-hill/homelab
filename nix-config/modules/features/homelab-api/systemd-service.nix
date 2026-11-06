@@ -140,6 +140,18 @@ in
           '';
           default = null;
         };
+
+        resumeSiteUrl = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          description = ''
+            RESUME_SITE_URL override for the PDF print service — the origin headless
+            chrome loads when rendering POST /resume/print. Set to the loopback
+            resume-site vhost on augustus (features/resume-site) so printing does not
+            depend on the public GitHub Pages deployment. Null keeps the code default
+            (https://resume.rae-hill.dev).
+          '';
+          default = null;
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -200,6 +212,7 @@ in
             ACME_KEY_SIZE=256
             ${if cfg.serialNumbersFile != null then "SERIAL_NUMBERS_FILE=${cfg.serialNumbersFile}" else ""}
             ${if cfg.chromeExecutable != null then "CHROME_EXECUTABLE=${cfg.chromeExecutable}" else ""}
+            ${if cfg.resumeSiteUrl != null then "RESUME_SITE_URL=${cfg.resumeSiteUrl}" else ""}
             ${
               if config.services.tempo.enable then
                 "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}"

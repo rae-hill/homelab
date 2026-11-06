@@ -45,6 +45,7 @@ in
       nixos.unpoller
       nixos.homelab-api
       nixos.homelab-ui
+      nixos.resume-site
       nixos.technitium-kanidm
 
       ./../_private/augustus/hardware.nix

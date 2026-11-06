@@ -279,6 +279,9 @@ in
         frontendUrl = mkUrl "homelab";
         insecureUrl = mkInsecureUrl "homelab-api";
         port = 35427;
+        # Loopback-only Caddy vhost serving the built resume SPA for homelab-api's
+        # headless PDF printing (features/resume-site). Not externally reachable.
+        resumeSitePort = 35428;
         hmacFileName = "hmac.secret";
       };
 

@@ -68,6 +68,7 @@ in
     serialNumbersFile = config.sops.templates."serial-numbers-file".path;
     # Headless chrome for POST /resume/print (remote-printing feature). Chrome makes the
     # best PDFs; the wrapper resolves its own runtime deps via absolute store paths.
+    # resumeSiteUrl is set by services.resume-site.enable (features/resume-site).
     chromeExecutable = "${pkgs.google-chrome}/bin/google-chrome-stable";
     apiKeys = {
       jacob = {
@@ -89,6 +90,11 @@ in
     privateKeyPasswordFile = config.sops.secrets.homelab_api_jwk_password.path;
     apiKeys = config.services.homelab-api.apiKeys;
   };
+
+  # Loopback static resume SPA served by Caddy for homelab-api's PDF printing;
+  # enabling it also points services.homelab-api.resumeSiteUrl at the vhost
+  # (see features/resume-site/caddy.nix).
+  services.resume-site.enable = true;
 
   services.restic.backups.postgres = {
     user = "restic";
