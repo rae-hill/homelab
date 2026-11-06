@@ -4,6 +4,71 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
+## 2026-11-06 — Session 4 (augustus print-ready timeout ROOT-CAUSED: stalled webfont loads; fallback shipped)
+
+### The bug
+
+`POST /resume/print` on augustus: `page.goto(networkidle2)` succeeded but
+`waitForSelector("html[data-print-ready]")` timed out (30s). **Not** a JS-disabled /
+renderer problem — puppeteer enables JS by default and a baseline headless run against
+the live site sets the attribute in ~1.1s.
+
+**Root cause:** resume's `index.html` loads Victor Mono from `fonts.googleapis.com`
+(CSS) + `fonts.gstatic.com` (woff2). When those requests STALL in flight (dropped
+egress upstream — host firewall is inbound-only, so something further out),
+`document.fonts.ready` never settles ⇒ `PrintConfigProvider` never sets
+`data-print-ready` ⇒ selector timeout. And `page.pdf()` ALSO hangs while font loads
+are pending (verified: 30s protocol timeout), so setting the flag earlier alone would
+NOT rescue the print. If font requests fail FAST (DNS refused etc.), everything works
+(failures settle fonts.ready).
+
+Reproduced locally via `--host-resolver-rules=MAP fonts.gstatic.com 10.255.255.1`:
+
+- gstatic-only stall ⇒ goto OK (~1.1s) + selector timeout + `document.fonts.status
+  === "loading"` with 12 pending Victor Mono faces — **exact augustus symptom**
+- both hosts stalled ⇒ goto(networkidle2) itself times out (stalled connections never
+  let the page go idle)
+
+### The fix (commit `9d53263b`, services-node pdf-print-service)
+
+- `puppeteer-run`: passively tracks in-flight font-host requests (Set<HTTPRequest> via
+  request/requestfinished/requestfailed — zero overhead on happy path). On print-ready
+  failure: if pending font requests > 0 (or `document.fonts.status === "loading"` via
+  page.evaluate), enable request interception aborting `fonts.(googleapis|gstatic).com`,
+  reload once, re-await the selector. Aborted loads settle fonts.ready; PDF renders with
+  the site's `display=swap` fallback faces. Error message notes "(after font-stall
+  fallback reload)". Validated all three scenarios against the live site: baseline 1.6s
+  no-fallback (real fonts); both stall variants ⇒ %PDF via fallback.
+- `pupeteer-cleanup`: console-log drain moved BEFORE `browser.close()` (+ best-effort
+  second drain after). Drain can't fail (takeAll + Effect<void>), so a failing close can
+  no longer skip it. This SUPERSEDES the WIP `Effect.addFinalizer` approach: ambient
+  addFinalizer leaks `Scope` into printResume's R channel (Def contract is R = never),
+  and acquireUseRelease already guarantees release on use failure/interruption —
+  reordering covers the only real gap (close failing before the drain).
+- acquire: `browser.close()` if `newPage()` fails post-launch (release never runs when
+  acquire fails — was a chrome-process leak path).
+- Full validation after: e2e 14/108 green (happy path unchanged), lint 0 errors, unit
+  tests green, typecheck green.
+
+### Deploy + follow-ups (user)
+
+1. Deploy the fix to augustus (push + `nixos-rebuild switch`). Printing will then SUCCEED
+   even with the font stall — but PDFs render with **fallback fonts** until egress is
+   fixed or fonts are self-hosted.
+2. Diagnose augustus egress (run ON augustus):
+   `curl -4 -sS -o /dev/null -w '%{http_code} %{time_total}s\n' --max-time 10 'https://fonts.googleapis.com/css2?family=Victor+Mono&display=swap'`
+   and same for a gstatic woff2 URL from that CSS (plus `-6` variants — a broken IPv6
+   path is a classic stall cause; also check upstream router/firewall and DNS resolver
+   behavior for those hosts).
+3. Optional root fix: **self-host Victor Mono** in the resume bundle (@fontsource) and
+   drop the Google `<link>`s — removes the third-party failure class entirely, PDFs
+   always get real fonts, better privacy. Needs a GH Pages redeploy.
+4. Optional frontend hardening (independent): bound `document.fonts.ready` with a
+   timeout in `provider.tsx` before setting `data-print-ready` (server-side fallback
+   makes this non-critical).
+
+---
+
 ## 2026-11-05 — Session 3b (e2e infra: standalone script, CI job, pre-commit guard, fixture bootstrap)
 
 ### Commits
