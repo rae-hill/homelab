@@ -146,6 +146,7 @@ let
     postgres = mkCatalogDns "postgres" "postgres-augustus" "augustus";
     homelab-api = mkCatalogDns "homelab-api" "homelab-api" "augustus";
     homelab-ui = mkCatalogDns "homelab-ui" "homelab" "augustus";
+    resume-site = mkCatalogDns "resume-site" "resume" "augustus";
     habitsync = mkCatalogDns "habitsync" "habitsync" "augustus";
     prometheus = mkCatalogDns "prometheus" "prometheus" "augustus";
     prometheus-client = mkCatalogDns "prometheus-client" "prometheus-client" "augustus";
@@ -279,9 +280,10 @@ in
         frontendUrl = mkUrl "homelab";
         insecureUrl = mkInsecureUrl "homelab-api";
         port = 35427;
-        # Loopback-only Caddy vhost serving the built resume SPA for homelab-api's
-        # headless PDF printing (features/resume-site). Not externally reachable.
-        resumeSitePort = 35428;
+        # Tailnet-served build of the resume SPA (features/resume-site catalog entry):
+        # browsable mirror of resume.rae-hill.dev AND the origin homelab-api's
+        # headless chrome renders POST /resume/print from.
+        resumeSiteUrl = mkUrl "resume";
         hmacFileName = "hmac.secret";
       };
 

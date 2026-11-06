@@ -145,9 +145,10 @@ in
           type = lib.types.nullOr lib.types.str;
           description = ''
             RESUME_SITE_URL override for the PDF print service — the origin headless
-            chrome loads when rendering POST /resume/print. Set to the loopback
-            resume-site vhost on augustus (features/resume-site) so printing does not
-            depend on the public GitHub Pages deployment. Null keeps the code default
+            chrome loads when rendering POST /resume/print. Defaults (via the
+            features/resume-site catalog module) to the tailnet-served local build,
+            https://resume.plato-splunk.media, so printing does not depend on the
+            public GitHub Pages deployment. Null keeps the code default
             (https://resume.rae-hill.dev).
           '';
           default = null;
