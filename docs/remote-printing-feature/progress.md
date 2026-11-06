@@ -4,6 +4,84 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
+## 2026-11-06 — Session 5 (414 root cause, localStorage seeding, resume-site tailnet vhost)
+
+### Commits
+
+| Commit     | What                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `231dc6c7` | pdf-print: seed config via localStorage instead of the URL (fixes GH Pages **414**); bounded `browser.close()` (10s + SIGKILL, never fails the request) |
+| `d84ec7d3` | nix: `resume-site` flake package (offline vite build of packages/resume, mirrors the homelab-ui derivation, shared yarn hash)                           |
+| `ff4e98ab` | nix: serve it as a **catalog vhost** `https://resume.plato-splunk.media` (tailnet) + point `RESUME_SITE_URL` at it                                      |
+
+### Round-2 augustus failure — the REAL root cause: HTTP 414
+
+- After deploying the font-stall fallback, print still failed. The (newly visible —
+  drain-first cleanup!) page-console logs in the journal showed
+  `Failed to load resource: ... 414` + `404`: the `importPrintSettings=<base64>` query
+  param makes the request line too long for GitHub Pages/Fastly on REAL-WORLD configs
+  (e2e fixtures are tiny, which is why every local run passed). Chrome renders GH
+  Pages' 414 error page → no SPA → no `data-print-ready` → selector timeout. Round 1's
+  augustus selector timeout was almost certainly the same 414 (the font-stall mechanism
+  is real — reproduced locally — but may never have been what augustus hit).
+- `browser.close()` also HUNG after the 414 page (trace showed the first `drain-logs`
+  span and nothing after) → close is now bounded (10s race, SIGKILL last resort) and
+  cleanup failures log-and-succeed so the real use-step error surfaces.
+
+### The transport fix (no frontend redeploy needed)
+
+- `shared/print-config/constants.ts`: `PRINT_CONFIG_LOCAL_STORAGE_KEY`
+  (`"https://resume.rae-hill.dev__print-config"`) is now the shared wire contract;
+  resume's constants re-export it (deployed bundle unchanged).
+- `PdfPrintService` decodes the edge-validated config base64 to its JSON form and seeds
+  it into the site's localStorage via `page.evaluateOnNewDocument` (script-text form,
+  JSON.stringify'd values), then navigates with only `?theme=`. The SPA's existing
+  hydration path does the rest. The script re-runs on every navigation, so the
+  font-stall fallback reload re-seeds automatically.
+- Verified: full e2e 108/108 through the LIVE site via seeding, and resume suite 5/5
+  against the LOCAL nix build served on loopback (exact augustus shape).
+
+### resume-site: local build served on the tailnet (user's option 2)
+
+- `packages` → `.#resume-site` (x86_64-linux): offline `yarn workspace resume build`
+  (vite/rolldown) with the SAME monorepo src filter + fetchYarnBerryDeps hash as
+  homelab-api/ui — **refresh all THREE package.nix files together on yarn.lock changes.**
+- `homelab.catalog.resume-site` (features/resume-site/catalog.nix): static file_server
+  vhost `https://resume.plato-splunk.media` on augustus — tailnet scope, `dns.tailnet`
+  record (aedilis emits A/AAAA → 100.95.250.77), `tls.cert.shared` (Caddy-managed via
+  internal CA; chrome trusts it through `security.pki.certificateFiles` alford-root),
+  tracing span, `try_files {path} /index.html` SPA fallback via `extraCaddyConfig`.
+  Browsable mirror of the GH Pages deploy AND the print origin (user can hit either).
+- `services.homelab.resumeSiteUrl = mkUrl "resume"` in the registry; the catalog module
+  `mkDefault`s `services.homelab-api.resumeSiteUrl` to it → `RESUME_SITE_URL` in the
+  sops env template (verified by eval). No dedicated port (shared caddy :443) — the
+  earlier loopback 35428 design was replaced before deploy.
+- `services.homelab-api.resumeSiteUrl` is a nullOr option: null keeps the code default
+  (public site) — praeconinus untouched (resume group stays dark there).
+- **DEPLOY ORDER: aedilis FIRST (DNS record), then augustus** — chrome on augustus must
+  resolve resume.plato-splunk.media before printing works.
+
+### Rejected / deferred
+
+- User's option 1 (JsonPatch diffs vs defaults + content/print-settings redux split):
+  unnecessary given localStorage seeding; would be a large restructure. Revisit only if
+  the config ever outgrows localStorage (~5MB) or POST-body limits.
+- Self-hosting Victor Mono (@fontsource) so the local build makes ZERO external calls:
+  not done — the SPA still links Google Fonts, so augustus PDFs may render fallback
+  faces via the font-stall abort path IF gstatic still stalls from augustus (unverified;
+  test with `curl -m 10 https://fonts.gstatic.com/...`). Follow-up if print typography
+  matters or the stall persists. yarn.lock change ⇒ hash dance ×3 (api/ui/resume-site).
+
+### Verification this session
+
+- e2e: full suite 108/108 (live site, seeding path) + resume 5/5 against the local
+  nix build served on :39999 (throwaway static server; a stray `static-serve.mjs` may
+  still be running there — kill it if so).
+- `nix build .#resume-site` ✓; `nix flake check --no-build` ✓; augustus toplevel +
+  env template + vhost extraConfig + catalogDns evals ✓; typecheck/lint/unit ✓.
+
+---
+
 ## 2026-11-06 — Session 4 (augustus print-ready timeout ROOT-CAUSED: stalled webfont loads; fallback shipped)
 
 ### The bug
