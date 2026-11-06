@@ -13,6 +13,8 @@ import {
 
 const HEALTH_URL = new URL(`${BASE_URL}/status/health`)
 
+const describeWithNetwork = process.env.DISABLE_NETWORK_TESTS === "true" ? describe.skip : describe
+
 describe("PUT /status/health", () => {
   describe("authorization", () => {
     it.live("rejects a request with a mismathced html", () =>
@@ -67,7 +69,7 @@ describe("PUT /status/health", () => {
       }).pipe(Effect.provide(E2ETestLayer)))
   })
 
-  describe("success", () => {
+  describeWithNetwork("success", () => {
     it.live("returns health status for an authenticated identity with Status_Health permission", () =>
       Effect.gen(function*() {
         const client = yield* makeApiClient

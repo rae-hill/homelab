@@ -16,7 +16,7 @@
 # - CHROME_EXECUTABLE (provided by the devshell) enables the live resume-print
 #   success test; when it is unset (e.g. GitHub Actions) that test self-skips
 #   and puppeteer never launches a browser.
-set -uo pipefail
+set -muo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)" || {
   echo "ERROR: e2e must run inside the homelab git checkout" >&2
@@ -33,7 +33,7 @@ cleanup() {
   local exit_code=$?
   trap - EXIT INT TERM
   if [[ -n "${server_pid}" ]] && kill -0 "${server_pid}" 2>/dev/null; then
-    kill "${server_pid}"
+    kill -TERM -- "-${server_pid}"
     wait "${server_pid}" 2>/dev/null || true
   fi
   exit "${exit_code}"

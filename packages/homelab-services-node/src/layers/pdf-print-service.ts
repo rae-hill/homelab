@@ -1,4 +1,17 @@
-import { Chunk, DateTime, Effect, flow, Layer, MutableHashMap, Option, Queue, Random, Ref, Tuple } from "effect"
+import {
+  Chunk,
+  DateTime,
+  Effect,
+  flow,
+  Formatter,
+  Layer,
+  MutableHashMap,
+  Option,
+  Queue,
+  Random,
+  Ref,
+  Tuple,
+} from "effect"
 import { Config, type Schemas, Services } from "homelab-services"
 import puppeteer from "puppeteer-core"
 
@@ -82,29 +95,31 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
                     Effect.gen(function*() {
                       const type = msg.type()
                       const groups = yield* Ref.get(groupListRef)
+                      const msgArgs = msg.args()
+                      const logLines = msgArgs.length === 0 ? [msg.text()] : Formatter.format(msgArgs)
 
                       switch (type) {
                         case "log":
                         case "dir":
                         case "table":
-                          yield* Effect.log(...msg.args()).pipe(withSpans(groups))
+                          yield* Effect.log(...logLines).pipe(withSpans(groups))
                           break
                         case "info":
-                          yield* Effect.logInfo(...msg.args()).pipe(withSpans(groups))
+                          yield* Effect.logInfo(...logLines).pipe(withSpans(groups))
                           break
                         case "debug":
                         case "verbose":
-                          yield* Effect.logDebug(...msg.args()).pipe(withSpans(groups))
+                          yield* Effect.logDebug(...logLines).pipe(withSpans(groups))
                           break
                         case "error":
                         case "assert":
-                          yield* Effect.logError(...msg.args()).pipe(withSpans(groups))
+                          yield* Effect.logError(...logLines).pipe(withSpans(groups))
                           break
                         case "trace":
-                          yield* Effect.logTrace(...msg.args()).pipe(withSpans(groups))
+                          yield* Effect.logTrace(...logLines).pipe(withSpans(groups))
                           break
                         case "warn":
-                          yield* Effect.logWarning(...msg.args()).pipe(withSpans(groups))
+                          yield* Effect.logWarning(...logLines).pipe(withSpans(groups))
                           break
                         case "startGroup":
                         case "startGroupCollapsed": {
@@ -228,8 +243,8 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
         }),
         Effect.fn("pupeteer-cleanup")(function*([browser]) {
           yield* Effect.tryPromise({
-            try() {
-              return browser.close()
+            async try() {
+              return await browser.close()
             },
             catch(error) {
               return new Services.PdfPrintService.PdfPrintError({

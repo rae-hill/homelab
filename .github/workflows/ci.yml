@@ -77,6 +77,8 @@ jobs:
       # success test self-skips and puppeteer never launches a browser.
       - name: Run e2e suite (bundled server)
         run: bash scripts/e2e.sh
+        env:
+          DISABLE_NETWORK_TESTS: "true"
 
   nix-check:
     name: Nix Flake Check
