@@ -11,6 +11,8 @@
  * - packages/homelab-server/private/hmac-secret   — nonce HMAC secret (64 hex chars)
  * - packages/homelab-server/private/serial-numbers.json — IP → serial map for the
  *   EAP-TLS wifi fine-grained-authorization tests (recognized-IP contract)
+ * - packages/homelab-server/private/openrouter-api-key — dummy OpenRouter key so the
+ *   server boots without a real one (e2e must never hit OpenRouter)
  *
  * Also runs stage-test-secrets.mjs (homelab-services-node unit-test fixtures),
  * since the e2e workspace transitively imports that package's test-utils.
@@ -164,6 +166,7 @@ FEATURE_FLAGS=*
 KANIDM_OPENID_PROVIDER_URL=https://idm.plato-splunk.media/oauth2/openid/homelab/.well-known/openid-configuration
 API_KEYS_FILE=./private/api-keys.json
 SERIAL_NUMBERS_FILE=./private/serial-numbers.json
+OPENROUTER_API_KEY_FILE=./private/openrouter-api-key
 ROOT_CERT_DER=../../certs/alford-root.der
 INTERMEDIATE_CERT_DER=../../certs/intermediate_ca_2.der
 ROOT_CERT_CRT=../../certs/alford-root.crt
@@ -180,4 +183,5 @@ await stage(path.join(privateDir, "jwk.pub.json"), async () => publicJwk)
 await stage(path.join(privateDir, "jwk-secret"), async () => jwkSecret)
 await stage(path.join(privateDir, "hmac-secret"), async () => randomBytes(32).toString("hex"))
 await stage(path.join(privateDir, "serial-numbers.json"), async () => JSON.stringify(serialNumbers, null, 2))
+await stage(path.join(privateDir, "openrouter-api-key"), async () => "sk-or-e2e-dummy-not-a-real-key")
 await stage(path.join(serverDir, ".env-serve-test"), async () => envServeTest)

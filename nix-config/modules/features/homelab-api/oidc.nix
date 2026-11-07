@@ -70,6 +70,7 @@ in
             ];
             "resume.printing" = [
               "Resume_Print"
+              "Resume_Tailor"
             ];
           };
         };

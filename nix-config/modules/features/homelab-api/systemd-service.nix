@@ -115,6 +115,7 @@ in
                       "OAuth_Token"
                       "OAuth_ClaimCheck"
                       "Resume_Print"
+                      "Resume_Tailor"
                     ]
                   );
                 };
@@ -150,6 +151,16 @@ in
             https://resume.plato-splunk.media, so printing does not depend on the
             public GitHub Pages deployment. Null keeps the code default
             (https://resume.rae-hill.dev).
+          '';
+          default = null;
+        };
+
+        openRouterApiKeyFile = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          description = ''
+            Path to a file holding the OpenRouter API key; exported as
+            OPENROUTER_API_KEY_FILE for the resume tailor (POST /resume/tailor).
+            Null where the tailor is dark (e.g. praeconinus).
           '';
           default = null;
         };
@@ -214,6 +225,12 @@ in
             ${if cfg.serialNumbersFile != null then "SERIAL_NUMBERS_FILE=${cfg.serialNumbersFile}" else ""}
             ${if cfg.chromeExecutable != null then "CHROME_EXECUTABLE=${cfg.chromeExecutable}" else ""}
             ${if cfg.resumeSiteUrl != null then "RESUME_SITE_URL=${cfg.resumeSiteUrl}" else ""}
+            ${
+              if cfg.openRouterApiKeyFile != null then
+                "OPENROUTER_API_KEY_FILE=${cfg.openRouterApiKeyFile}"
+              else
+                ""
+            }
             ${
               if config.services.tempo.enable then
                 "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}"
