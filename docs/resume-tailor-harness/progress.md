@@ -1,0 +1,68 @@
+# Resume Tailor — Progress & Session Handoffs
+
+Living document. Update after every work session (and before context gets tight) so any agent can
+pick up cold. Convention follows `docs/remote-printing-feature/progress.md`.
+
+**Cold-start instructions for the next agent:** read [`README.md`](./README.md) (decisions D1–D9,
+wire contract, task graph) → the section doc for your task → the sources it cites. House rules:
+`AGENTS.md` + `.opencode/skills/` (`validation`, `adding-endpoints`, `effect-services`, `frontend`
+does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS homelab-frontend).
+
+## Status
+
+| Task | Doc | Scope one-liner                                                                            | Status   | Commit |
+| ---- | --- | ------------------------------------------------------------------------------------------ | -------- | ------ |
+| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | planned  | —      |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | planned  | —      |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | planned  | —      |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | planned  | —      |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | planned  | —      |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                | planned  | —      |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | planned  | —      |
+| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | planned  | —      |
+| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | planned  | —      |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | planned  | —      |
+| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred | —      |
+
+Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
+**C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
+`yarn lint && yarn typecheck && yarn test` green (+ `nix build .#checks.x86_64-linux.shellcheck`
+if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix build`).
+
+## Human-only / owner decisions (blocking flags)
+
+- **Sops encryption (T9.1):** agents must NOT run `sops` (denied). Owner runs
+  `sops edit nix-config/secrets/augustus.yaml` and adds `homelab_api_openrouter_key` (doc 05 §1).
+- **Model slugs (README OQ1, blocks T5 go-live not T5 code):** owner picks stage-1/stage-2 slugs;
+  env-overridable, pin dated slugs.
+- **Kanidm group (README OQ5):** doc 05 §5 recommends Option A (reuse `resume.printing` claim map).
+- **Deploy:** `systemd-service.nix` throws on a dirty git tree — commit before deploying.
+
+## Gotchas learned so far (carry forward)
+
+- `yarn.lock` changes (T7 adds the `homelab-services-browser` workspace) ⇒ refresh
+  `fetchYarnBerryDeps` hashes per the `nix-hashes` skill (`homelab-api` + `homelab-ui` package.nix).
+- Permissions enums are duplicated in `secret-provisioner.nix`/`systemd-service.nix` and already
+  drifted (`Resume_Print` missing in the former) — T9.2 fixes both + adds `Resume_Tailor`.
+- `featureFlags` option REPLACES (augustus keeps `["*"]`); praeconinus stays dark (owner-confirmed).
+- `JsonPatch.apply` throws; `toDifferJsonPatch.diff` takes TYPED values (encodes internally);
+  `decodeTo` getters bridge `From.Type ↔ To.Encoded` (doc 01 §D has the verified chain).
+- Chakra v3 Dialog: `placement` is center/top/bottom only; details view is a plain centered modal (D7).
+- Formatters run automatically via the harness — never manually; commits use `--no-verify`.
+
+## Session log
+
+### 2026-11-07 — planning session (complete)
+
+- Explored repo via subagents (resume app, api/server chain, shared/services, nix/sops); corrected
+  the external agent's initial plan against reality (README §"Corrected repo facts").
+- Owner decisions captured: D1 auto-apply+preset snapshot; D2 extend ContentState; D3 base64
+  JSON-Patch-only wire with decode-to-state schema (owner's design); D4 no review step; D5 two-model
+  pipeline; D6 local state now; D7 plain details modal; D8 small SOLID services +
+  `homelab-services-browser` (tests there; resume gets no test infra); D9 NO cache in v1 (lands with
+  persistence work). Cypress UI e2e = backlog (doc 03).
+- Wrote docs 01–06 via cheaper-model subagents (qwen3.7-plus ×3, qwen3.8-flash ×3), reviewed
+  end-to-end, fixed cross-doc inconsistencies (codec sketch, replace-only invariant → merge delta,
+  TailorMeta nullable stages + listingHash, quota restored, edge-decode semantics).
+- Committed planning docs: (this commit).
+- **Next:** Wave A — T1 (doc 01) via subagent, review, validate, commit; then T2; then T3.
