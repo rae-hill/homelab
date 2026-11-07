@@ -80,6 +80,8 @@ const fixtureConfig: PrintConfig.PersistedConfig = {
     description: { kind: "Blurb", textAlign: "center" },
   },
   content: {
+    blurb: "Agentic developer seeking a software engineering or DevOps role.",
+    aboutMe: "Dedicated to the craft of principled engineering.",
     experience: [
       {
         id: "acme",

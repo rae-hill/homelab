@@ -81,6 +81,7 @@ const apiKeys = [
       "Cert_Intermediate",
       "Cert_Combined",
       "Resume_Print",
+      "Resume_Tailor",
     ],
     email: "test@a.plato-splunk.media",
   },

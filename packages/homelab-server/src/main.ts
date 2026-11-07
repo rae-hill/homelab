@@ -24,6 +24,9 @@ const Server = HttpRouter.serve(Routes).pipe(
   Layer.provide(Shell.Authorization.Aggregate),
   Layer.provide(Shell.Crypto.Aggregate),
   Layer.provide(Shell.Printing.Aggregate),
+  // PLACEHOLDER until T4 (doc 02): stub TailorService so the tailor handler's
+  // dependency is provided; T4 replaces Shell.Tailor.Aggregate with the real composition.
+  Layer.provide(Shell.Tailor.Aggregate),
   Layer.provide(Shell.ProfilePayload.Aggregate),
   Layer.provide(Layers.CertificateService.CertificateServiceLive),
   Layer.provide(Layers.UuidService.UuidServiceLive),
