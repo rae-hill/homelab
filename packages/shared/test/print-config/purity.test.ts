@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { PersistedPrintConfig } from "./schema.js"
-import type { PersistedConfig } from "./types.js"
+import { PersistedPrintConfig } from "../../src/print-config/schema.js"
+import type { PersistedConfig } from "../../src/print-config/types.js"
 
 describe("print-config purity", () => {
   it("PersistedPrintConfig cannot contain tailor-related fields", () => {

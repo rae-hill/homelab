@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import { ABOUT_ME_DEFAULT, BLURB_DEFAULT, INITIAL_CONTENT_STATE } from "./constants.js"
-import { ContentState } from "./schema.js"
-import type { ExperienceContent, ProjectContent } from "./types.js"
+import { ABOUT_ME_DEFAULT, BLURB_DEFAULT, INITIAL_CONTENT_STATE } from "../../src/resume-content/constants.js"
+import { ContentState } from "../../src/resume-content/schema.js"
+import type { ExperienceContent, ProjectContent } from "../../src/resume-content/types.js"
 
 describe("resume-content", () => {
   describe("roundtrip", () => {
