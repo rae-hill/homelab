@@ -1,8 +1,27 @@
-import type { PrintConfig } from "shared"
+import type { ContentState } from "./types.js"
 
-type ContentState = PrintConfig.ContentState
-type ExperienceContent = PrintConfig.ExperienceContent
-type ProjectContent = PrintConfig.ProjectContent
+/** Frozen version tag for the default content state. Patches persist in localStorage (tailor
+ * entries) and decode against this base, so changing the default is a versioned contract
+ * change. */
+export const CONTENT_DEFAULTS_VERSION = "v1" as const
+
+/** Personal summary paragraph shown in the heading when the description mode is `Blurb`.
+ * Lifted from `packages/resume/src/components/resume/sections/heading.tsx` `BLURB` const. */
+export const BLURB_DEFAULT =
+  "Agentic developer, multilingual full-stack engineer, DevOps architect, and mathematician " +
+  "seeking a software engineering or DevOps role. Experienced in applying AI to solve " +
+  "complex problems and improve user workflows. Proficient in TypeScript, Python, frontend " +
+  "frameworks, systems design, and backend microservice architecture. Skilled at building secure, " +
+  "distributed, scalable, observable systems with strong performance characteristics."
+
+/** The About Me section paragraph. Lifted from
+ * `packages/resume/src/components/resume/sections/about-me.tsx` `Text` content. */
+export const ABOUT_ME_DEFAULT =
+  "Multilingual full-stack engineer and mathematician seeking a software engineering role with an " +
+  "emphasis in frontend or backend development. Dedicated to the craft of principled engineering and " +
+  "systematized approaches to AI workflow integration. Experienced in TypeScript, Python, frontend " +
+  "frameworks, systems design, and backend microservice architecture. Skilled at building secure, " +
+  "distributed, scalable, observable systems with strong performance characteristics."
 
 function bullets(entryId: string, texts: ReadonlyArray<string>) {
   return texts.map((text, i) => ({
@@ -12,11 +31,7 @@ function bullets(entryId: string, texts: ReadonlyArray<string>) {
   }))
 }
 
-/**
- * The default experience content — the previous static `experiences` data, now the
- * editable Default. Bullet strings are lifted into `{ id, text, visible }`.
- */
-const experience: ReadonlyArray<ExperienceContent> = [
+const experience = [
   {
     id: "nutrien",
     company: "Nutrien (P3-Uplift)",
@@ -133,11 +148,7 @@ const experience: ReadonlyArray<ExperienceContent> = [
   },
 ]
 
-/**
- * The default project content — the previous static `projects` data. `icon` / `iconColor`
- * are intentionally omitted (derived statically at render time; not editable).
- */
-const projects: ReadonlyArray<ProjectContent> = [
+const projects = [
   {
     id: "nixos-homelab",
     title: "NixOS declarative homelab with Grafana, OpenTelemetry, and Prometheus",
@@ -197,8 +208,11 @@ const projects: ReadonlyArray<ProjectContent> = [
   },
 ]
 
-/** The default content slice — the editable "Default" for the resume. */
-export const initialContentState: ContentState = {
+/** The default content state — lifted from `packages/resume/src/state/print-config/content-defaults.ts`,
+ * extended with blurb and aboutMe defaults. */
+export const INITIAL_CONTENT_STATE: ContentState = {
+  blurb: BLURB_DEFAULT,
+  aboutMe: ABOUT_ME_DEFAULT,
   experience,
   projects,
   skills: ["Foo", "Bar"],

@@ -60,6 +60,8 @@ export const fixtureConfig: PersistedConfig = {
     description: { kind: "Blurb", textAlign: "center" },
   },
   content: {
+    blurb: "A professional summary",
+    aboutMe: "About me text",
     experience: [
       {
         id: "acme",

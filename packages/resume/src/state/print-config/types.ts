@@ -5,11 +5,10 @@
  * persisted), the UI target unions, and the initial state value.
  */
 
+import { ResumeContent } from "shared"
 import type { PrintConfig } from "shared"
 
-import { initialContentState } from "./content-defaults"
-
-export { initialContentState } from "./content-defaults"
+export const initialContentState = ResumeContent.INITIAL_CONTENT_STATE
 
 /* ---- Schema-derived types (re-exported from shared) ----------------------------------- */
 
