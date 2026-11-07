@@ -26,8 +26,8 @@ export interface DownloadFabProps {
  * (see `chakra/toaster.tsx`). The `<Toaster />` viewport is mounted once in `__root.tsx`.
  */
 export function DownloadFab({
-  bottom = [22, 22, 28],
-  left = [10, 10, 16],
+  bottom = [100, 100, 14],
+  left = [10, 10, 140],
 }: DownloadFabProps) {
   const canPrint = useCanPrintResume()
   const { exportBase64 } = useConfigIO()

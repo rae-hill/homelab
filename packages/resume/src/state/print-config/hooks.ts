@@ -211,7 +211,7 @@ export function useContent() {
 /** The Konami-gated editing flag + setter. */
 export function useEditingEnabled() {
   const dispatch = useAppDispatch()
-  const editingEnabled = useAppSelector((s) => s.printConfig.editingEnabled)
+  const editingEnabled = useAppSelector((s) => s.homelab.auth.status === "signedIn" || s.printConfig.editingEnabled)
   const setEditingEnabled = useCallback(
     (enabled: boolean) => dispatch(A.setEditingEnabled(enabled)),
     [dispatch],
