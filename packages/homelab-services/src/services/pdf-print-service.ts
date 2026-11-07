@@ -19,7 +19,9 @@ export interface PdfPrintServiceDef {
    * `theme` query param. The config is deliberately NOT embedded as an
    * `importPrintSettings` URL param: real-world configs exceed GitHub Pages'
    * request-line limit (HTTP 414, observed on augustus). Waits for the page's
-   * print-ready signal and returns the PDF bytes.
+   * print-ready signal and returns the PDF bytes. The whole render is bounded
+   * by a backstop timeout, so callers always get a resolution (logs drained,
+   * browser closed) even if the page hangs.
    */
   readonly printResume: (
     configBase64: string,

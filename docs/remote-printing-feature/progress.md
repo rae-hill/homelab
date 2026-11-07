@@ -4,6 +4,163 @@ Handoff log for agents. Newest entries at the top. Read `README.md` + `plan.md` 
 
 ---
 
+## 2026-11-06 — Session 6 (PuppeteerService extraction DONE; Effect v4 fiber/scope/queue bug ROOT-CAUSED FROM SOURCE)
+
+Picks up from the previous session's WIP (uncommitted `PuppeteerService` extraction that
+failed e2e with a 503 InterruptError). This session: source-verified the failure model in
+`repos/effect` + installed `effect@4.1.2`, redesigned the log-queue lifecycle, shipped,
+full validation green, committed. The old handoff doc
+(`puppeteer-refactor-handoff.md`) is deleted — its knowledge lives below.
+
+### The bug — complete source-backed model (expensive knowledge; do NOT re-derive)
+
+The prior WIP had a `forkScoped` log-consumer fiber + a drain finalizer doing
+`Queue.shutdown` → `takeAll`. Symptom: print SUCCEEDED (211KB %PDF) but the request died
+with `InterruptError` → 503. Mechanism, all from `repos/effect/packages/effect/src/`:
+
+- **`Queue.shutdown`** finalizes the queue with an _interrupt-shaped_ exit
+  (`Queue.ts:1206-1217`, `exitInterrupt`) and DISCARDS buffered messages. Any later
+  `take`/`takeAll` on the shut-down queue receives `state.exit` (`Queue.ts:1625-1628`,
+  `2022-2023`) → **the closer fiber itself dies with Interrupt**. A failing scope close
+  REPLACES a successful use-step (`internal/effect.ts:4256-4265`) → 503. (Probes A/E.)
+- **`Queue.takeAll` = `takeBetween(1, ∞)` PARKS on an empty OPEN queue** until ≥1 message
+  (`Queue.ts:1303`, `2047-2063`; the installed d.ts says so verbatim: "waiting until at
+  least one message is available when the queue is empty", returns `NonEmptyArray`).
+  Inside a scope finalizer that is an **unkillable deadlock**: finalizers run
+  uninterruptibly (`internal/effect.ts:4250-4255`), and `Effect.timeout`'s kill path
+  (interrupt+await, `internal/effect.ts:1744`, `971-982`) can't touch an uninterruptible
+  fiber — `interruptUnsafe` merely accumulates the cause (`592-613`). This is why probe G
+  hung even with NO shutdown anywhere: the outer-timeout race forks the scoped effect
+  (`3961-3981`, `1751`), the dispatcher runs the consumer, the consumer empties the
+  queue, the drain's `takeAll` parks forever in the inner fiber's close; the 4-min sleep
+  wins but `fiberAwaitAll` never resolves. Probes F/H/H' are the same park (straggler
+  `takeAll` after the consumer drained / after `Fiber.interrupt` removed the taker).
+- **`forkScoped` is clean**: it registers the fiber's interrupt as a scope FINALIZER
+  (`internal/effect.ts:5697-5739`); at close, `fiberInterrupt` = interrupt + await +
+  **discard the cause** (`940-967`, `843-852`). A parked consumer killed at scope close
+  contributes nothing to the result (probe C). The prior session's v1 hang was NOT the
+  interrupt — it was the `takeAll` after it.
+- Finalizers run in **reverse registration order** (`internal/effect.ts:4057-4062`);
+  per-finalizer failures are captured and MERGED into the close cause (`4062`,
+  `2194-2207`).
+- `Effect.timeout` inside a finalizer is fine (probe D): its sleep is timer-driven and
+  resumes the parked closer via the callback path — no interrupt needed.
+- **The outer backstop timeout is NOT an escape hatch for scope close**: if any finalizer
+  parks unboundedly, the program deadlocks regardless. The only safe discipline: no
+  unbounded awaits inside finalizers.
+
+### The fix (new `puppeteer-service.ts` lifecycle; no consumer-fiber compromise needed)
+
+Registration order inside `withPage`'s `Effect.scoped` (⇒ unwind order):
+
+1. **close finalizer** (added FIRST ⇒ runs LAST): unchanged bounded close
+   (`Effect.timeout(10s)` → `Effect.catch` → SIGKILL `browser.process()`, never fails),
+   straggler drain swapped `takeAll` → **`Queue.clear`**.
+2. **drain finalizer** (runs SECOND): **`Queue.clear` + `Effect.forEach` run**. NO
+   `shutdown`, NO `takeAll` anywhere in the codebase's finalizers anymore.
+3. **`forkScoped` consumer** (added LAST ⇒ its interrupt entry runs FIRST): live
+   `Queue.take` → run, `Effect.forever` — logs execute in order as they arrive; the
+   queue is fully decoupled from acquire/use/release (user's ask), and the scope's own
+   interrupt handling kills it cleanly (cause discarded).
+
+`Queue.clear` (`Queue.ts:1256-1264`) is the ONLY safe drain primitive: never parks,
+empty ⇒ `[]`, Done ⇒ `[]`. Safe under the outer backstop: timeout fires → use-step
+interrupted → close runs uninterruptibly but interrupt-entry + clear + forEach +
+bounded close all complete without parking → `TimeoutError` surfaces properly.
+
+- **Font/request tracking is synchronous now** (user's Ref+HashSet ask, kept):
+  `Ref.makeUnsafe(HashSet.empty<HTTPRequest>())`; handlers mutate
+  `MutableRef.update(trackedRequests.ref, HashSet.add/remove(request))` directly —
+  `Ref<A>` publicly exposes its `MutableRef` cell (`Ref.d.ts:58`) and `MutableRef`
+  get/set/update are synchronous. Queue-deferred Ref updates (old WIP) would be stale at
+  the font-stall decision point. Reads stay Effects: `Ref.get(...).pipe(map(HashSet.size))`.
+- **Callback→Effect bridge**: `Queue.offerUnsafe` from the raw mitt/EventEmitter handlers
+  — the sanctioned v4 pattern (Effect's own `Stream.fromEventListener` uses it,
+  `Stream.ts:1487-1498`). Puppeteer handlers are sync, return value ignored, no
+  try/catch in mitt's emit — every offered effect is `catchDefect`-guarded so a dead
+  JSHandle (e.g. Formatter after a reload) can't kill the consumer or a finalizer.
+- **Puppeteer fix** (from `repos/puppeteer` source): in the interception handler,
+  `request.continue()` REJECTS for `data:` URLs (they skip interception but still get
+  `interception.enabled`, `NetworkManager.ts:416-418`, `cdp/HTTPRequest.ts:271-275`) →
+  both `abort()`/`continue()` now have `.catch(() => {})` (unhandled-rejection guard).
+- `pdf-print-service.ts` is the thin domain flow (seed localStorage → goto/networkidle2 →
+  print-ready selector → font-stall fallback → pdf), backstop `Effect.timeout("4 minutes")`
+  - `Match` error mapping; the two temp debug logs are removed; permanent `[print]` phase
+    logs kept.
+- Other useful puppeteer source facts: `page.pdf()` waits for `document.fonts.ready` by
+  default (`waitForFonts: true`, 30s per-call timeout, `cdp/Page.ts:1249-1334`) — the
+  font-stall abort fallback is what settles it; `browser.close()` is idempotent
+  (guarded by a `closing` flag) and its only unbound is protocolTimeout (180s) — hence
+  the 10s Effect bound; `launch({signal})` abort SIGKILLs the whole chrome process
+  group; `evaluateOnNewDocument` re-runs on every navigation (fallback reload re-seeds).
+
+### Also shipped in this commit (from the prior WIP, kept per its handoff §6)
+
+- **Confetti popup root cause + double fix**: the resume SPA injects
+  `run.confettipage.com/here.js` with a domain-bound `data-confetticode` — on the
+  tailnet mirror it errors/popups. (1) print chrome launches with
+  `--host-resolver-rules=MAP run.confettipage.com ~NOTFOUND` (verified: no popup, no
+  stall); (2) `CONFETTI_ALLOWED_HOSTNAMES` gate in `prod-side-effects.ts` for human
+  mirror visitors — **needs a GH Pages redeploy (public site) and augustus rebuild
+  (`resume-site`) to take effect; printing doesn't wait for either (DNS block covers it)**.
+- **Event observability** (user ask #2): request/requestfinished/requestfailed/
+  response≥400/pageerror/dialog(dismiss)/targetcreated handlers → server logs. NOTE the
+  resume SPA noops `console.log` in prod builds — server-side event logging is the
+  reliable channel. Debug-level lines are invisible on augustus (`LoggerLive` has no
+  min-level env; follow-up if ever needed).
+- `scripts/e2e.sh`: pre-start port check on :54328 (a stale server once produced a
+  FALSE-GREEN suite run) + `set -m` job-control rationale comment. Do NOT "fix" with
+  `setsid` (breaks `$!` and the group kill).
+- Chrome Local-Network-Access note: the SPA's reachability probe from the public site to
+  the tailnet API fails with `ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` — benign for
+  printing (print-ready doesn't depend on it).
+
+### Verification (all green this session)
+
+- `yarn typecheck` ✓; `yarn lint` ✓ (0 errors; 4 pre-existing resume warnings);
+  `yarn test` ✓ (600 services-node + 55 server + others).
+- Full `e2e`: **14 files / 108 tests green INCLUDING the live %PDF resume-print success
+  test** (`[print] pdf rendered: 211643 bytes`); `.e2e-log-dump.txt`: no
+  TypeError/InterruptError/undeclared-status; spans `puppeteer-run` → `puppeteer-drain-logs`
+  (87µs) → `puppeteer-close` (40ms) all completed; port 54328 free afterwards.
+- Post-commit nix: `nix build .#resume-site`, `nix flake check --no-build`, shellcheck
+  gate, `nix build .#homelab-api` — results noted in the commit session (see below /
+  re-run if in doubt).
+
+### What remains (ordered)
+
+1. **User deploy**: push `main` (yubikey; agents never push) + `nixos-rebuild switch`
+   augustus — picks up the whole refactor + confetti gate for the tailnet mirror.
+   Public-site confetti gate needs a GH Pages redeploy (workflow runs on push).
+2. Manual verification checklist (session 1 item 4) — re-run after deploy.
+3. Optional polish (unchanged): silent token renew, IdP-side logout, browser pooling
+   (only if print volume warrants), self-hosted Victor Mono (kills the font-stall class
+   entirely; yarn.lock change ⇒ nix-hashes dance for api/ui/resume-site ×3).
+
+### Gotchas (new / refreshed)
+
+- **Effect v4 `Queue.takeAll` PARKS on an empty open queue** (returns NonEmptyArray) —
+  nothing like v3. In finalizers/release steps use `Queue.clear` (never parks) or
+  `Queue.collect` (after `Queue.end`). The COMMITTED session-4/5 code had a latent hang
+  here (release-step `takeAll` only worked because response-handler offers guaranteed a
+  non-empty queue); the refactor removed the last `takeAll` call sites.
+- `Queue.shutdown` ≠ "stop consumers": it discards buffered messages AND poisons later
+  takes with an interrupt exit that lands on the TAKING fiber (a finalizer → replaces
+  the use-step's success). `Queue.end` is the typed clean stop (`Cause.Fail(Done)`,
+  buffered messages stay drainable via `collect`).
+- `Effect.timeout` (and any interrupt) cannot rescue a fiber parked inside its own
+  uninterruptible scope close. Design finalizers to never park unboundedly.
+- `forkScoped`/`forkIn` interrupt-and-discard at scope close (child cause never leaks);
+  `forkDetach` leaks the fiber entirely; there is no plain `Effect.fork` in v4.
+- Sync writes into a `Ref` from raw callbacks: `ref.ref` is a public `MutableRef` cell
+  (`MutableRef.update/set`); `Ref.makeUnsafe`/`Ref.getUnsafe` exist; there is no
+  `Ref.setUnsafe`.
+- Everything from sessions 1–5 still applies: `nix develop . --command yarn …`, `git add`
+  before nix eval, clean tree for `.#homelab-api`, `--no-verify` commits, never push,
+  light subagent models WITHOUT variant suffixes.
+
+---
+
 ## 2026-11-06 — Session 5 (414 root cause, localStorage seeding, resume-site tailnet vhost)
 
 ### Commits

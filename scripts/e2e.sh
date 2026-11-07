@@ -16,6 +16,11 @@
 # - CHROME_EXECUTABLE (provided by the devshell) enables the live resume-print
 #   success test; when it is unset (e.g. GitHub Actions) that test self-skips
 #   and puppeteer never launches a browser.
+# -m (job control): background jobs get their OWN process group (pgid = $!),
+# so cleanup's `kill -TERM -- "-${server_pid}"` reaps the whole server tree
+# (yarn → dotenvx → node). Do NOT "improve" this with setsid: setsid forks,
+# $! exits immediately, and both the health loop's kill -0 and the cleanup
+# then miss the real server (observed: port zombie + false-green suite run).
 set -muo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)" || {
@@ -64,7 +69,16 @@ yarn workspace homelab-server build || exit 1
 export HOMELAB_COMMIT_HASH
 HOMELAB_COMMIT_HASH="$(git rev-parse HEAD)"
 
+# A stale server already on the port would silently make this run test the
+# WRONG bundle (the health probe below would happily reach it) — fail loudly.
+if (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
+  echo "ERROR: port ${port} is already in use — stale e2e server?" >&2
+  echo "  find it:  ss -tlnp | grep ${port}" >&2
+  exit 1
+fi
+
 echo "==> starting bundled server on ${origin} (logs: ${log_dump})"
+# (Process-group containment comes from `set -m` above — see the header.)
 yarn workspace homelab-server serve:test >"${log_dump}" 2>&1 &
 server_pid=$!
 
