@@ -10,19 +10,19 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 
 ## Status
 
-| Task | Doc | Scope one-liner                                                                            | Status                                                                                         | Commit         |
-| ---- | --- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------- |
-| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat) | `62d248e97683` |
-| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                        | `0dab24d048fa` |
-| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                    | `afd402ddc11c` |
-| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **in progress**                                                                                | —              |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **in progress** (same agent as T4/T6)                                                          | —              |
-| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **in progress** (same agent as T4/T5)                                                          | —              |
-| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **in progress** (parallel with T4–T6)                                                          | —              |
-| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | planned                                                                                        | —              |
-| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **partial done** (§§2,4,5,7 committed; §1 owner sops edit + §3 augustus wiring deferred)       | `f5f02a6fd9b9` |
-| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | planned                                                                                        | —              |
-| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                       | —              |
+| Task | Doc | Scope one-liner                                                                            | Status                                                                                                | Commit         |
+| ---- | --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------- |
+| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)        | `62d248e97683` |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                               | `0dab24d048fa` |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                           | `afd402ddc11c` |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                            | `db5134460c1d` |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs are TBD placeholders — owner picks, README OQ1)                                       | `db5134460c1d` |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                            | `db5134460c1d` |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite) | `5e45edd1782a` |
+| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                             | `1f1b8e76b862` |
+| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **partial done** (§§2,4,5,7 committed; §1 owner sops edit + §3 augustus wiring deferred)              | `f5f02a6fd9b9` |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | planned                                                                                               | —              |
+| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                              | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -111,3 +111,36 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
 - **Wave B dispatched in parallel:** T4–T6 (doc 02, qwen3.7-plus) ∥ T7 (doc 04, qwen3.7-plus).
   Concurrency guardrails given (barrel files: edit-not-write, re-read before edit). After T7:
   nix-hashes refresh for the new workspace (yarn.lock change) before any nix build.
+- NOTE: first parallel dispatch failed weirdly (one agent returned a greeting, one was cancelled)
+  but both left substantial PARTIAL work on disk. Recovery pattern that worked: audit partial
+  state, re-dispatch fresh agents in "audit + complete" mode sequentially, coordinator commits
+  with barrel-line trim/restore when scopes share a file (services/index.ts).
+
+### 2026-11-07 — waves B + C (complete through T8)
+
+- **T4–T6 done** (`db5134460c1d`, qwen3.7-plus audit-and-complete): two-stage OpenRouter pipeline
+  (hygiene → quota → cleanup → tailor → guards → merge → coverage → replace-only merge-delta
+  assertion → degraded-never-500), OpenRouterClientService (strict json_schema, require_parameters,
+  data_collection:deny, finish_reason branching, 60s timeouts), TailorQuotaService, logger+OTel
+  redaction, env plumbing (OPENROUTER_API_KEY_FILE optional → hosts boot without it), 5 test suites
+  (712 services-node tests). **Owner-directed refactor applied**: quota state moved from closure
+  mutable Map to layer-owned `Ref` + atomic `Ref.modify`, `Clock.currentTimeMillis` (TestClock
+  test proves injection + midnight reset), `makeTailorQuotaService(limits)` factory; latency
+  timing in cleanup/tailor also moved off `Date.now()`. Model slugs are "TBD/…" placeholders —
+  live calls fail until the owner sets OPENROUTER_MODEL / OPENROUTER_CLEANUP_MODEL (README OQ1).
+- **T7 done** (`5e45edd1782a`, qwen3.7-plus audit-and-complete): `packages/homelab-services-browser`
+  (25 tests), contracts + pure helpers in homelab-services, thin tailor slice + services.ts runtime
+  - provider hydration/write-through, usePresets → PresetSnapshotService wrapper. Coordinator fix:
+    `save(..., {onCollision})` — default "overwrite" (legacy manual-save behavior), "suffix" opt-in
+    for pre-tailor snapshots (the interrupted agent had made suffix unconditional).
+- **T8 done** (`1f1b8e76b862`, qwen3.7-plus): Tailoring tab, Job Listings, read-only details modal
+  (D7 plain centered Dialog after the settings sheet), auto-apply flow (pre-save suffix snapshot →
+  applyTailoredContent), requestTailor (typed client, Bearer id_token), blurb/aboutMe render from
+  state + Heading-tab editors, RESUME_TAILOR_ROLE. Full gate green incl. resume vite build.
+- **nix hashes refreshed** (qwen3.8-flash): fetchYarnBerryDeps sha256 updated in homelab-api,
+  homelab-ui, AND resume-site package.nix (lockfile changed in T7); `nix build .#homelab-api` +
+  `.#homelab-ui` green.
+- **Remaining:** T9 finish (owner `sops edit` + 2-line augustus wiring — exact lines in doc 05
+  report/§3), T10 (run e2e: delete stale `packages/homelab-server/private/api-keys.json` first so
+  stage-e2e-secrets regenerates it WITH Resume_Tailor), owner picks model slugs, manual browser
+  check of the Tailoring tab, deploy-time smoke per doc 05 Test Plan.
