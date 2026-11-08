@@ -83,13 +83,20 @@ yarn workspace homelab-server serve:test >"${log_dump}" 2>&1 &
 server_pid=$!
 
 healthy=""
-for _ in {1..60}; do
-  if curl -sf "${origin}/status/health" >/dev/null 2>&1; then
+for attempt in {1..60}; do
+  # --max-time: a probe must never hang on a slow/blocked /status/health (the
+  # handler's outbound checks carry their own 5s timeouts; this is belt-and-braces
+  # so a wedged request surfaces as a bounded failure with the log dump below
+  # instead of a silent CI stall).
+  if curl -sf --max-time 10 "${origin}/status/health" >/dev/null 2>&1; then
     healthy=1
     break
   fi
   if ! kill -0 "${server_pid}" 2>/dev/null; then
     break
+  fi
+  if (( attempt % 10 == 0 )); then
+    echo "    ...still waiting for server health (attempt ${attempt}/60)"
   fi
   sleep 0.5
 done

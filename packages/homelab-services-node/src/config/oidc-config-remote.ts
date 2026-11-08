@@ -19,6 +19,10 @@ export const RemoteOIDCWellKnownDetailsServiceLive = Layer.effect(
       Effect.andThen(
         HttpClientResponse.schemaBodyJson(Schemas.OIDC.OIDCWellKnown),
       ),
+      // Bounded: the kanidm host resolves to a tailnet-only address that blackholes
+      // from outside (e.g. CI runners) — an untimed SYN wait would stall server boot
+      // for minutes before the option-degrade below ever runs.
+      Effect.timeout("10 seconds"),
       Effect.tapError(Console.error),
       Effect.option,
     )
