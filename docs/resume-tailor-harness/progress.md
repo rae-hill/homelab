@@ -16,7 +16,7 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                               | `0dab24d048fa` |
 | T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                           | `afd402ddc11c` |
 | T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                            | `db5134460c1d` |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs are TBD placeholders — owner picks, README OQ1)                                       | `db5134460c1d` |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)           | `db5134460c1d` |
 | T6   | 02  | Validation pipeline + merge + quota + evals                                                | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                            | `db5134460c1d` |
 | T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite) | `5e45edd1782a` |
 | T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                             | `1f1b8e76b862` |
@@ -33,8 +33,9 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
 
 - **Sops encryption (T9.1):** agents must NOT run `sops` (denied). Owner runs
   `sops edit nix-config/secrets/augustus.yaml` and adds `homelab_api_openrouter_key` (doc 05 §1).
-- **Model slugs (README OQ1, blocks T5 go-live not T5 code):** owner picks stage-1/stage-2 slugs;
-  env-overridable, pin dated slugs.
+- **Model slugs (README OQ1):** **RESOLVED (owner, 2026-11-08)** — stage 2
+  `anthropic/claude-sonnet-5.5`, stage 1 `openai/gpt-6-luna`, code defaults in
+  `packages/homelab-server/src/env.ts` (`cc692e5ea`), env-overridable.
 - **Kanidm group (README OQ5):** doc 05 §5 recommends Option A (reuse `resume.printing` claim map).
 - **Deploy:** `systemd-service.nix` throws on a dirty git tree — commit before deploying.
 
@@ -71,10 +72,11 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
    `openRouterApiKeyFile = config.sops.secrets.homelab_api_openrouter_key.path;` in
    `_private/augustus/programs.nix`. Until then the feature is dark (absent key → clean
    TailorError; hosts boot fine).
-2. **OWNER — model slugs (README OQ1):** code defaults are `"TBD/stage2-model"` /
-   `"TBD/stage1-model"` (`packages/homelab-server/src/env.ts`) — live calls fail until real slugs
-   are set via `OPENROUTER_MODEL` / `OPENROUTER_CLEANUP_MODEL`. Decide: env-template lines in
-   `systemd-service.nix` (doc 05 §2 pattern) vs real code defaults. Pin dated slugs, never aliases.
+2. ~~**OWNER — model slugs (README OQ1):**~~ **RESOLVED (owner, 2026-11-08):** slugs pinned as
+   real code defaults in `packages/homelab-server/src/env.ts` (`cc692e5ea`): stage 2 =
+   `anthropic/claude-sonnet-5.5`, stage 1 (cleanup) = `openai/gpt-6-luna`. Version-pinned, never
+   aliases; env-overridable (`OPENROUTER_MODEL` / `OPENROUTER_CLEANUP_MODEL`) — no nix
+   env-template lines needed. Live calls still blocked on item 1 (no key provisioned).
 3. **Live smoke (needs 1+2):** `RUN_TAILOR_LIVE=1` on the e2e tailor test, or paste a real listing
    in the UI. Review quality against doc 02 §I (injection + poor-fit are the regression-critical
    evals). Tune prompts if needed — bump `promptVersion` (layers/tailor/prompts.ts) when you do.
@@ -183,3 +185,20 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   ALWAYS regenerate after role-contract changes). Results: `e2e src/resume` 9✓+1 skip (live-AI
   gated); FULL `e2e` suite 15 files, 112✓+1 skip, exit 0.
 - **Remaining (owner + polish):** see "Open items" below and `next-agent-prompt.md`.
+
+### 2026-11-08 — model slugs pinned (Open item 2 resolved)
+
+- Owner present; asked the four blocking questions (sops readiness, slug choice, slug placement,
+  live/deploy authorization). Decisions: **slugs = `openai/gpt-6-luna` (stage-1 cleanup) +
+  `anthropic/claude-sonnet-5.5` (stage-2 main)**, placed as **real code defaults in env.ts**
+  (not nix env-template) — committed `cc692e5ea`, full gate green (typecheck, 851 unit tests,
+  lint 0 errors; tests use their own `test-model` defaults so no ripple). Slug research: current
+  Nov-2026 OpenRouter market — gpt-6-luna $0.10/$0.50 top JSON-extraction reliability,
+  sonnet-5.5 $2/$10 strong rewriting voice; both support strict json_schema +
+  `require_parameters:true` routing; version-pinned names, no `:latest`/`~` aliases.
+- Owner deferred: sops secret (**not yet** — item 1 still blocks go-live), live smoke + deploy
+  (**neither yet** — items 3, 5). Item 4 (manual browser check) remains owner's.
+- **Feature still DARK:** slugs are real but no key is provisioned; live calls fail cleanly until
+  owner runs `sops edit nix-config/secrets/augustus.yaml` (exact steps: doc 05 §1; then the 2-line
+  wiring: doc 05 §3, verified anchor points `_private/augustus/sops.nix` line ~126 +
+  `_private/augustus/programs.nix` beside `serialNumbersFile` line ~68).

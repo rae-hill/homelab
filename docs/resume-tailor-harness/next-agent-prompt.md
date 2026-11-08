@@ -31,8 +31,10 @@ You are continuing the **resume-tailor AI feature** in the homelab monorepo at
   1 skipped = the `RUN_TAILOR_LIVE`-gated live-AI test), `nix build .#homelab-api .#homelab-ui
   .#resume-site`.
 - The feature is **code-complete end-to-end but DARK**: no OpenRouter key provisioned (owner sops
-  edit pending) and model slugs are `"TBD/…"` placeholders — live calls fail cleanly until set.
-  Absent key never breaks server boot (Option-based env; praeconinus stays dark by design).
+  edit pending). Model slugs are PINNED as code defaults in env.ts (`cc692e5ea`, owner-picked
+  2026-11-08): stage 2 `anthropic/claude-sonnet-5.5`, stage 1 `openai/gpt-6-luna`. Live calls fail
+  cleanly until the key lands. Absent key never breaks server boot (Option-based env; praeconinus
+  stays dark by design).
 - T9 is partial: nix option/env-template/kanidm-claim/enum-drift-fix committed; the owner-gated
   sops secret + 2-line augustus wiring remain (exact lines in Open items #1).
 

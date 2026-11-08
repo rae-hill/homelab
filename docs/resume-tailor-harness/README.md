@@ -156,10 +156,10 @@ Suggested waves: **A:** T1→T2→T3. **B (parallel once T2 lands):** T7, and T4
 
 ## Open questions
 
-1. **Model slugs** — configurable via env with code defaults. Candidates to benchmark: a strong
-   instruction-following model with reliable strict structured outputs for stage 2 (rewriting
-   voice matters more than reasoning depth), and a cheap fast model for stage 1. Owner to pick
-   before T5; slugs pinned with dates, never mutable aliases.
+1. **Model slugs** — **RESOLVED (owner, 2026-11-08):** stage 2 = `anthropic/claude-sonnet-5.5`,
+   stage 1 (cleanup) = `openai/gpt-6-luna`. Pinned as code defaults in
+   `packages/homelab-server/src/env.ts`, env-overridable via `OPENROUTER_MODEL` /
+   `OPENROUTER_CLEANUP_MODEL`. Version-pinned names, never mutable aliases.
 2. **Defaults versioning cadence** — how often will the real resume content drift from
    `INITIAL_CONTENT_STATE` v1? Doc 01 proposes a frozen-base registry; confirm appetite vs.
    simply re-tailoring after content edits.
