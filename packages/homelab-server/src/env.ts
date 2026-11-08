@@ -27,5 +27,12 @@ export const EnvLive = Layer.effect(
       Config.schema(Schema.URLFromString, "RESUME_SITE_URL"),
       new URL("https://resume.rae-hill.dev"),
     ),
+    openRouterApiKeyFile: Config.option(Config.String("OPENROUTER_API_KEY_FILE")),
+    openRouterModel: Config.withDefault(Config.String("OPENROUTER_MODEL"), "TBD/stage2-model"),
+    openRouterCleanupModel: Config.withDefault(Config.String("OPENROUTER_CLEANUP_MODEL"), "TBD/stage1-model"),
+    openRouterBaseUrl: Config.withDefault(
+      Config.schema(Schema.URLFromString, "OPENROUTER_BASE_URL"),
+      new URL("https://openrouter.ai/api/v1"),
+    ),
   }),
 )

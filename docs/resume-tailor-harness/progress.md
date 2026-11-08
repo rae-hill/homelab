@@ -13,12 +13,12 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | Task | Doc | Scope one-liner                                                                            | Status                                                                                         | Commit         |
 | ---- | --- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------- |
 | T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat) | `62d248e97683` |
-| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **in progress**                                                                                | —              |
-| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | planned                                                                                        | —              |
-| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | planned                                                                                        | —              |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | planned                                                                                        | —              |
-| T6   | 02  | Validation pipeline + merge + quota + evals                                                | planned                                                                                        | —              |
-| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | planned                                                                                        | —              |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                        | `0dab24d048fa` |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                    | `afd402ddc11c` |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **in progress**                                                                                | —              |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **in progress** (same agent as T4/T6)                                                          | —              |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **in progress** (same agent as T4/T5)                                                          | —              |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **in progress** (parallel with T4–T6)                                                          | —              |
 | T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | planned                                                                                        | —              |
 | T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **partial done** (§§2,4,5,7 committed; §1 owner sops edit + §3 augustus wiring deferred)       | `f5f02a6fd9b9` |
 | T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | planned                                                                                        | —              |
@@ -54,6 +54,12 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   schemas/values are `ResumeContent.Schema.ContentState` and `ResumeContent.INITIAL_CONTENT_STATE`
   (constants are values re-exported flat). Doc 01's sketches wrote flat `ResumeContent.ContentState`
   for the SCHEMA — that is the TYPE; use `.Schema.` for the schema object. Same for `Schemas.OptionalWithDefault`.
+- **Owner directive (2026-11-07): service state must be layer-owned, not module-scoped.** Mutable
+  state lives in Effect `Ref`s created inside the layer (house precedent: `puppeteer-service.ts`),
+  updated atomically (`Ref.modify`); use `Mutex`/`Semaphore` from Effect when coordination is
+  needed; time comes from `Clock.currentTimeMillis` (TestClock-testable), never `Date.now()`.
+  Configurable internals = parameters of a `makeXService(...)` layer factory with defaults
+  (see `tailor-quota-service.ts`). Applies to ALL services incl. browser ones.
 - Formatters run automatically via the harness — never manually; commits use `--no-verify`.
 
 ## Session log
@@ -88,4 +94,20 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   conditional, kanidm claim (Option A), permissions-enum drift fixed (both enums now
   Resume_Print + Resume_Tailor), `.env-local` + `stage-e2e-secrets.mjs` dummy key. Deferred:
   owner `sops edit` (§1) then the 2-line augustus wiring (§3, exact lines in the T9 report).
-- **Next:** T2 (patch codec + wire schemas) → T3 (endpoint) → wave B (T4–T6 ∥ T7) → T8 → T10.
+- **T2 done** (`0dab24d048fa`, qwen3.7-plus, reviewed): `ContentPatchBase64` codec in
+  `shared/src/resume-content/patch.ts` (decode = apply-to-frozen-defaults inside
+  `SchemaGetter.transformEffect`, apply-throw → `SchemaIssue.InvalidValue` decode failure; encode =
+  `JsonPatch.get` vs `EncodedDefaults`; `ContentDiffer` exported for merge-delta assertions) +
+  `Schemas.ResumeTailor` wire schemas (listing bounds 1..200k, FitReport closed taxonomy, TailorMeta
+  with nullable stages + listingHash). 14+9 tests. Fixed: T1 tests sat in `src/` (shared vitest
+  include = `test/**` only) → relocated; purity test likewise. Deferred: JSON-Schema emission
+  snapshot (fold into T5, which needs emission for `response_format` anyway).
+- **T3 done** (`afd402ddc11c`, qwen3.8-flash, reviewed): endpoint def + group wiring, resource URI,
+  2 BadRequest reasons, TailorService tag (full doc-02 def incl. subject + TailorQuotaExceeded),
+  handler (canCreate → baseVersion gate → service → Match mapping), FGA arm + authz-test defaults,
+  PLACEHOLDER Live layer + Shell.Tailor (T4 replaces innards only), 9 handler tests, e2e file
+  (live-AI gated `RUN_TAILOR_LIVE`), stage-e2e-secrets grants Resume_Tailor. Identity subject =
+  `identity.identifier`. Also fixed e2e print fixture (Type-side blurb/aboutMe required since T1).
+- **Wave B dispatched in parallel:** T4–T6 (doc 02, qwen3.7-plus) ∥ T7 (doc 04, qwen3.7-plus).
+  Concurrency guardrails given (barrel files: edit-not-write, re-read before edit). After T7:
+  nix-hashes refresh for the new workspace (yarn.lock change) before any nix build.

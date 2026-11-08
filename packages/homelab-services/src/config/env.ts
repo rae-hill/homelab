@@ -76,6 +76,18 @@ export interface EnvDef {
 
   /** Base URL of the resume site that the PDF print service navigates to. */
   readonly resumeSiteUrl: URL
+
+  /** Filesystem path to the OpenRouter API key file. None = feature dark on this host. */
+  readonly openRouterApiKeyFile: Option.Option<string>
+
+  /** Model slug for the main tailor stage (stage 2). */
+  readonly openRouterModel: string
+
+  /** Model slug for the cheap cleanup stage (stage 1). */
+  readonly openRouterCleanupModel: string
+
+  /** Base URL of the OpenRouter API. */
+  readonly openRouterBaseUrl: URL
 }
 
 export class Env extends Context.Service<Env, EnvDef>()("homelab-api/config/env/Env") {}
@@ -142,3 +154,15 @@ export const chromeExecutable = Env.pipe(Effect.map((_) => _.chromeExecutable))
 
 /** {@inheritDoc EnvDef.resumeSiteUrl} */
 export const resumeSiteUrl = Env.pipe(Effect.map((_) => _.resumeSiteUrl))
+
+/** {@inheritDoc EnvDef.openRouterApiKeyFile} */
+export const openRouterApiKeyFile = Env.pipe(Effect.map((_) => _.openRouterApiKeyFile))
+
+/** {@inheritDoc EnvDef.openRouterModel} */
+export const openRouterModel = Env.pipe(Effect.map((_) => _.openRouterModel))
+
+/** {@inheritDoc EnvDef.openRouterCleanupModel} */
+export const openRouterCleanupModel = Env.pipe(Effect.map((_) => _.openRouterCleanupModel))
+
+/** {@inheritDoc EnvDef.openRouterBaseUrl} */
+export const openRouterBaseUrl = Env.pipe(Effect.map((_) => _.openRouterBaseUrl))

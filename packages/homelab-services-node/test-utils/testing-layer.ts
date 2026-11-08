@@ -22,6 +22,7 @@ const TestConfigProvider = ConfigProvider.layer(
     INTERMEDIATE_CERT_CRT: path.join(privateDir, "intermediate.crt"),
     KANIDM_OPENID_PROVIDER_URL: "https://kanidm.test/oauth2/openid/test/.well-known/openid-configuration",
     SERIAL_NUMBERS_FILE: path.join(privateDir, "serial-numbers.json"),
+    OPENROUTER_API_KEY_FILE: path.join(privateDir, "openrouter-key"),
   }),
 )
 
@@ -51,6 +52,13 @@ const TestEnvLive = Layer.effect(
       Config.schema(Schema.URLFromString, "RESUME_SITE_URL"),
       new URL("https://resume.rae-hill.dev"),
     ),
+    openRouterApiKeyFile: Config.option(Config.String("OPENROUTER_API_KEY_FILE")),
+    openRouterModel: Config.withDefault(Config.String("OPENROUTER_MODEL"), "test-model"),
+    openRouterCleanupModel: Config.withDefault(Config.String("OPENROUTER_CLEANUP_MODEL"), "test-cleanup-model"),
+    openRouterBaseUrl: Config.withDefault(
+      Config.schema(Schema.URLFromString, "OPENROUTER_BASE_URL"),
+      new URL("https://openrouter.ai/api/v1"),
+    ),
   }),
 ).pipe(Layer.provide(TestConfigProvider))
 
@@ -78,6 +86,10 @@ export const makeTestEnvWithFlags = (
     serialNumbersFile: Option.some(path.join(privateDir, "serial-numbers.json")),
     chromeExecutable: Option.none(),
     resumeSiteUrl: new URL("https://resume.test"),
+    openRouterApiKeyFile: Option.some(path.join(privateDir, "openrouter-key")),
+    openRouterModel: "test-model",
+    openRouterCleanupModel: "test-cleanup-model",
+    openRouterBaseUrl: new URL("https://openrouter.ai/api/v1"),
   })
 
 const TestRemoteOIDCWellKnownDetails = Layer.succeed(

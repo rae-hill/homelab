@@ -1,6 +1,17 @@
 import { Array, Cause, Config, Formatter, Inspectable, Layer, Logger, References } from "effect"
 import { match } from "ts-pattern"
 
+/** Regex matching sensitive key names that should be redacted in logs. */
+const SENSITIVE_KEY_PATTERN = /authorization|api[_-]?key|secret|bearer/i
+
+/** Redact sensitive values in log annotations to prevent credential leakage. */
+const redactSensitiveValue = (key: string, value: unknown): unknown => {
+  if (SENSITIVE_KEY_PATTERN.test(key)) {
+    return "[REDACTED]"
+  }
+  return value
+}
+
 export const structureLogMessage = (u: unknown): unknown => {
   switch (typeof u) {
     case "bigint":
@@ -46,7 +57,7 @@ export const jsonLogger = Logger.make<unknown, unknown>(
 
     const annotations = fiber.getRef(References.CurrentLogAnnotations)
     for (const [k, v] of Object.entries(annotations)) {
-      annotationsObj[k] = structureLogMessage(v)
+      annotationsObj[k] = structureLogMessage(redactSensitiveValue(k, v))
     }
 
     const spans = fiber.getRef(References.CurrentLogSpans)
