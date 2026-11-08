@@ -1,6 +1,9 @@
+import { Effect, Option } from "effect"
+import { Services } from "homelab-services"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-import { DEFAULT_PRESET_NAME, PRINT_CONFIG_PRESETS_LOCAL_STORAGE_KEY } from "../../constants/print-config.constants"
+import { DEFAULT_PRESET_NAME } from "../../constants/print-config.constants"
+import { runBrowser } from "../services"
 import { decodeBase64Config, encodeBase64Config } from "./persistence"
 import { printConfigActions as A } from "./slice"
 import { useAppDispatch, useAppSelector } from "./store"
@@ -262,36 +265,15 @@ export function useConfigIO() {
   )
 }
 
-/** A saved preset: a name plus the base64-encoded config, and whether it's built-in. */
+/** A single preset entry with name, base64-encoded config, and whether it's built-in */
 export interface PresetEntry {
-  readonly name: string
-  readonly base64: string
-  readonly builtIn: boolean
-}
-
-function readPresetRecord(): Record<string, string> {
-  try {
-    const raw = window.localStorage.getItem(PRINT_CONFIG_PRESETS_LOCAL_STORAGE_KEY)
-    if (raw === null) {
-      return {}
-    }
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== "object" || parsed === null) {
-      return {}
-    }
-    // Keep only string→string entries.
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).filter(
-        ([, v]) => typeof v === "string",
-      ) as Array<[string, string]>,
-    )
-  } catch {
-    return {}
-  }
+  name: string
+  base64: string
+  builtIn: boolean
 }
 
 /**
- * Named presets stored in localStorage, plus a built-in read-only **Default** preset
+ * Named presets stored via PresetSnapshotService, plus a built-in read-only **Default** preset
  * (the `initialPrintConfigState`) that always appears first and is the Reset target.
  * Saving under the reserved name "Default" is rejected.
  */
@@ -301,19 +283,20 @@ export function usePresets() {
 
   // Load once on mount (client-only; SSR renders with the built-in Default only).
   useEffect(() => {
-    setRecord(readPresetRecord())
-  }, [])
-
-  const persist = useCallback((next: Record<string, string>) => {
-    setRecord(next)
-    try {
-      window.localStorage.setItem(
-        PRINT_CONFIG_PRESETS_LOCAL_STORAGE_KEY,
-        JSON.stringify(next),
-      )
-    } catch {
-      // best-effort
-    }
+    void runBrowser(
+      Effect.gen(function*() {
+        const service = yield* Services.PresetSnapshotService.PresetSnapshotService
+        const names = yield* service.list()
+        const loaded: Record<string, string> = {}
+        for (const name of names) {
+          const result = yield* service.recall(name)
+          if (Option.isSome(result)) {
+            loaded[name] = result.value
+          }
+        }
+        setRecord(loaded)
+      }),
+    )
   }, [])
 
   /** Built-in Default first, then user presets alphabetically. */
@@ -336,10 +319,22 @@ export function usePresets() {
       if (trimmed === "" || trimmed === DEFAULT_PRESET_NAME) {
         return false
       }
-      persist({ ...record, [trimmed]: encodeBase64Config(state) })
+      const base64 = encodeBase64Config(state)
+      void runBrowser(
+        Effect.gen(function*() {
+          const service = yield* Services.PresetSnapshotService.PresetSnapshotService
+          const result = yield* Effect.match(service.save(trimmed, base64), {
+            onFailure: () => null,
+            onSuccess: (finalName) => finalName,
+          })
+          if (result !== null) {
+            setRecord((prev) => ({ ...prev, [result]: base64 }))
+          }
+        }),
+      )
       return true
     },
-    [record, persist],
+    [],
   )
 
   const remove = useCallback(
@@ -347,11 +342,19 @@ export function usePresets() {
       if (name === DEFAULT_PRESET_NAME) {
         return
       }
-      const next = { ...record }
-      delete next[name]
-      persist(next)
+      void runBrowser(
+        Effect.gen(function*() {
+          const service = yield* Services.PresetSnapshotService.PresetSnapshotService
+          yield* service.remove(name)
+          setRecord((prev) => {
+            const next = { ...prev }
+            delete next[name]
+            return next
+          })
+        }),
+      )
     },
-    [record, persist],
+    [],
   )
 
   /** Recall a preset into the store (preserving `editingEnabled`). Returns success. */

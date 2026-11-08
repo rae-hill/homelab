@@ -22,6 +22,8 @@
     "@tanstack/react-router": "1.170.46",
     "effect": "4.1.2",
     "homelab-api": "workspace:*",
+    "homelab-services": "workspace:*",
+    "homelab-services-browser": "workspace:*",
     "next-themes": "^0.4.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -1,7 +1,10 @@
 import { Effect } from "effect"
+import { Services } from "homelab-services"
 import { type ReactNode, useEffect, useRef } from "react"
 import { Provider } from "react-redux"
 
+import { runBrowser } from "../services"
+import { tailorActions } from "../tailor/slice"
 import { decodeBase64Config, parsePersisted, persistableSnapshot, PRINT_CONFIG_LOCAL_STORAGE_KEY } from "./persistence"
 import { printConfigActions } from "./slice"
 import { type AppStore, makeStore } from "./store"
@@ -62,7 +65,7 @@ export function PrintConfigProvider({ children }: PrintConfigProviderProps) {
     }
 
     // Persist on every subsequent change.
-    const unsubscribe = store.subscribe(() => {
+    const unsubscribePrintConfig = store.subscribe(() => {
       try {
         window.localStorage.setItem(
           PRINT_CONFIG_LOCAL_STORAGE_KEY,
@@ -70,6 +73,30 @@ export function PrintConfigProvider({ children }: PrintConfigProviderProps) {
         )
       } catch {
         // Ignore quota / unavailable-storage errors — persistence is best-effort.
+      }
+    })
+
+    // Hydrate tailor entries from the service.
+    void runBrowser(
+      Effect.gen(function*() {
+        const entryStore = yield* Services.TailorEntryStoreService.TailorEntryStoreService
+        const entries = yield* entryStore.load()
+        store.dispatch(tailorActions.hydrate({ entries, detailEntryId: null }))
+      }),
+    )
+
+    // Persist tailor entries on every subsequent change (write-through via the service).
+    let previousTailorEntries = store.getState().tailor.entries
+    const unsubscribeTailor = store.subscribe(() => {
+      const currentEntries = store.getState().tailor.entries
+      if (currentEntries !== previousTailorEntries) {
+        previousTailorEntries = currentEntries
+        void runBrowser(
+          Effect.gen(function*() {
+            const entryStore = yield* Services.TailorEntryStoreService.TailorEntryStoreService
+            yield* entryStore.save(currentEntries)
+          }),
+        )
       }
     })
 
@@ -90,7 +117,10 @@ export function PrintConfigProvider({ children }: PrintConfigProviderProps) {
       ),
     )
 
-    return unsubscribe
+    return () => {
+      unsubscribePrintConfig()
+      unsubscribeTailor()
+    }
   }, [store])
 
   return <Provider store={store}>{children}</Provider>
