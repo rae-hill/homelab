@@ -84,6 +84,10 @@ export const jsonConsoleLogger = jsonLogger.pipe(
   Logger.withLeveledConsole,
 )
 
+// Logger.layer REPLACES the default logger set, and the default set includes
+// `Logger.tracerLogger` — the logger that turns `Effect.log*` messages into OTel span
+// events. Without it explicitly listed here, no log text is ever attached to spans and
+// Tempo's span "Logs" sections stay empty. Keep it in every branch.
 export const LoggerLive = Layer.unwrap(
   Config.option(Config.Literals(["JSON", "pretty"], "LOG_STYLE"))
     .pipe(
@@ -93,11 +97,11 @@ export const LoggerLive = Layer.unwrap(
             .with(
               { _tag: "None" },
               { _tag: "Some", value: "JSON" },
-              () => Logger.layer([jsonConsoleLogger]),
+              () => Logger.layer([jsonConsoleLogger, Logger.tracerLogger]),
             )
             .with(
               { _tag: "Some", value: "pretty" },
-              () => Logger.layer([Logger.consolePretty()]),
+              () => Logger.layer([Logger.consolePretty(), Logger.tracerLogger]),
             )
             .exhaustive(),
       ),

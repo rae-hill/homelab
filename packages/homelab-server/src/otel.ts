@@ -36,14 +36,24 @@ class RedactingSpanProcessor implements SpanProcessor {
 
   onEnd(span: ReadableSpan): void {
     // Redact sensitive attributes before passing to inner processor
-    const originalAttributes = span.attributes
-    const redactedAttributes = redactSpanAttributes(originalAttributes as Record<string, any>)
+    const redactedAttributes = redactSpanAttributes(span.attributes as Record<string, any>)
 
-    // Create a wrapper that returns redacted attributes
+    // Span events carry Effect log annotations (via Logger.tracerLogger) — redact those
+    // too so log-derived events cannot leak credentials into Tempo.
+    const redactedEvents = span.events.map((event) =>
+      event.attributes === undefined
+        ? event
+        : { ...event, attributes: redactSpanAttributes(event.attributes as Record<string, any>) }
+    )
+
+    // Create a wrapper that returns redacted attributes/events
     const wrappedSpan = new Proxy(span, {
       get(target, prop) {
         if (prop === "attributes") {
           return redactedAttributes
+        }
+        if (prop === "events") {
+          return redactedEvents
         }
         const value = (target as any)[prop]
         return typeof value === "function" ? value.bind(target) : value
