@@ -21,7 +21,7 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite) | `5e45edd1782a` |
 | T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                             | `1f1b8e76b862` |
 | T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **partial done** (§§2,4,5,7 committed; §1 owner sops edit + §3 augustus wiring deferred)              | `f5f02a6fd9b9` |
-| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | planned                                                                                               | —              |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)       | `7900cdab4a17` |
 | T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                              | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
@@ -61,6 +61,36 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   Configurable internals = parameters of a `makeXService(...)` layer factory with defaults
   (see `tailor-quota-service.ts`). Applies to ALL services incl. browser ones.
 - Formatters run automatically via the harness — never manually; commits use `--no-verify`.
+
+## Open items (prioritized — the work queue for the next session)
+
+1. **OWNER — sops secret:** `sops edit nix-config/secrets/augustus.yaml` → add
+   `homelab_api_openrouter_key` (the `sk-or-v1-…` value). Agents are DENIED sops. Then the 2-line
+   augustus wiring lands (exact lines in doc 05 §3): `sops.secrets.homelab_api_openrouter_key =
+   { owner = "homelab-api"; group = "homelab-api"; };` in `_private/augustus/sops.nix` +
+   `openRouterApiKeyFile = config.sops.secrets.homelab_api_openrouter_key.path;` in
+   `_private/augustus/programs.nix`. Until then the feature is dark (absent key → clean
+   TailorError; hosts boot fine).
+2. **OWNER — model slugs (README OQ1):** code defaults are `"TBD/stage2-model"` /
+   `"TBD/stage1-model"` (`packages/homelab-server/src/env.ts`) — live calls fail until real slugs
+   are set via `OPENROUTER_MODEL` / `OPENROUTER_CLEANUP_MODEL`. Decide: env-template lines in
+   `systemd-service.nix` (doc 05 §2 pattern) vs real code defaults. Pin dated slugs, never aliases.
+3. **Live smoke (needs 1+2):** `RUN_TAILOR_LIVE=1` on the e2e tailor test, or paste a real listing
+   in the UI. Review quality against doc 02 §I (injection + poor-fit are the regression-critical
+   evals). Tune prompts if needed — bump `promptVersion` (layers/tailor/prompts.ts) when you do.
+4. **Manual browser check of the Tailoring tab** (no headless UI test in v1): tab visible; submit
+   gated when signed out; pending entry → success; auto-apply + "Pre-tailor: …" preset snapshot
+   toast; details modal (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe
+   editable in Heading tab and rendering on the resume; print output contains no tailor data.
+5. **Deploy (needs 1–4):** everything committed → deploy augustus (dirty-tree guard requires it)
+   → doc 05 Test Plan smoke steps 3–7, including the redaction grep
+   (`journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0).
+6. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
+   point"); doc 06 stretch phase — postgres persistence + category-keyed bases + cache decorator
+   (owner wants to do persistence together); "update entry from current content" nicety (README
+   OQ4); frozen-base registry mechanics (doc 01 §B — only needed when defaults change);
+   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change); kanidm
+   dedicated `resume.tailoring` group (doc 05 OQ1 — only if print/tailor ACLs must diverge).
 
 ## Session log
 
@@ -137,10 +167,19 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   (D7 plain centered Dialog after the settings sheet), auto-apply flow (pre-save suffix snapshot →
   applyTailoredContent), requestTailor (typed client, Bearer id_token), blurb/aboutMe render from
   state + Heading-tab editors, RESUME_TAILOR_ROLE. Full gate green incl. resume vite build.
-- **nix hashes refreshed** (qwen3.8-flash): fetchYarnBerryDeps sha256 updated in homelab-api,
-  homelab-ui, AND resume-site package.nix (lockfile changed in T7); `nix build .#homelab-api` +
-  `.#homelab-ui` green.
-- **Remaining:** T9 finish (owner `sops edit` + 2-line augustus wiring — exact lines in doc 05
-  report/§3), T10 (run e2e: delete stale `packages/homelab-server/private/api-keys.json` first so
-  stage-e2e-secrets regenerates it WITH Resume_Tailor), owner picks model slugs, manual browser
-  check of the Tailoring tab, deploy-time smoke per doc 05 Test Plan.
+- **nix hashes refreshed** (`f54fdb6b7aeb`, qwen3.8-flash): fetchYarnBerryDeps sha256 updated in
+  homelab-api, homelab-ui, AND resume-site package.nix (lockfile changed in T7);
+  `nix build .#homelab-api` + `.#homelab-ui` + `.#resume-site` all green.
+- **T10 done / e2e unblocked** (`7900cdab4a17`): first `e2e src/resume` hung forever in the
+  health-check loop. Winning diagnosis: kill the tree, boot the bundled server MANUALLY
+  (`export HOMELAB_COMMIT_HASH=$(git rev-parse HEAD)` — e2e.sh normally sets it — then
+  `dotenvx run -f .env-serve-test -- node dist/bundle/main.js` from packages/homelab-server) →
+  instant crash surfaced: `_.Agent is not a constructor`. Root cause: the T4–T6
+  `OpenRouterClientServiceLive` piped `NodeHttpClient.layerUndici`; `undici` is NOT installed and
+  rolldown evaluates the dispatcher module eagerly → bundled server died at boot. Unit tests
+  missed it (they stub the client service). Fix: dropped the provision — `HttpClient.HttpClient`
+  bubbles to main.ts's global FetchHttpClient (house pattern, restores filterStatusOk). Also:
+  deleted stale `private/api-keys.json` (predated Resume_Tailor; stage script is idempotent —
+  ALWAYS regenerate after role-contract changes). Results: `e2e src/resume` 9✓+1 skip (live-AI
+  gated); FULL `e2e` suite 15 files, 112✓+1 skip, exit 0.
+- **Remaining (owner + polish):** see "Open items" below and `next-agent-prompt.md`.
