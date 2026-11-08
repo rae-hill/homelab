@@ -7,6 +7,13 @@ export const BASE_KEY = "plato-splunk.services.homelab-api"
  */
 export const RESUME_PRINT_ROLE = "Resume_Print"
 
+/**
+ * The kanidm claim-map role (and homelab-server resource URI) required to tailor resumes
+ * via `POST /resume/tailor`. Granted by the `resume.printing` kanidm group's claim map
+ * (nix-config/modules/features/homelab-api/oidc.nix → claimMaps.roles, Option A per doc 05 §5).
+ */
+export const RESUME_TAILOR_ROLE = "Resume_Tailor"
+
 export const JWT_ROLES_KEY = "roles"
 
 export const JWT_HOMELAB_API_AUD = `homelab`

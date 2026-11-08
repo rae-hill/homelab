@@ -12,6 +12,7 @@ import {
   Switch,
   Tabs,
   Text,
+  Textarea,
   VStack,
 } from "@chakra-ui/react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
@@ -38,6 +39,7 @@ import {
   LuFolderGit2,
   LuShare2,
   LuUserRound,
+  LuWand,
   LuX,
 } from "react-icons/lu"
 
@@ -45,6 +47,7 @@ import { MdOutlineVisibility } from "react-icons/md"
 import { useKonamiCode } from "../hooks/useKonamiCode"
 import { useResizableHeight } from "../hooks/useResizableHeight"
 import {
+  useContent,
   useEditingEnabled,
   useFeaturedMode,
   useHeadingConfig,
@@ -73,6 +76,8 @@ import type {
 import { Tooltip } from "./chakra/tooltip"
 import { PresetsPanel, SharePanel } from "./config-io"
 import { ContentEditor, ContentSubsectionDivider } from "./content-editor"
+import { ListingDetailModal } from "./tailoring/listing-detail-modal"
+import { TailoringTab } from "./tailoring/tailoring-tab"
 
 /** Query-string flag controlling whether the settings modal is open. */
 const OPEN_QUERY_PARAM = "print-options-open"
@@ -81,7 +86,7 @@ const OPEN_QUERY_PARAM = "print-options-open"
 const TAB_QUERY_PARAM = "print-options-tab"
 
 /** Valid settings tabs; also the default (first) when the param is absent/invalid. */
-const TABS = ["print", "heading", "experience", "projects", "presets", "share"] as const
+const TABS = ["print", "heading", "experience", "projects", "presets", "share", "tailoring"] as const
 type SettingsTab = (typeof TABS)[number]
 
 interface ToggleItem {
@@ -618,6 +623,7 @@ export function PrintConfigFab({
     setHeadingNameAlign,
   } = useHeadingConfig()
   const { editingEnabled, setEditingEnabled } = useEditingEnabled()
+  const { content, setAboutMe, setBlurb } = useContent()
   const reset = useResetPrintConfig()
 
   // Per-section config, keyed for the two SectionControls panels.
@@ -694,247 +700,277 @@ export function PrintConfigFab({
   const hidePrint = { "@media print": { display: "none" } }
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(details) => setOpen(details.open)}
-      placement="bottom"
-      motionPreset="slide-in-bottom"
-      scrollBehavior="inside"
-    >
-      <Tooltip
-        showArrow
-        openDelay={200}
-        closeDelay={100}
-        positioning={{ placement: "top" }}
-        content={editingEnabled ? "Tweak resume" : "You need a cheatcode for this feature"}
-        contentProps={{ css: hidePrint }}
+    <>
+      <Dialog.Root
+        open={open}
+        onOpenChange={(details) => setOpen(details.open)}
+        placement="bottom"
+        motionPreset="slide-in-bottom"
+        scrollBehavior="inside"
       >
-        <IconButton
-          css={{
-            ...hidePrint,
-            "&[aria-disabled=\"true\"]": { opacity: 0.5, cursor: "not-allowed" },
-          }}
-          zIndex="docked"
-          aria-label="settings"
-          position="fixed"
-          left={left}
-          bottom={bottom}
-          rounded="full"
-          size="xl"
-          shadow="lg"
-          colorPalette="teal"
-          // Use `aria-disabled` rather than the native `disabled` attribute so the button
-          // still receives hover events and the "cheatcode" tooltip shows while locked.
-          aria-disabled={!editingEnabled}
-          // The dialog is controlled (open / onOpenChange), so we open it directly here
-          // instead of via Dialog.Trigger — a Trigger wrapped around the Tooltip wrapper
-          // loses its click handler, which previously made the button unresponsive.
-          onClick={() => {
-            if (editingEnabled) {
-              setOpen(true)
-            }
-          }}
+        <Tooltip
+          showArrow
+          openDelay={200}
+          closeDelay={100}
+          positioning={{ placement: "top" }}
+          content={editingEnabled ? "Tweak resume" : "You need a cheatcode for this feature"}
+          contentProps={{ css: hidePrint }}
         >
-          <CiSettings />
-        </IconButton>
-      </Tooltip>
-      <Portal>
-        <Dialog.Backdrop css={hidePrint} bg="transparent" backdropFilter="none" />
-        <Dialog.Positioner css={hidePrint}>
-          <Dialog.Content
-            ref={resizeRef}
-            w="100dvw"
-            maxW="100dvw"
-            h={{ base: "100dvh", md: "40dvh" }}
-            m={0}
-            borderBottomRadius={0}
-            borderTopRadius={{ base: 0, md: "l3" }}
-            display="flex"
-            flexDirection="column"
-            bg="bg.panel/60"
-            backdropFilter="blur(8px)"
+          <IconButton
+            css={{
+              ...hidePrint,
+              "&[aria-disabled=\"true\"]": { opacity: 0.5, cursor: "not-allowed" },
+            }}
+            zIndex="docked"
+            aria-label="settings"
+            position="fixed"
+            left={left}
+            bottom={bottom}
+            rounded="full"
+            size="xl"
+            shadow="lg"
+            colorPalette="teal"
+            // Use `aria-disabled` rather than the native `disabled` attribute so the button
+            // still receives hover events and the "cheatcode" tooltip shows while locked.
+            aria-disabled={!editingEnabled}
+            // The dialog is controlled (open / onOpenChange), so we open it directly here
+            // instead of via Dialog.Trigger — a Trigger wrapped around the Tooltip wrapper
+            // loses its click handler, which previously made the button unresponsive.
+            onClick={() => {
+              if (editingEnabled) {
+                setOpen(true)
+              }
+            }}
           >
-            {
-              /* Drag bar: pointer-drag to resize the panel height (imperative, no state).
-                `touchAction: none` keeps the gesture from scrolling on touch devices. */
-            }
-            <Box
-              {...handleProps}
-              css={hidePrint}
-              flexShrink={0}
+            <CiSettings />
+          </IconButton>
+        </Tooltip>
+        <Portal>
+          <Dialog.Backdrop css={hidePrint} bg="transparent" backdropFilter="none" />
+          <Dialog.Positioner css={hidePrint}>
+            <Dialog.Content
+              ref={resizeRef}
+              w="100dvw"
+              maxW="100dvw"
+              h={{ base: "100dvh", md: "40dvh" }}
+              m={0}
+              borderBottomRadius={0}
+              borderTopRadius={{ base: 0, md: "l3" }}
               display="flex"
-              justifyContent="center"
-              alignItems="center"
-              h={5}
-              cursor="ns-resize"
-              style={{ touchAction: "none" }}
+              flexDirection="column"
+              bg="bg.panel/60"
+              backdropFilter="blur(8px)"
             >
-              <Box w={10} h="4px" borderRadius="full" bg="fg.muted" opacity={0.5} />
-            </Box>
-            <Dialog.Header pt={1}>
-              <Dialog.Title>Settings</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body flex="1" minH={0}>
-              <Tabs.Root
-                value={tab}
-                onValueChange={(details) => setTab(details.value)}
-                h="full"
+              {
+                /* Drag bar: pointer-drag to resize the panel height (imperative, no state).
+                `touchAction: none` keeps the gesture from scrolling on touch devices. */
+              }
+              <Box
+                {...handleProps}
+                css={hidePrint}
+                flexShrink={0}
                 display="flex"
-                flexDirection="column"
+                justifyContent="center"
+                alignItems="center"
+                h={5}
+                cursor="ns-resize"
+                style={{ touchAction: "none" }}
               >
-                <Tabs.List
-                  flexShrink={0}
-                  overflowX="auto"
-                  overflowY="hidden"
-                  css={{
-                    // Single scrollable row on narrow (mobile) screens instead of wrapping
-                    // or overflowing; triggers keep their size, the row scrolls sideways.
-                    "& button": { flexShrink: 0 },
-                    scrollbarWidth: "none",
-                    "&::-webkit-scrollbar": { display: "none" },
-                  }}
+                <Box w={10} h="4px" borderRadius="full" bg="fg.muted" opacity={0.5} />
+              </Box>
+              <Dialog.Header pt={1}>
+                <Dialog.Title>Settings</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body flex="1" minH={0}>
+                <Tabs.Root
+                  value={tab}
+                  onValueChange={(details) => setTab(details.value)}
+                  h="full"
+                  display="flex"
+                  flexDirection="column"
                 >
-                  <Tabs.Trigger value="print">
-                    <Icon as={MdOutlineVisibility} />
-                    Visibility
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="heading">
-                    <Icon as={LuUserRound} />
-                    Heading
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="experience">
-                    <Icon as={LuBriefcase} />
-                    Experience
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="projects">
-                    <Icon as={LuFolderGit2} />
-                    Projects
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="presets">
-                    <Icon as={LuBookmark} />
-                    Presets
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="share">
-                    <Icon as={LuShare2} />
-                    Share
-                  </Tabs.Trigger>
-                  <Tabs.Indicator />
-                </Tabs.List>
-                <Box flex="1" minH={0} overflowY="auto" pt={4}>
-                  <Tabs.Content value="print" mt={0}>
-                    <VStack align="stretch" gap={6}>
-                      <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={4} w="full">
-                        {TOGGLE_ITEMS.map(({ description, key, label }) => (
-                          <Stack key={key} gap={1}>
-                            <Switch.Root
-                              checked={toggles[key]}
-                              onCheckedChange={() => toggleOption(key)}
-                            >
-                              <Switch.HiddenInput />
-                              <Switch.Control />
-                              <Switch.Label>{label}</Switch.Label>
-                            </Switch.Root>
-                            <Text m={0} textStyle="xs" color="fg.muted">
-                              {description}
-                            </Text>
-                          </Stack>
-                        ))}
-                      </SimpleGrid>
-                      <Field label="Show Featured">
-                        <TextSegment
-                          value={featuredMode}
-                          options={FEATURED_MODES}
-                          onChange={(mode) => setFeaturedMode(mode)}
+                  <Tabs.List
+                    flexShrink={0}
+                    overflowX="auto"
+                    overflowY="hidden"
+                    css={{
+                      // Single scrollable row on narrow (mobile) screens instead of wrapping
+                      // or overflowing; triggers keep their size, the row scrolls sideways.
+                      "& button": { flexShrink: 0 },
+                      scrollbarWidth: "none",
+                      "&::-webkit-scrollbar": { display: "none" },
+                    }}
+                  >
+                    <Tabs.Trigger value="print">
+                      <Icon as={MdOutlineVisibility} />
+                      Visibility
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="heading">
+                      <Icon as={LuUserRound} />
+                      Heading
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="experience">
+                      <Icon as={LuBriefcase} />
+                      Experience
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="projects">
+                      <Icon as={LuFolderGit2} />
+                      Projects
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="presets">
+                      <Icon as={LuBookmark} />
+                      Presets
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="share">
+                      <Icon as={LuShare2} />
+                      Share
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="tailoring">
+                      <Icon as={LuWand} />
+                      Tailoring
+                    </Tabs.Trigger>
+                    <Tabs.Indicator />
+                  </Tabs.List>
+                  <Box flex="1" minH={0} overflowY="auto" pt={4}>
+                    <Tabs.Content value="print" mt={0}>
+                      <VStack align="stretch" gap={6}>
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={4} w="full">
+                          {TOGGLE_ITEMS.map(({ description, key, label }) => (
+                            <Stack key={key} gap={1}>
+                              <Switch.Root
+                                checked={toggles[key]}
+                                onCheckedChange={() => toggleOption(key)}
+                              >
+                                <Switch.HiddenInput />
+                                <Switch.Control />
+                                <Switch.Label>{label}</Switch.Label>
+                              </Switch.Root>
+                              <Text m={0} textStyle="xs" color="fg.muted">
+                                {description}
+                              </Text>
+                            </Stack>
+                          ))}
+                        </SimpleGrid>
+                        <Field label="Show Featured">
+                          <TextSegment
+                            value={featuredMode}
+                            options={FEATURED_MODES}
+                            onChange={(mode) => setFeaturedMode(mode)}
+                          />
+                        </Field>
+                      </VStack>
+                    </Tabs.Content>
+                    <Tabs.Content value="heading" mt={0}>
+                      <HeadingControls
+                        iconTextSize={heading.iconTextSize}
+                        gap={heading.gap}
+                        contactGap={heading.contactGap}
+                        skillListGap={heading.skillListGap}
+                        nameAlign={heading.nameAlign}
+                        contactAlign={heading.contactAlign}
+                        description={heading.description}
+                        onIconTextSizeChange={setHeadingIconTextSize}
+                        onGapChange={setHeadingGap}
+                        onNameAlignChange={setHeadingNameAlign}
+                        onContactAlignChange={setHeadingContactAlign}
+                        onDescriptionKindChange={setHeadingDescriptionKind}
+                        onDescriptionChange={setHeadingDescription}
+                      />
+                      {editingEnabled && (
+                        <VStack align="stretch" gap={4} mt={6}>
+                          <Field label="Blurb">
+                            <Textarea
+                              value={content.blurb}
+                              onChange={(e) => setBlurb(e.target.value)}
+                              rows={4}
+                              placeholder="Personal summary shown in the header blurb mode..."
+                            />
+                          </Field>
+                          <Field label="About Me">
+                            <Textarea
+                              value={content.aboutMe}
+                              onChange={(e) => setAboutMe(e.target.value)}
+                              rows={6}
+                              placeholder="About Me section content..."
+                            />
+                          </Field>
+                        </VStack>
+                      )}
+                    </Tabs.Content>
+                    <Tabs.Content value="experience" mt={0}>
+                      <VStack w="full" align="stretch" gap={0}>
+                        <SectionControls
+                          section="experience"
+                          config={sections.experience}
+                          onKindChange={setLayoutKind}
+                          onLayoutChange={setLayout}
+                          onTextAlignChange={setTextAlign}
+                          onBlockAlignChange={setBlockAlign}
+                          onGapChange={setGap}
+                          onTagDisplayChange={setTagDisplay}
                         />
-                      </Field>
-                    </VStack>
-                  </Tabs.Content>
-                  <Tabs.Content value="heading" mt={0}>
-                    <HeadingControls
-                      iconTextSize={heading.iconTextSize}
-                      gap={heading.gap}
-                      contactGap={heading.contactGap}
-                      skillListGap={heading.skillListGap}
-                      nameAlign={heading.nameAlign}
-                      contactAlign={heading.contactAlign}
-                      description={heading.description}
-                      onIconTextSizeChange={setHeadingIconTextSize}
-                      onGapChange={setHeadingGap}
-                      onNameAlignChange={setHeadingNameAlign}
-                      onContactAlignChange={setHeadingContactAlign}
-                      onDescriptionKindChange={setHeadingDescriptionKind}
-                      onDescriptionChange={setHeadingDescription}
-                    />
-                  </Tabs.Content>
-                  <Tabs.Content value="experience" mt={0}>
-                    <VStack w="full" align="stretch" gap={0}>
-                      <SectionControls
-                        section="experience"
-                        config={sections.experience}
-                        onKindChange={setLayoutKind}
-                        onLayoutChange={setLayout}
-                        onTextAlignChange={setTextAlign}
-                        onBlockAlignChange={setBlockAlign}
-                        onGapChange={setGap}
-                        onTagDisplayChange={setTagDisplay}
-                      />
-                      <ContentSubsectionDivider />
-                      <ContentEditor section="experience" />
-                    </VStack>
-                  </Tabs.Content>
-                  <Tabs.Content value="projects" mt={0}>
-                    <VStack w="full" align="stretch" gap={0}>
-                      <SectionControls
-                        section="projects"
-                        config={sections.projects}
-                        onKindChange={setLayoutKind}
-                        onLayoutChange={setLayout}
-                        onTextAlignChange={setTextAlign}
-                        onBlockAlignChange={setBlockAlign}
-                        onGapChange={setGap}
-                        onTagDisplayChange={setTagDisplay}
-                      />
-                      <ContentSubsectionDivider />
-                      <ContentEditor section="projects" />
-                    </VStack>
-                  </Tabs.Content>
-                  <Tabs.Content value="presets" mt={0}>
-                    <PresetsPanel />
-                  </Tabs.Content>
-                  <Tabs.Content value="share" mt={0}>
-                    <SharePanel />
-                  </Tabs.Content>
-                </Box>
-              </Tabs.Root>
-            </Dialog.Body>
-            <Dialog.Footer justifyContent="space-between">
-              <Button variant="outline" colorPalette="red" onClick={reset}>
-                Reset
-              </Button>
-              <HStack gap={3}>
-                <Button variant="outline" onClick={() => setOpen(false)}>
-                  Cancel
+                        <ContentSubsectionDivider />
+                        <ContentEditor section="experience" />
+                      </VStack>
+                    </Tabs.Content>
+                    <Tabs.Content value="projects" mt={0}>
+                      <VStack w="full" align="stretch" gap={0}>
+                        <SectionControls
+                          section="projects"
+                          config={sections.projects}
+                          onKindChange={setLayoutKind}
+                          onLayoutChange={setLayout}
+                          onTextAlignChange={setTextAlign}
+                          onBlockAlignChange={setBlockAlign}
+                          onGapChange={setGap}
+                          onTagDisplayChange={setTagDisplay}
+                        />
+                        <ContentSubsectionDivider />
+                        <ContentEditor section="projects" />
+                      </VStack>
+                    </Tabs.Content>
+                    <Tabs.Content value="presets" mt={0}>
+                      <PresetsPanel />
+                    </Tabs.Content>
+                    <Tabs.Content value="share" mt={0}>
+                      <SharePanel />
+                    </Tabs.Content>
+                    <Tabs.Content value="tailoring" mt={0}>
+                      <TailoringTab />
+                    </Tabs.Content>
+                  </Box>
+                </Tabs.Root>
+              </Dialog.Body>
+              <Dialog.Footer justifyContent="space-between">
+                <Button variant="outline" colorPalette="red" onClick={reset}>
+                  Reset
                 </Button>
-                <Button colorPalette="teal" onClick={handlePrint}>
-                  Print
-                </Button>
-              </HStack>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger asChild>
-              <IconButton
-                aria-label="close settings"
-                variant="ghost"
-                size="sm"
-                position="absolute"
-                top={2}
-                insetEnd={2}
-              >
-                <LuX />
-              </IconButton>
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+                <HStack gap={3}>
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button colorPalette="teal" onClick={handlePrint}>
+                    Print
+                  </Button>
+                </HStack>
+              </Dialog.Footer>
+              <Dialog.CloseTrigger asChild>
+                <IconButton
+                  aria-label="close settings"
+                  variant="ghost"
+                  size="sm"
+                  position="absolute"
+                  top={2}
+                  insetEnd={2}
+                >
+                  <LuX />
+                </IconButton>
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+      <ListingDetailModal />
+    </>
   )
 }

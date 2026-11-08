@@ -189,6 +189,14 @@ export function useContent() {
     (entryId: string, bulletId: string) => dispatch(A.removeBullet({ entryId, bulletId })),
     [dispatch],
   )
+  const setBlurb = useCallback(
+    (blurb: string) => dispatch(A.setBlurb(blurb)),
+    [dispatch],
+  )
+  const setAboutMe = useCallback(
+    (aboutMe: string) => dispatch(A.setAboutMe(aboutMe)),
+    [dispatch],
+  )
   return useMemo(
     () => ({
       content,
@@ -198,6 +206,8 @@ export function useContent() {
       setBulletText,
       toggleBulletVisible,
       removeBullet,
+      setBlurb,
+      setAboutMe,
     }),
     [
       content,
@@ -207,6 +217,8 @@ export function useContent() {
       setBulletText,
       toggleBulletVisible,
       removeBullet,
+      setBlurb,
+      setAboutMe,
     ],
   )
 }

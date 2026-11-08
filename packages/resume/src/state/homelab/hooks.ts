@@ -36,6 +36,22 @@ export function useCanPrintResume() {
   )
 }
 
+/**
+ * True only when the API is reachable, the user is signed in, and their kanidm `roles`
+ * claim carries `Resume_Tailor` — the gate for the Tailoring tab's Submit button.
+ */
+export function useCanTailorResume() {
+  const auth = useHomelabAuth()
+  const reachability = useHomelabReachability()
+  return useMemo(
+    () =>
+      reachability === "reachable" &&
+      auth.status === "signedIn" &&
+      auth.roles.includes(Constants.RESUME_TAILOR_ROLE),
+    [reachability, auth],
+  )
+}
+
 /** App-mount bootstrap: reachability probe + cached-session restore. Idempotent. */
 export function useHomelabBootstrap() {
   const dispatch = useAppDispatch()
