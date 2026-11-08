@@ -43,7 +43,12 @@ in
             "profile"
             "email"
           ];
-          "resume.printing" = [
+          "homelab.resume.printing" = [
+            "openid"
+            "profile"
+            "email"
+          ];
+          "homelab.resume.tailoring" = [
             "openid"
             "profile"
             "email"
@@ -68,8 +73,10 @@ in
               "Status_Self"
               "OAuth_ClaimCheck"
             ];
-            "resume.printing" = [
+            "homelab.resume.printing" = [
               "Resume_Print"
+            ];
+            "homelab.resume.tailoring" = [
               "Resume_Tailor"
             ];
           };
