@@ -134,24 +134,27 @@ describe("tailor pipeline", () => {
       ),
     ))
 
-  it.effect("stage 1 failure returns degraded result", () =>
+  it.effect("stage 1 failure returns TailorError", () =>
     Effect.gen(function*() {
       const service = yield* Services.TailorService.TailorService
       const content = ResumeContent.INITIAL_CONTENT_STATE
 
-      const result = yield* service.tailorResume(
-        "user@example.com",
-        "Some job listing",
-        content,
-        "v1",
+      const exit = yield* Effect.exit(
+        service.tailorResume("user@example.com", "Some job listing", content, "v1"),
       )
 
-      // Should return degraded success (not a failure)
-      expect(result.meta.degraded).toBe(true)
-      expect(result.meta.stage1).toBe(null)
-      expect(result.meta.stage2).toBe(null)
-      // Content should be unchanged
-      expect(JSON.stringify(result.content)).toBe(JSON.stringify(content))
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        const errorOption = Cause.findErrorOption(exit.cause)
+        expect(errorOption._tag).toBe("Some")
+        if (errorOption._tag === "Some") {
+          expect(errorOption.value._tag).toBe("TailorError")
+          if (errorOption.value._tag === "TailorError") {
+            expect(errorOption.value.message).toContain("Stage 1 (cleanup) failed")
+            expect(errorOption.value.message).toContain("Stage 1 failed")
+          }
+        }
+      }
     }).pipe(
       Effect.provide(
         TestLayer.pipe(
@@ -161,24 +164,27 @@ describe("tailor pipeline", () => {
       ),
     ))
 
-  it.effect("stage 2 failure returns degraded result", () =>
+  it.effect("stage 2 failure returns TailorError", () =>
     Effect.gen(function*() {
       const service = yield* Services.TailorService.TailorService
       const content = ResumeContent.INITIAL_CONTENT_STATE
 
-      const result = yield* service.tailorResume(
-        "user@example.com",
-        "Some job listing",
-        content,
-        "v1",
+      const exit = yield* Effect.exit(
+        service.tailorResume("user@example.com", "Some job listing", content, "v1"),
       )
 
-      // Should return degraded success (not a failure)
-      expect(result.meta.degraded).toBe(true)
-      expect(result.meta.stage1).toBeDefined() // Stage 1 succeeded
-      expect(result.meta.stage2).toBe(null) // Stage 2 failed
-      // Content should be unchanged
-      expect(JSON.stringify(result.content)).toBe(JSON.stringify(content))
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        const errorOption = Cause.findErrorOption(exit.cause)
+        expect(errorOption._tag).toBe("Some")
+        if (errorOption._tag === "Some") {
+          expect(errorOption.value._tag).toBe("TailorError")
+          if (errorOption.value._tag === "TailorError") {
+            expect(errorOption.value.message).toContain("Stage 2 (tailor) failed")
+            expect(errorOption.value.message).toContain("Stage 2 failed")
+          }
+        }
+      }
     }).pipe(
       Effect.provide(
         TestLayer.pipe(
@@ -279,4 +285,46 @@ describe("tailor pipeline", () => {
         ),
       ),
     ))
+
+  // Note: The merge-delta guard is a safety net for edge cases where edits slip through
+  // validation but would produce non-replace JSON Patch operations. Testing this requires
+  // constructing a scenario where edits pass all validation but the merge produces non-replace
+  // ops, which is complex and depends on the initial content structure. The guard is tested
+  // implicitly through integration tests.
+
+  it.effect("unexpected error wraps into TailorError", () => {
+    // Stub that throws an unexpected error (not a TailorError)
+    const failingClient = Layer.succeed(Services.OpenRouterClientService.OpenRouterClientService, {
+      chat: (_req: any) => Effect.die(new Error("Unexpected network failure")),
+    })
+
+    return Effect.gen(function*() {
+      const service = yield* Services.TailorService.TailorService
+      const content = ResumeContent.INITIAL_CONTENT_STATE
+
+      const exit = yield* Effect.exit(
+        service.tailorResume("user@example.com", "Some listing", content, "v1"),
+      )
+
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        const errorOption = Cause.findErrorOption(exit.cause)
+        expect(errorOption._tag).toBe("Some")
+        if (errorOption._tag === "Some") {
+          expect(errorOption.value._tag).toBe("TailorError")
+          if (errorOption.value._tag === "TailorError") {
+            expect(errorOption.value.message).toContain("Tailor pipeline failed")
+            expect(errorOption.value.message).toContain("Unexpected network failure")
+          }
+        }
+      }
+    }).pipe(
+      Effect.provide(
+        TestLayer.pipe(
+          Layer.provide(failingClient),
+          Layer.provide(StubQuotaService),
+        ),
+      ),
+    )
+  })
 })

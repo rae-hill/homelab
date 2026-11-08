@@ -4,6 +4,7 @@ import { createHash } from "node:crypto"
 import { ResumeContent } from "shared"
 import type { ResumeContent as ResumeContentType } from "shared"
 import { runCleanupStage } from "./tailor/cleanup.js"
+import { describeErrorChain } from "./tailor/errors.js"
 import { sanitize, truncate } from "./tailor/hygiene.js"
 import { buildTailorMessages, buildTailorResponseFormat } from "./tailor/prompts.js"
 import {
@@ -62,6 +63,11 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         .update(JSON.stringify(content))
         .digest("hex")
 
+      yield* Effect.logDebug("[tailor] pipeline starting", {
+        listingLength: listing.length,
+        contentHashPrefix: contentHash.slice(0, 12),
+      })
+
       // 1. Hygiene + truncate
       const sanitized = sanitize(listing)
       const { result: hygienedListing, truncated } = truncate(sanitized)
@@ -80,21 +86,26 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         this.openRouterClient,
         hygienedListing,
         this.env.openRouterCleanupModel,
+      ).pipe(
+        Effect.catch((err) =>
+          Effect.flatMap(
+            Effect.logError(`Stage 1 (cleanup) failed: ${describeErrorChain(err)}`),
+            () =>
+              Effect.fail(
+                new Services.TailorService.TailorError({
+                  message: `Stage 1 (cleanup) failed: ${describeErrorChain(err)}`,
+                  error: err,
+                }),
+              ),
+          )
+        ),
       )
 
-      // If stage 1 failed (meta is null), degrade immediately
-      if (stage1Result.meta === null) {
-        yield* Effect.logWarning("[tailor] stage 1 failed, returning degraded result")
-        return this.buildDegradedResult(
-          content,
-          baseVersion,
-          stage1Result.cleanup.jobTitle,
-          stage1Result.cleanup.company,
-          listingHash,
-          contentHash,
-          null,
-        )
-      }
+      yield* Effect.logInfo("Stage 1 (cleanup) succeeded", {
+        model: stage1Result.meta.model,
+        tokens: stage1Result.meta.tokens,
+        latencyMs: stage1Result.meta.latencyMs,
+      })
 
       const cleanedListing = stage1Result.cleanup.cleanedListing
       const jobTitle = stage1Result.cleanup.jobTitle
@@ -105,11 +116,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       const tailorMessages = buildTailorMessages(cleanedListing, content)
       const tailorResponseFormat = buildTailorResponseFormat()
 
-      type Stage2Result =
-        | { edits: TailorEdits; tokens: { input: number; output: number }; latencyMs: number; degraded?: false }
-        | { edits: null; error: unknown; degraded: true }
-
-      const stage2Result: Stage2Result = yield* this.openRouterClient
+      const stage2Result = yield* this.openRouterClient
         .chat({
           model: this.env.openRouterModel,
           messages: tailorMessages,
@@ -124,7 +131,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
               try: () => JSON.parse(response.content) as TailorEdits,
               catch: (error) =>
                 new Services.TailorService.TailorError({
-                  message: "Failed to parse stage 2 output as JSON",
+                  message: `Stage 2 (tailor) output was not valid JSON: ${describeErrorChain(error)}`,
                   error,
                 }),
             }).pipe(
@@ -142,32 +149,25 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
               ),
             )
           }),
-          Effect.catch((error) => {
-            // Stage 2 failed — degrade
-            return Effect.succeed({
-              edits: null,
-              error,
-              degraded: true,
-            } as Stage2Result)
-          }),
+          Effect.catch((err) =>
+            Effect.flatMap(
+              Effect.logError(`Stage 2 (tailor) failed: ${describeErrorChain(err)}`),
+              () =>
+                Effect.fail(
+                  new Services.TailorService.TailorError({
+                    message: `Stage 2 (tailor) failed: ${describeErrorChain(err)}`,
+                    error: err,
+                  }),
+                ),
+            )
+          ),
         )
 
-      // If stage 2 failed, return degraded result
-      if (stage2Result.degraded) {
-        yield* Effect.logWarning("[tailor] stage 2 failed, returning degraded result", {
-          error: stage2Result.error,
-        })
-
-        return this.buildDegradedResult(
-          content,
-          baseVersion,
-          jobTitle,
-          company,
-          listingHash,
-          contentHash,
-          stage1Result.meta,
-        )
-      }
+      yield* Effect.logInfo("Stage 2 (tailor) succeeded", {
+        model: this.env.openRouterModel,
+        tokens: stage2Result.tokens,
+        latencyMs: stage2Result.latencyMs,
+      })
 
       // 5. Validation pipeline
       let edits = stage2Result.edits
@@ -208,21 +208,20 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       // 5f. Keyword coverage (server-side)
       const coverage = computeKeywordCoverage(edits.fit.keywordCoverage.required, mergedContent)
 
-      // 5g. Merge-delta assertion (replace-only)
+      // 5g. Merge-delta assertion (replace-only) — FAIL on non-replace ops
       const patch = ResumeContent.ContentDiffer.diff(content, mergedContent)
-      const hasNonReplaceOps = patch.some((op) => op.op !== "replace")
-      if (hasNonReplaceOps) {
-        yield* Effect.logWarning("[tailor] merge delta contains non-replace ops, degrading", {
-          ops: patch.map((op) => op.op),
+      const nonReplaceOps = patch.filter((op) => op.op !== "replace")
+      if (nonReplaceOps.length > 0) {
+        yield* Effect.logWarning("[tailor] merge delta contains non-replace ops, failing", {
+          ops: nonReplaceOps.map((op) => op.op),
         })
-        return this.buildDegradedResult(
-          content,
-          baseVersion,
-          jobTitle,
-          company,
-          listingHash,
-          contentHash,
-          stage1Result.meta,
+        return yield* Effect.fail(
+          new Services.TailorService.TailorError({
+            message: `Merge-delta guard: model produced non-replace JSON-Patch ops [${
+              nonReplaceOps.map((op) => op.op).join(", ")
+            }] violating the replace-only contract`,
+            error: null,
+          }),
         )
       }
 
@@ -266,72 +265,38 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         schemaVersion,
       }),
       Effect.catch((error) => {
-        // Let TailorQuotaExceeded propagate as a typed error (don't degrade)
-        if (error instanceof Services.TailorService.TailorQuotaExceeded) {
+        // Pass through typed errors unchanged
+        if (
+          error instanceof Services.TailorService.TailorError ||
+          error instanceof Services.TailorService.TailorQuotaExceeded
+        ) {
           return Effect.fail(error)
         }
-        // Degrade for all other errors
+        // Wrap unexpected typed errors
         return Effect.flatMap(
-          Effect.logError("[tailor] pipeline error, degrading", { error }),
+          Effect.logError(`Tailor pipeline failed: ${describeErrorChain(error)}`),
           () =>
-            Effect.succeed(
-              this.buildDegradedResult(
-                content,
-                baseVersion,
-                "Unknown Role",
-                null,
-                createHash("sha256").update(listing).digest("hex"),
-                createHash("sha256").update(JSON.stringify(content)).digest("hex"),
-                null,
-              ),
+            Effect.fail(
+              new Services.TailorService.TailorError({
+                message: `Tailor pipeline failed: ${describeErrorChain(error)}`,
+                error,
+              }),
+            ),
+        )
+      }),
+      Effect.catchDefect((defect) => {
+        // Catch defects (uncaught exceptions) and wrap them
+        return Effect.flatMap(
+          Effect.logError(`Tailor pipeline failed: ${describeErrorChain(defect)}`),
+          () =>
+            Effect.fail(
+              new Services.TailorService.TailorError({
+                message: `Tailor pipeline failed: ${describeErrorChain(defect)}`,
+                error: defect,
+              }),
             ),
         )
       }),
     )
-  }
-
-  private buildDegradedResult(
-    content: ResumeContentType.ContentState,
-    baseVersion: string,
-    jobTitle: string,
-    company: string | null,
-    listingHash: string,
-    contentHash: string,
-    stage1Meta: { model: string; tokens: { input: number; output: number }; latencyMs: number } | null,
-  ): Services.TailorService.TailorResult {
-    return {
-      jobTitle,
-      company,
-      content,
-      baseVersion,
-      fit: {
-        verdict: "weak",
-        summary: "Tailoring degraded due to pipeline failure. Review the listing manually.",
-        tips: [
-          {
-            category: "listing-quality",
-            severity: "info",
-            title: "Manual review recommended",
-            detail: "The AI pipeline encountered an issue. Please review the listing and content manually.",
-            evidence: "",
-          },
-        ],
-        keywordCoverage: {
-          required: [],
-          matched: [],
-          missing: [],
-        },
-      },
-      meta: {
-        stage1: stage1Meta,
-        stage2: null,
-        degraded: true,
-        cacheHit: false,
-        contentHash,
-        listingHash,
-        promptVersion,
-        schemaVersion,
-      },
-    }
   }
 }

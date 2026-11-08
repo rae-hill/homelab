@@ -37,8 +37,9 @@ export interface TailorServiceDef {
    *   `ContentState` by the payload codec at the HttpApi edge.
    * - `baseVersion`: already validated against `CONTENT_DEFAULTS_VERSION` by the handler.
    *
-   * Degrades internally: on partial provider failure returns the unchanged content with
-   * `meta.degraded = true` (a success, never a 500). Full pipeline contract: doc 02.
+   * Pipeline failures are typed `TailorError` failures (mapped to 500 by the handler)
+   * with upstream causes rendered into `message`; quota stays a separate 400. Full
+   * pipeline contract: doc 02.
    */
   readonly tailorResume: (
     subject: string,

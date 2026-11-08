@@ -170,6 +170,10 @@ describe("handleResumeTailor", () => {
       )
     })
 
+    // NOTE: The live pipeline no longer produces degraded results (meta.degraded is always false).
+    // This test verifies the handler's pass-through semantics for success responses, which remains
+    // unchanged — if a service implementation were to return degraded results, the handler would
+    // pass them through as 200 OK.
     it.effect("passes degraded results through as successes", () => {
       const degraded = {
         ...sampleTailorResponse,
@@ -224,13 +228,18 @@ describe("handleResumeTailor", () => {
         )),
       ))
 
-    it.effect("maps TailorError to InternalServerError", () =>
-      Effect.gen(function*() {
+    it.effect("maps TailorError to InternalServerError with cause chain in message", () => {
+      const nestedError = new Error("provider connection failed")
+      return Effect.gen(function*() {
         const result = yield* Effect.flip(handleResumeTailor(tailorArgs()))
         assert(
           result instanceof ApiErrors.InternalServerError,
           `Expected InternalServerError, got ${result._tag ?? result}`,
         )
+        // Message should contain the chain rendered by describeErrorChain
+        expect(result.message).toContain("Stage 2 failed")
+        expect(result.message).toContain("OpenRouterError")
+        expect(result.message).toContain("provider connection failed")
       }).pipe(
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
@@ -239,12 +248,13 @@ describe("handleResumeTailor", () => {
             tailorResume: () =>
               Effect.fail(
                 new Services.TailorService.TailorError({
-                  message: "provider exploded",
-                  error: null,
+                  message: "Stage 2 failed: OpenRouterError: provider connection failed",
+                  error: nestedError,
                 }),
               ),
           }),
         )),
-      ))
+      )
+    })
   })
 })

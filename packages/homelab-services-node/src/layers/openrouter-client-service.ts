@@ -1,6 +1,7 @@
-import { Effect, FileSystem, Layer, Option, Redacted, Schema } from "effect"
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { Duration, Effect, FileSystem, Layer, Option, Redacted, Schema } from "effect"
+import { HttpClient, type HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { Config, Services } from "homelab-services"
+import { describeErrorChain } from "./tailor/errors.js"
 
 // OpenRouter response schema (minimal, just what we need)
 const OpenRouterResponseSchema = Schema.Struct({
@@ -20,12 +21,25 @@ const OpenRouterResponseSchema = Schema.Struct({
   ),
 })
 
-// Helper to map errors to OpenRouterError
-const mapError = (error: unknown): Services.OpenRouterClientService.OpenRouterError =>
-  new Services.OpenRouterClientService.OpenRouterError({
+// Helper to map errors to OpenRouterError. Avoids double-wrapping if the error
+// is already an OpenRouterError (e.g. from an inner catch that was re-raised).
+const mapError = (error: unknown): Services.OpenRouterClientService.OpenRouterError => {
+  if (error instanceof Services.OpenRouterClientService.OpenRouterError) {
+    return error
+  }
+  return new Services.OpenRouterClientService.OpenRouterError({
     message: error instanceof Error ? error.message : String(error),
     error,
   })
+}
+
+// Detect Effect's TimeoutError (tagged with _tag "TimeoutError"). Used to give
+// timeout failures a dedicated message rather than the generic chain render.
+const isTimeoutError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "_tag" in error &&
+  (error as any)._tag === "TimeoutError"
 
 /**
  * Live implementation of the OpenRouter client service.
@@ -67,6 +81,13 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
 
   chat(req: Services.OpenRouterClientService.OpenRouterRequest) {
     return Effect.gen({ self: this }, function*() {
+      yield* Effect.logDebug("OpenRouter request starting", {
+        model: req.model,
+        messagesCount: req.messages.length,
+        maxTokens: req.maxTokens,
+        totalContentChars: req.messages.reduce((sum, m) => sum + m.content.length, 0),
+      })
+
       // Fail fast if no API key configured
       if (Option.isNone(this.apiKey)) {
         return yield* Effect.fail(
@@ -102,9 +123,48 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
         HttpClientRequest.setHeader("X-Title", "Homelab Resume Tailor"),
       )
 
-      const response = yield* this.httpClient.execute(httpRequest)
+      // Execute with error recovery for non-2xx responses wrapped by filterStatusOk
+      const response = yield* this.httpClient.execute(httpRequest).pipe(
+        Effect.catch((executeErr) => {
+          // filterStatusOk wraps non-2xx as HttpClientError with StatusCodeError reason
+          // Extract response body for better error messages
+          if (
+            typeof executeErr === "object" &&
+            executeErr !== null &&
+            "_tag" in executeErr &&
+            (executeErr as any)._tag === "HttpClientError"
+          ) {
+            const httpErr = executeErr as HttpClientError.HttpClientError
+            const reason = httpErr.reason
+            if (reason._tag === "StatusCodeError" && reason.response) {
+              // Read the response body for the real OpenRouter error text. The catch is
+              // scoped to the body READ only — an unscoped trailing catch would also
+              // intercept the deliberate OpenRouterError below and always replace the
+              // excerpt with the "(body unreadable)" variant.
+              const failedResponse = reason.response
+              return Effect.flatMap(
+                failedResponse.text.pipe(Effect.catch(() => Effect.succeed(null))),
+                (bodyText) => {
+                  const excerpt = bodyText === null
+                    ? "(body unreadable)"
+                    : bodyText.length > 2000
+                    ? bodyText.slice(0, 2000) + "…"
+                    : bodyText
+                  return Effect.fail(
+                    new Services.OpenRouterClientService.OpenRouterError({
+                      message: `OpenRouter API returned status ${failedResponse.status}: ${excerpt}`,
+                      error: httpErr,
+                    }),
+                  )
+                },
+              )
+            }
+          }
+          return Effect.fail(mapError(executeErr))
+        }),
+      )
 
-      // Check status code explicitly
+      // Safety net: check status code explicitly (should not happen with filterStatusOk, but defensive)
       if (response.status < 200 || response.status >= 300) {
         const text = yield* response.text
         return yield* Effect.fail(
@@ -140,7 +200,7 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
         )
       }
 
-      return {
+      const result = {
         content,
         finishReason,
         usage: {
@@ -148,9 +208,38 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
           completionTokens: decoded.usage?.completion_tokens ?? 0,
         },
       }
+
+      yield* Effect.logInfo("OpenRouter request succeeded", {
+        model: req.model,
+        finishReason,
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+      })
+
+      return result
     }).pipe(
       Effect.timeout(req.timeout),
-      Effect.mapError(mapError),
+      Effect.catch((error) => {
+        // Dedicated message for timeout failures
+        if (isTimeoutError(error)) {
+          const timeoutSec = Duration.toSeconds(req.timeout)
+          return Effect.flatMap(
+            Effect.logError(`OpenRouter request timed out after ${timeoutSec}s for model ${req.model}`),
+            () =>
+              Effect.fail(
+                new Services.OpenRouterClientService.OpenRouterError({
+                  message: `OpenRouter request timed out after ${timeoutSec}s for model ${req.model}`,
+                  error,
+                }),
+              ),
+          )
+        }
+        // Log all other failures with chain description
+        return Effect.flatMap(
+          Effect.logError(`OpenRouter request failed: ${describeErrorChain(error)}`),
+          () => Effect.fail(mapError(error)),
+        )
+      }),
     )
   }
 }

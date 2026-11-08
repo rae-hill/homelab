@@ -1,6 +1,6 @@
 import { Clock, Duration, Effect } from "effect"
-import type { Services } from "homelab-services"
-import { sanitize, truncate } from "./hygiene.js"
+import { Services } from "homelab-services"
+import { describeErrorChain } from "./errors.js"
 import { buildCleanupMessages, buildCleanupResponseFormat } from "./prompts.js"
 import type { CleanupResponse } from "./wire-schema.js"
 
@@ -8,7 +8,7 @@ import type { CleanupResponse } from "./wire-schema.js"
  * Stage 1: Listing cleanup pipeline.
  *
  * Runs the cheap model to extractive-only delete cruft (EEO, benefits, legal, nav)
- * and extract jobTitle/company. On failure, falls back to hygiene'd raw listing.
+ * and extract jobTitle/company. On failure, propagates typed errors.
  */
 
 /**
@@ -17,7 +17,7 @@ import type { CleanupResponse } from "./wire-schema.js"
  * @param client - OpenRouterClientService for making the API call
  * @param listing - raw listing text (already hygiene'd + truncated by caller)
  * @param cleanupModel - model slug for the cheap cleanup model
- * @returns CleanupResponse + stage metadata
+ * @returns CleanupResponse + stage metadata, or typed error on failure
  */
 export const runCleanupStage = (
   client: Services.OpenRouterClientService.OpenRouterClientServiceDef,
@@ -30,9 +30,9 @@ export const runCleanupStage = (
       model: string
       tokens: { input: number; output: number }
       latencyMs: number
-    } | null
+    }
   },
-  never
+  Services.OpenRouterClientService.OpenRouterError | Services.TailorService.TailorError
 > =>
   Clock.currentTimeMillis.pipe(
     Effect.flatMap((startTime) => {
@@ -67,37 +67,31 @@ export const runCleanupStage = (
                       latencyMs: endTime - startTime,
                     },
                   })),
-                  Effect.catch(() => {
-                    // Decode failure — fall back to defaults
-                    return Effect.succeed(fallbackCleanup(listing))
-                  }),
+                  Effect.catch((parseErr) =>
+                    Effect.fail(
+                      new Services.TailorService.TailorError({
+                        message: `Stage 1 (cleanup) output was not valid JSON: ${describeErrorChain(parseErr)}`,
+                        error: parseErr,
+                      }),
+                    )
+                  ),
                 )
               ),
             )
           ),
-          Effect.catch(() => {
-            // API call failed — fall back to defaults
-            return Effect.succeed(fallbackCleanup(listing))
-          }),
+          Effect.flatMap((result) =>
+            Effect.logInfo("Stage 1 (cleanup) succeeded", {
+              model: result.meta.model,
+              tokens: result.meta.tokens,
+              latencyMs: result.meta.latencyMs,
+            }).pipe(Effect.map(() => result))
+          ),
+          Effect.catch((error) =>
+            Effect.flatMap(
+              Effect.logError(`Stage 1 (cleanup) failed: ${describeErrorChain(error)}`),
+              () => Effect.fail(error),
+            )
+          ),
         )
     }),
   )
-
-/**
- * Fallback cleanup: return hygiene'd listing + extract first non-empty line as jobTitle.
- */
-const fallbackCleanup = (listing: string) => {
-  const sanitized = sanitize(listing)
-  const truncated = truncate(sanitized)
-  const lines = truncated.result.split("\n").map((l) => l.trim()).filter((l) => l.length > 0)
-  const jobTitle = lines[0]?.slice(0, 100) ?? "Unknown Role"
-
-  return {
-    cleanup: {
-      cleanedListing: truncated.result,
-      jobTitle,
-      company: null,
-    },
-    meta: null,
-  }
-}

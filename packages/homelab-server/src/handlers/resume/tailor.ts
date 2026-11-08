@@ -9,8 +9,8 @@ import { ResumeContent } from "shared"
  * two-stage AI pipeline. The payload's `content` arrives as a decoded `ContentState`
  * (the `ContentPatchBase64` edge codec applies the base64 JSON Patch to the defaults);
  * the returned content is encoded back to a patch by the success codec. Quota
- * exhaustion is a 4xx (user-facing spend cap); pipeline failure is a 500. Degraded
- * results (`meta.degraded = true`) come back as plain successes from the service.
+ * exhaustion is a 4xx (user-facing spend cap); pipeline failure is a 500 with the
+ * cause chain rendered into the error message.
  */
 export const handleResumeTailor = Effect.fn("handleResumeTailor")(
   function*(args: Homelab.ResumeEndpoints.Tailor.ResumeTailorHandlerArgs) {
