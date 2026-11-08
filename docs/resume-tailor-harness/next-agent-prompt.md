@@ -24,19 +24,24 @@ You are continuing the **resume-tailor AI feature** in the homelab monorepo at
 
 ## State of the world (as of 2026-11-07)
 
-- **T1–T8 + T10 are DONE and committed** (hashes in the progress.md status table; latest:
-  `7900cdab4a17` undici fix, `1f1b8e76b862` T8 UI, `f54fdb6b7aeb` nix hashes).
+- **T1–T10 are DONE and committed** (every hash in the progress.md status table — it is
+  canonical; see also the 2026-11-08 session-log entries for the post-v1 fix wave).
 - Validation all green at last run: root `yarn typecheck`, full `yarn test` (800+ unit tests),
   `yarn lint` (0 errors), `yarn workspace resume build`, FULL `e2e` suite (15 files, 112 passed,
   1 skipped = the `RUN_TAILOR_LIVE`-gated live-AI test), `nix build .#homelab-api .#homelab-ui
   .#resume-site`.
-- The feature is **code-complete end-to-end but DARK**: no OpenRouter key provisioned (owner sops
-  edit pending). Model slugs are PINNED as code defaults in env.ts (`cc692e5ea`, owner-picked
-  2026-11-08): stage 2 `anthropic/claude-sonnet-5.5`, stage 1 `openai/gpt-6-luna`. Live calls fail
-  cleanly until the key lands. Absent key never breaks server boot (Option-based env; praeconinus
-  stays dark by design).
-- T9 is partial: nix option/env-template/kanidm-claim/enum-drift-fix committed; the owner-gated
-  sops secret + 2-line augustus wiring remain (exact lines in Open items #1).
+- The feature is **code-complete, key-provisioned, and wired — pending DEPLOY**: owner added the
+  sops secret (`7077d7b2b444`), agent landed the augustus wiring (`e30f55bb2`, eval-verified).
+  Model slugs pinned in env.ts (`cc692e5ea`): stage 2 `anthropic/claude-sonnet-5.5`, stage 1
+  `openai/gpt-6-luna`. Absent key never breaks server boot (Option-based env; praeconinus stays
+  dark by design).
+- **Degraded results no longer exist (owner override of D5, 2026-11-08, `cdc7b6db8`):** pipeline
+  failures are 500s with the nested cause chain in the message (`describeErrorChain`); the
+  OpenRouter client recovers non-2xx bodies past `filterStatusOk`. Observability fixed
+  (`c9f54b838`): per-request root spans resolve in Tempo; Effect logs appear as span events.
+- T9 is COMPLETE: nix option/env-template/kanidm-claim/enum-drift-fix + owner sops secret +
+  augustus wiring all committed. Owner also split kanidm groups (`9727a4ceb1ff`):
+  `homelab.resume.printing` / `homelab.resume.tailoring` (rae-only membership).
 
 ## Your job
 
@@ -130,8 +135,9 @@ both directions, patches vs the frozen versioned `INITIAL_CONTENT_STATE` (`v1`),
 decode-to-ContentState schema sits in the HttpApi edge codecs (typed code never sees base64;
 entries re-encode for storage). D4 no per-edit review — server merge+guards are authoritative,
 the rendered resume is the review surface. D5 two-model pipeline: extractive-only cleanup +
-title/company extraction (cheap), constrained ID-addressed edits + fit report (main); degraded
-responses (unchanged content + surviving tips) are 200s, never 500s. D6 redux + versioned
+title/company extraction (cheap), constrained ID-addressed edits + fit report (main);
+**OVERRIDDEN 2026-11-08: failures are 500s with cause chains, never degraded 200s**
+(`meta.degraded` stays in the schema, always false). D6 redux + versioned
 localStorage for now. D7 details view = plain centered Dialog over the settings sheet. D8 small
 SOLID services; browser impls + tests in `packages/homelab-services-browser` (resume has no test
 infra by design). D9 NO cache in v1 (`meta.cacheHit` always false; caching arrives as a

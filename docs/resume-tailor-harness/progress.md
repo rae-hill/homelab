@@ -10,19 +10,19 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 
 ## Status
 
-| Task | Doc | Scope one-liner                                                                            | Status                                                                                                | Commit         |
-| ---- | --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------- |
-| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)        | `62d248e97683` |
-| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                               | `0dab24d048fa` |
-| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                           | `afd402ddc11c` |
-| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                            | `db5134460c1d` |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)           | `db5134460c1d` |
-| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                            | `db5134460c1d` |
-| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite) | `5e45edd1782a` |
-| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                             | `1f1b8e76b862` |
-| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **partial done** (§§2,4,5,7 committed; §1 owner sops edit + §3 augustus wiring deferred)              | `f5f02a6fd9b9` |
-| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)       | `7900cdab4a17` |
-| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                              | —              |
+| Task | Doc | Scope one-liner                                                                            | Status                                                                                                                      | Commit         |
+| ---- | --- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                              | `62d248e97683` |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                                                     | `0dab24d048fa` |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                 | `afd402ddc11c` |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                  | `db5134460c1d` |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                 | `db5134460c1d` |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                  | `db5134460c1d` |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                       | `5e45edd1782a` |
+| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                                                   | `1f1b8e76b862` |
+| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`) | `e30f55bb2`    |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                             | `7900cdab4a17` |
+| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                                                    | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -31,12 +31,19 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
 
 ## Human-only / owner decisions (blocking flags)
 
-- **Sops encryption (T9.1):** agents must NOT run `sops` (denied). Owner runs
-  `sops edit nix-config/secrets/augustus.yaml` and adds `homelab_api_openrouter_key` (doc 05 §1).
+- **Sops encryption (T9.1):** **DONE (owner, 2026-11-08)** — `homelab_api_openrouter_key` added
+  to `nix-config/secrets/augustus.yaml` (`7077d7b2b444`); agent landed the §3 wiring
+  (`e30f55bb2`, eval-verified: secret path + env template + praeconinus null).
 - **Model slugs (README OQ1):** **RESOLVED (owner, 2026-11-08)** — stage 2
   `anthropic/claude-sonnet-5.5`, stage 1 `openai/gpt-6-luna`, code defaults in
   `packages/homelab-server/src/env.ts` (`cc692e5ea`), env-overridable.
-- **Kanidm group (README OQ5):** doc 05 §5 recommends Option A (reuse `resume.printing` claim map).
+- **Kanidm group (README OQ5):** **RESOLVED (owner, 2026-11-08, `9727a4ceb1ff`)** — dedicated
+  groups `homelab.resume.printing` (→ Resume_Print) + `homelab.resume.tailoring` (→ Resume_Tailor);
+  old `resume.printing` renamed/retired. NOTE: membership is rae-only now; jacob's group list was
+  slimmed (flagged to owner — intentional per "TODO: Remove deadname" context).
+- **Degraded semantics (doc 02 / README D5):** **OVERRIDDEN (owner, 2026-11-08)** — pipeline
+  failures are 500s with cause chains, never degraded 200s (`cdc7b6db8`). `meta.degraded` stays
+  in the wire schema (always false); frontend degraded UI paths are now unreachable-but-harmless.
 - **Deploy:** `systemd-service.nix` throws on a dirty git tree — commit before deploying.
 
 ## Gotchas learned so far (carry forward)
@@ -62,31 +69,60 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   Configurable internals = parameters of a `makeXService(...)` layer factory with defaults
   (see `tailor-quota-service.ts`). Applies to ALL services incl. browser ones.
 - Formatters run automatically via the harness — never manually; commits use `--no-verify`.
+- **`Logger.layer([...])` REPLACES the default logger set** — which includes
+  `Logger.tracerLogger`, the bridge turning `Effect.log*` into OTel span events. Omit it and
+  Tempo spans show zero logs (this was the "span logs don't show up" bug). Always list
+  `Logger.tracerLogger` alongside console loggers (`homelab-server/src/logger.ts`).
+- **`HttpClient.filterStatusOk` (global client in main.ts) fails non-2xx AT `execute`** with
+  `HttpClientError` (`reason._tag === "StatusCodeError"`, body on `reason.response.text`) —
+  in-gen status checks never see non-2xx. Recover the body from the error or lose the upstream
+  message (this was the opaque stage-1 failure). Pinned by `test/openrouter-client.test.ts`.
+- **vitest runs tests CONCURRENTLY within a file** (`vitest.shared.ts` →
+  `sequence.concurrent: true`). No mutable module state shared across tests (fake-server
+  "current responder" variables race); dispatch fake responses on request CONTENT.
+- **`@effect/vitest` `it.effect` runs under TestClock** — real-IO/clock-dependent tests
+  (HTTP timeouts) must use `it.live` (house pattern: the e2e suite).
+- **`.env-serve-test` regeneration hazard:** the stage-script template points
+  `TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH` at `jwk-secret`, but THIS machine's `jwk.json`
+  (Apr 19) pairs with `private-key-secret`; `jwk-secret` (Nov 5) is an orphan → regenerating
+  the file breaks boot with `JWKPrivateKeyDecryptionError`. Fixed by pointing the env var back
+  at `private-key-secret` + merging the hand-added vars (PORT/LOG_STYLE/CA_URL/ACME_*/
+  HOMELAB_ORIGIN_URL) that standalone `serve:test` needs (e2e.sh exports its own PORT/ORIGIN).
+- **OTel span naming quirk (empirically verified):** a `SpanNameGenerator` provided inside
+  `serve`'s middleware option lands on HttpApi's route-level span (`POST /resume/tailor` +
+  `http.route`), NOT the outermost middleware span (method-only `POST` root). Both end properly
+  — the "root span never resolves" bug was the ABSENCE of `HttpMiddleware.tracer`, not naming.
 
 ## Open items (prioritized — the work queue for the next session)
 
-1. **OWNER — sops secret:** `sops edit nix-config/secrets/augustus.yaml` → add
-   `homelab_api_openrouter_key` (the `sk-or-v1-…` value). Agents are DENIED sops. Then the 2-line
-   augustus wiring lands (exact lines in doc 05 §3): `sops.secrets.homelab_api_openrouter_key =
-   { owner = "homelab-api"; group = "homelab-api"; };` in `_private/augustus/sops.nix` +
-   `openRouterApiKeyFile = config.sops.secrets.homelab_api_openrouter_key.path;` in
-   `_private/augustus/programs.nix`. Until then the feature is dark (absent key → clean
-   TailorError; hosts boot fine).
+1. ~~**OWNER — sops secret:**~~ **DONE (2026-11-08):** owner added `homelab_api_openrouter_key`
+   to `nix-config/secrets/augustus.yaml` (`7077d7b2b444`); the §3 wiring landed agent-side
+   (`e30f55bb2`) and is eval-verified: secret path `/run/secrets/homelab_api_openrouter_key`,
+   env template renders `OPENROUTER_API_KEY_FILE=…`, praeconinus stays `null` (dark).
+   **Deploy pending** for the key to reach the running service.
 2. ~~**OWNER — model slugs (README OQ1):**~~ **RESOLVED (owner, 2026-11-08):** slugs pinned as
    real code defaults in `packages/homelab-server/src/env.ts` (`cc692e5ea`): stage 2 =
    `anthropic/claude-sonnet-5.5`, stage 1 (cleanup) = `openai/gpt-6-luna`. Version-pinned, never
    aliases; env-overridable (`OPENROUTER_MODEL` / `OPENROUTER_CLEANUP_MODEL`) — no nix
    env-template lines needed. Live calls still blocked on item 1 (no key provisioned).
-3. **Live smoke (needs 1+2):** `RUN_TAILOR_LIVE=1` on the e2e tailor test, or paste a real listing
-   in the UI. Review quality against doc 02 §I (injection + poor-fit are the regression-critical
-   evals). Tune prompts if needed — bump `promptVersion` (layers/tailor/prompts.ts) when you do.
+3. **Live smoke (1+2 done — needs DEPLOY first):** the owner's 2026-11-08 morning test showed
+   "[tailor] stage 1 failed, returning degraded result" — with the wiring unlanded at test time,
+   the near-certain cause is `OpenRouter not configured on this host` (secret in sops ≠ env var
+   in the service) swallowed by the old degrade path. Post-`cdc7b6db8` that failure is a 500
+   naming its exact cause; post-deploy (`e30f55bb2`) the key is actually present. Then:
+   `RUN_TAILOR_LIVE=1` on the e2e tailor test or a real listing in the UI; review quality vs
+   doc 02 §I (injection + poor-fit are regression-critical). Tune prompts if needed — bump
+   `promptVersion` (layers/tailor/prompts.ts) when you do.
 4. **Manual browser check of the Tailoring tab** (no headless UI test in v1): tab visible; submit
    gated when signed out; pending entry → success; auto-apply + "Pre-tailor: …" preset snapshot
    toast; details modal (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe
    editable in Heading tab and rendering on the resume; print output contains no tailor data.
-5. **Deploy (needs 1–4):** everything committed → deploy augustus (dirty-tree guard requires it)
-   → doc 05 Test Plan smoke steps 3–7, including the redaction grep
-   (`journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0).
+5. **Deploy (nix side ready):** all wiring committed (`e30f55bb2` + owner's `7077d7b2b444` /
+   `9727a4ceb1ff` kanidm group split — both groups + claim maps + memberships deploy together).
+   → deploy augustus (dirty-tree guard requires committed tree ✓) → doc 05 Test Plan smoke steps
+   3–7, including the redaction grep
+   (`journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0). Verify in Tempo:
+   per-request root spans resolve and carry log events (`c9f54b838`).
 6. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
    point"); doc 06 stretch phase — postgres persistence + category-keyed bases + cache decorator
    (owner wants to do persistence together); "update entry from current content" nicety (README
@@ -202,3 +238,52 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   owner runs `sops edit nix-config/secrets/augustus.yaml` (exact steps: doc 05 §1; then the 2-line
   wiring: doc 05 §3, verified anchor points `_private/augustus/sops.nix` line ~126 +
   `_private/augustus/programs.nix` beside `serialNumbersFile` line ~68).
+
+### 2026-11-08 (afternoon) — owner field-test feedback: 500s, error chains, observability, wiring
+
+- Owner provisioned the OpenRouter key (sops `7077d7b2b444`) + field-tested; hit
+  "[tailor] stage 1 failed, returning degraded result" with zero detail. Asks: (1) degraded → 500
+  (D5 OVERRIDE — "makes me think something is working, but that's not the case"), (2) useful logs
+  - bubble upstream errors into the 500 message, (3) Tempo root span never resolves + span logs
+    missing, (4) `yarn circular` regression, (5) — discovered mid-session — owner also split kanidm
+    groups (`9727a4ceb1ff`: `homelab.resume.printing` + NEW `homelab.resume.tailoring`; OQ5
+    resolved as dedicated groups; rae-only membership — jacob's list slimmed, flagged).
+- **Circular fix** (`bea3a79aa`): `schema→constants→types→schema` broken by extracting
+  BLURB/ABOUT_ME defaults to leaf `defaults.ts`; constants.ts re-exports (barrel surface
+  unchanged). All 7 workspaces green.
+- **Degraded→500 + error chains** (`cdc7b6db8`, qwen3.7-plus subagent + coordinator review):
+  cleanup.ts stopped swallowing errors (fallbackCleanup deleted); all degrade paths now fail
+  TailorError with `describeErrorChain` (new `tailor/errors.ts`, walks `.error`/`.cause`, caps
+  500/level, 2000 total); catchDefect wraps unexpected defects; handler mapping unchanged (500 +
+  message = the chain). **Coordinator review caught a real bug** in the subagent's client
+  hardening: an unscoped `Effect.catch` after the body-read flatMap intercepted the deliberate
+  OpenRouterError, so the recovered body was ALWAYS replaced by "(body unreadable)" — rescoped
+  the catch to the read only. Client also: no double-wrap, StatusCodeError body recovery
+  (filterStatusOk was eating non-2xx bodies at `execute` — the real reason stage-1 failures were
+  opaque), dedicated timeout message, request/response logging (never content/headers/key).
+  New tests: errors.test.ts (13), openrouter-client.test.ts (6 — REAL local HTTP server through
+  production-shaped filterStatusOk client; concurrency-safe via request-body scenario routing
+  after the shared-mutable-responder race bit us; timeout test uses it.live for the real clock).
+- **Observability** (`c9f54b838`): root cause 1 — no per-request server span existed (no
+  `HttpMiddleware.tracer` installed); root cause 2 — `Logger.layer([jsonConsoleLogger])` REPLACED
+  the default logger set, dropping `Logger.tracerLogger` (the Effect.log*→span-events bridge;
+  only Tempo-visible log channel — stack has no OTLP logs receiver, Loki is journald-only).
+  Fixes: tracer middleware in serve options + SpanNameGenerator override (lands on the HttpApi
+  route span: `POST /resume/tailor` + http.route; outer root stays method-named — quirk
+  documented in main.ts), tracerLogger re-added to both LOG_STYLE branches, RedactingSpanProcessor
+  extended to span-EVENT attributes. **Empirically verified** via manual boot + ConsoleSpanExporter:
+  root `parentSpanContext: undefined`, finite durations, events with `effect.cause` present.
+- **Sops wiring landed** (`e30f55bb2`, unblocked by owner's secret): doc 05 §3 two-liner;
+  eval-verified end-to-end (secret path → openRouterApiKeyFile → env template renders
+  OPENROUTER_API_KEY_FILE → praeconinus null). Feature no longer dark once deployed.
+- **Diagnosis of the owner's degraded result:** with wiring unlanded at test time the server had
+  no OPENROUTER_API_KEY_FILE → "OpenRouter not configured on this host" → swallowed by the old
+  degrade path. Post-fix this is a 500 naming the cause; post-deploy the key is present.
+- Fixture hazards hit + fixed (see Gotchas): `.env-serve-test` regeneration orphaned the
+  jwk.json/private-key-secret pair (template points at the orphan `jwk-secret`); vitest
+  `sequence.concurrent: true` races mutable test state; `it.effect` = TestClock.
+- Gates: typecheck ✓, 871 unit tests ✓ (+20 new), lint 0 errors, FULL e2e 15 files 112✓+1 skip ✓
+  (middleware change is global — full suite, not just resume).
+- Delegation: explore(flash) for the vendored-effect/OTel research (nailed both root causes with
+  file:line refs); qwen3.7-plus for the pipeline rework (one real bug caught in review —
+  the review step pays for itself).

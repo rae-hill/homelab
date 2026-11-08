@@ -8,7 +8,17 @@ services. Source paths verified against the tree; if this doc conflicts with sou
 Two-stage OpenRouter pipeline. **Stage 1** (cheap model): extractive cleanup + `jobTitle`/`company`
 extraction — deletion only, verbatim preservation so stage-2 evidence stays substring-verifiable.
 **Stage 2** (main model): constrained ID-addressed edits + fit report. Server merge authoritative
-(D4): no client review, rendered resume is the review surface. Degraded fallback: no-op patch +
+(D4): no client review, rendered resume is the review surface.
+
+> **OVERRIDE (owner, 2026-11-08 — supersedes the degraded-fallback text below):** pipeline
+> failures are typed `TailorError` failures mapped to **500**, with the nested upstream cause
+> chain rendered into the error message (`describeErrorChain`, `layers/tailor/errors.ts`). The
+> degraded 200 no-op result is gone; `meta.degraded` remains in the wire schema and is always
+> `false`. Rationale: a degraded 200 looked like partial success while hiding the real failure
+> (e.g. an unconfigured/swallowed OpenRouter error). Stage-1 cleanup no longer falls back to the
+> raw listing either. See progress.md §2026-11-08 (afternoon) and commit `cdc7b6db8`.
+
+Original (superseded) design: Degraded fallback: no-op patch +
 surviving tips + `meta.degraded=true`, never a 500.
 
 ## Verified Current State
@@ -271,8 +281,10 @@ Order matters. Run server-side before anything reaches the client:
    `add`/`remove` ops reflecting the user's OWN structural edits (their content arrived as a patch
    vs defaults), so replace-only is an invariant of the MERGE DELTA, not of the wire patch. The
    initial plan's §2 assertion is adapted accordingly.
-9. **Degraded fallback** — any hard failure → `content` = round-trip of request (no-op), surviving
-   tips, `meta.degraded=true`. Unchanged resume + usable fit report > 500.
+9. **Degraded fallback** — SUPERSEDED by the 2026-11-08 override (see Purpose): hard failures are
+   now 500s with cause chains, not no-op degraded 200s. Kept for design history: ~~any hard
+   failure → `content` = round-trip of request (no-op), surviving tips, `meta.degraded=true`.
+   Unchanged resume + usable fit report > 500.~~
 
 **Threat model:** schema vocabulary is the guardrail (injection can only produce text inside existing
 fields); fabrication guard catches invented numbers; tag guard blocks invented skills; rendered-resume
