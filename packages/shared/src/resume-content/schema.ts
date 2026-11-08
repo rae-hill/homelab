@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { OptionalWithDefault } from "../schemas/optionals.js"
-import { ABOUT_ME_DEFAULT, BLURB_DEFAULT } from "./constants.js"
+import { ABOUT_ME_DEFAULT, BLURB_DEFAULT } from "./defaults.js"
 
 /**
  * Content schemas for the resume — extracted from print-config/schema.ts to be shared
