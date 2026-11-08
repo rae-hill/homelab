@@ -66,6 +66,10 @@ in
     originUrl = "https://homelab-api.plato-splunk.media";
     privateKeySecretPath = config.sops.secrets.homelab_api_jwk_password.path;
     serialNumbersFile = config.sops.templates."serial-numbers-file".path;
+    # OpenRouter API key for POST /resume/tailor (resume-tailor feature). Exported as
+    # OPENROUTER_API_KEY_FILE via the homelab-api-env template; null on praeconinus
+    # keeps the tailor dark there by design.
+    openRouterApiKeyFile = config.sops.secrets.homelab_api_openrouter_key.path;
     # Headless chrome for POST /resume/print (remote-printing feature). Chrome makes the
     # best PDFs; the wrapper resolves its own runtime deps via absolute store paths.
     # resumeSiteUrl defaults to the tailnet resume-site vhost via features/resume-site.

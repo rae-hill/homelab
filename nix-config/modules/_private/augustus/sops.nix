@@ -128,6 +128,11 @@
     group = "homelab-api";
   };
 
+  sops.secrets.homelab_api_openrouter_key = {
+    owner = "homelab-api";
+    group = "homelab-api";
+  };
+
   sops.secrets.step_jwk_provisioner_password = {
     owner = "root";
   };
