@@ -1,4 +1,3 @@
-import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient"
 import { Effect, FileSystem, Layer, Option, Redacted, Schema } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { Config, Services } from "homelab-services"
@@ -57,7 +56,7 @@ export const OpenRouterClientServiceLive = Layer.effect(
 
     return new OpenRouterClientServiceImpl(env, apiKey, httpClient)
   }),
-).pipe(Layer.provide(NodeHttpClient.layerUndici))
+)
 
 class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.OpenRouterClientServiceDef {
   constructor(
