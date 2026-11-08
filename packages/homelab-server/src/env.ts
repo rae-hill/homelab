@@ -28,8 +28,8 @@ export const EnvLive = Layer.effect(
       new URL("https://resume.rae-hill.dev"),
     ),
     openRouterApiKeyFile: Config.option(Config.String("OPENROUTER_API_KEY_FILE")),
-    openRouterModel: Config.withDefault(Config.String("OPENROUTER_MODEL"), "TBD/stage2-model"),
-    openRouterCleanupModel: Config.withDefault(Config.String("OPENROUTER_CLEANUP_MODEL"), "TBD/stage1-model"),
+    openRouterModel: Config.withDefault(Config.String("OPENROUTER_MODEL"), "anthropic/claude-sonnet-5.5"),
+    openRouterCleanupModel: Config.withDefault(Config.String("OPENROUTER_CLEANUP_MODEL"), "openai/gpt-6-luna"),
     openRouterBaseUrl: Config.withDefault(
       Config.schema(Schema.URLFromString, "OPENROUTER_BASE_URL"),
       new URL("https://openrouter.ai/api/v1"),
