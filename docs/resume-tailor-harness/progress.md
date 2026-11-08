@@ -92,6 +92,18 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   `serve`'s middleware option lands on HttpApi's route-level span (`POST /resume/tailor` +
   `http.route`), NOT the outermost middleware span (method-only `POST` root). Both end properly
   — the "root span never resolves" bug was the ABSENCE of `HttpMiddleware.tracer`, not naming.
+- **`new URL("/path", base)` DROPS the base path** (absolute-path resolution against origin):
+  `new URL("/chat/completions", "https://openrouter.ai/api/v1")` = `…/chat/completions` → 404.
+  This was the production 404 (fixed `e7137e69d` by joining onto `basePath`). Fake-server tests
+  must reject unknown paths or they silently pass with URL-join bugs.
+- **CI hang class (e2e "started server" then nothing):** tailnet-only hosts
+  (idm/jellyfin/ca.plato-splunk.media) are AAAA-only `fd7a:` ULAs — blackholed from GitHub
+  runners (dropped SYNs, minutes of kernel retries). ANY unbounded fetch to them (health
+  handler, boot OIDC well-known) plus an unbounded probe `curl` (no `--max-time`) stalls the
+  health loop past the 20-min job timeout. Fixed `b372d0713`: 5s per-check timeouts
+  (TimeoutError → "Unreachable"), 10s boot-fetch timeout, probe `--max-time 10` + progress
+  echoes. Rule: outbound calls to tailnet hosts ALWAYS carry `Effect.timeout`
+  (precedent: `shared/src/oidc/reachability.ts`).
 
 ## Open items (prioritized — the work queue for the next session)
 
@@ -105,14 +117,14 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
    `anthropic/claude-sonnet-5.5`, stage 1 (cleanup) = `openai/gpt-6-luna`. Version-pinned, never
    aliases; env-overridable (`OPENROUTER_MODEL` / `OPENROUTER_CLEANUP_MODEL`) — no nix
    env-template lines needed. Live calls still blocked on item 1 (no key provisioned).
-3. **Live smoke (1+2 done — needs DEPLOY first):** the owner's 2026-11-08 morning test showed
-   "[tailor] stage 1 failed, returning degraded result" — with the wiring unlanded at test time,
-   the near-certain cause is `OpenRouter not configured on this host` (secret in sops ≠ env var
-   in the service) swallowed by the old degrade path. Post-`cdc7b6db8` that failure is a 500
-   naming its exact cause; post-deploy (`e30f55bb2`) the key is actually present. Then:
-   `RUN_TAILOR_LIVE=1` on the e2e tailor test or a real listing in the UI; review quality vs
-   doc 02 §I (injection + poor-fit are regression-critical). Tune prompts if needed — bump
-   `promptVersion` (layers/tailor/prompts.ts) when you do.
+3. **Live smoke (needs REDEPLOY of `e7137e69d`):** owner deployed + field-tested 2026-11-08:
+   the new 500-chain immediately surfaced the real failure — OpenRouter 404. Root cause:
+   `new URL("/chat/completions", …/api/v1)` dropped the base path (fixed `e7137e69d`, verified
+   404→401 against the real API, zero spend; local `private/openrouter-api-key` is still the
+   DUMMY so no local live run yet — owner offered $10 budget: either drop the real key into
+   that gitignored file for `RUN_TAILOR_LIVE=1 e2e src/resume`, or retest via UI after
+   redeploy). Then review quality vs doc 02 §I (injection + poor-fit regression-critical);
+   tune prompts if needed — bump `promptVersion` (layers/tailor/prompts.ts) when you do.
 4. **Manual browser check of the Tailoring tab** (no headless UI test in v1): tab visible; submit
    gated when signed out; pending entry → success; auto-apply + "Pre-tailor: …" preset snapshot
    toast; details modal (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe
@@ -287,3 +299,31 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
 - Delegation: explore(flash) for the vendored-effect/OTel research (nailed both root causes with
   file:line refs); qwen3.7-plus for the pipeline rework (one real bug caught in review —
   the review step pays for itself).
+
+### 2026-11-08 (evening) — owner deploy + field test: OpenRouter 404 fix, CI e2e hang fix
+
+- Owner DEPLOYED (wiring + kanidm groups) and field-tested with a real $10 OpenRouter account.
+  The new 500-with-cause-chain immediately earned its keep: it surfaced
+  "OpenRouter API returned status 404" — the old code would have hidden this as a degraded 200.
+- **Root cause of the 404** (`e7137e69d`): `new URL("/chat/completions", "https://openrouter.ai/api/v1")`
+  resolves the absolute path against the ORIGIN, silently dropping `/api/v1` → every call hit
+  `https://openrouter.ai/chat/completions`. Fixed by joining onto the base pathname
+  (trailing-slash safe). Verified against the real API with a dummy key: old path → 404, new
+  path → 401 "User not found" (endpoint reached, ZERO spend). Regression test hardened: the
+  fake server now 404s anything but `/api/v1/chat/completions` (every scenario doubles as a
+  URL-join test) + explicit path assertion (7 tests).
+- **CI e2e hang** (`b372d0713`): owner reported CI stuck after "starting bundled server".
+  Diagnosis (no `gh` available — reasoned from source + DNS): idm/jellyfin/ca.plato-splunk.media
+  are AAAA-only tailnet ULA (`fd7a:`) hosts, blackholed from GitHub runners (dropped SYNs →
+  kernel TCP retries for minutes). `/status/health` awaited all three with NO timeout; e2e.sh's
+  probe `curl` had no `--max-time`; boot-time OIDC well-known fetch likewise unbounded. 60 probes
+  × minutes ≫ the 20-min job timeout = silent stall. Fix: 5s `Effect.timeout` per health check
+  (TimeoutError → "Unreachable" match arm), 10s timeout on the boot fetch before its
+  option-degrade, probe `--max-time 10` + progress echo every 10 attempts (worst case ~10.5 min,
+  ends LOUDLY with the log dump). House precedent: `shared/src/oidc/reachability.ts`.
+- Gates: typecheck ✓, 872 unit tests ✓ (+1), lint 0 errors ✓, shellcheck ✓ (e2e.sh touched),
+  CI-mode e2e (`DISABLE_NETWORK_TESTS=true`) 15 files 111✓+2 skip ✓.
+- **Pending:** owner redeploys augustus (`e7137e69d` + `b372d0713`), re-runs CI (should pass or
+  fail loudly now), then live smoke (item 3) + redaction grep + Tempo check (root spans resolve,
+  span events visible). Local live-run option: owner drops the real key into gitignored
+  `packages/homelab-server/private/openrouter-api-key` → `RUN_TAILOR_LIVE=1 e2e src/resume`.
