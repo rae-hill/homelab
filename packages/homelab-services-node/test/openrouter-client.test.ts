@@ -27,6 +27,15 @@ import { OpenRouterClientServiceLive } from "../src/layers/openrouter-client-ser
 
 let server: Server
 let baseUrl: URL
+/** scenario marker → request URL, recorded per request (concurrency-safe: keyed by body). */
+const seenUrls = new Map<string, string>()
+
+const scenarioOf = (body: string): string => {
+  for (const marker of ["scenario-404", "scenario-huge", "scenario-hang", "scenario-ok"]) {
+    if (body.includes(marker)) return marker
+  }
+  return "scenario-default"
+}
 
 /** Stateless scenario router: the request body's message content selects the response. */
 const respondByBody = (body: string): { status: number; body: string; hang?: boolean } => {
@@ -68,6 +77,15 @@ beforeAll(async () => {
       raw += chunk
     })
     req.on("end", () => {
+      seenUrls.set(scenarioOf(raw), req.url ?? "")
+      // Mirror real OpenRouter: anything but the completions path under the base is a 404.
+      // This makes every scenario test double as a URL-join regression test (the
+      // `new URL("/chat/completions", base)` absolute-path trap dropped /api/v1).
+      if (req.url !== "/api/v1/chat/completions") {
+        res.writeHead(404, { "Content-Type": "application/json" })
+        res.end(JSON.stringify({ error: { message: `PATH-404: no route for ${req.url}` } }))
+        return
+      }
       const scenario = respondByBody(raw)
       if (scenario.hang) return // never respond — let the client timeout win
       res.writeHead(scenario.status, { "Content-Type": "application/json" })
@@ -174,5 +192,11 @@ describe("OpenRouterClientServiceLive (real HTTP, filterStatusOk)", () => {
     Effect.gen(function*() {
       const error = yield* Effect.flip(runChat("scenario-default"))
       expect(error.message).toContain("length")
+    }))
+
+  it.effect("joins the endpoint onto the base URL's path, not the origin root", () =>
+    Effect.gen(function*() {
+      yield* runChat("scenario-ok")
+      expect(seenUrls.get("scenario-ok")).toBe("/api/v1/chat/completions")
     }))
 })

@@ -101,7 +101,13 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
       const apiKey = this.apiKey.value
 
       const baseUrl = this.env.openRouterBaseUrl
-      const url = new URL("/chat/completions", baseUrl)
+      // Join onto the base PATH — `new URL("/chat/completions", base)` would replace it
+      // wholesale (absolute-path resolution), turning https://openrouter.ai/api/v1 into
+      // https://openrouter.ai/chat/completions → 404. Strip a trailing slash, append.
+      const basePath = baseUrl.pathname.endsWith("/")
+        ? baseUrl.pathname.slice(0, -1)
+        : baseUrl.pathname
+      const url = new URL(`${basePath}/chat/completions`, baseUrl)
 
       const body = {
         model: req.model,
