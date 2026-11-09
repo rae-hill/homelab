@@ -298,9 +298,13 @@ Env surface (draft): `PROTON_BRIDGE_IMAP_HOST` (default 127.0.0.1), `PROTON_BRID
 registration (what the LLM can see at all) + argument validation (only whitelisted labels/flags
 accepted) — with OpenClaw's `toolFilter` as a third layer.
 
+**DECIDED (2026-11-09): labeling ENABLED** — `PROTON_MCP_OPERATIONS: "read,label"` and
+`PROTON_MCP_ALLOWED_LABELS: "Declined,Applied,Needs Follow-Up,Job Hunt"` (exact Proton label
+names, case-sensitive; job-hunt triage workflow). Wired in `features/openclaw/service.nix`.
+
 Initial tool set — read: `mail_list_folders`, `mail_list_messages`, `mail_get_message`,
-`mail_search_messages`, `mail_get_unread_count`; label (gated): `mail_add_label`,
-`mail_remove_label`, `mail_mark_read`, `mail_mark_unread`, `mail_star`, `mail_unstar`.
+`mail_search_messages`, `mail_get_unread_count`; label (gated): `mail_list_labels`,
+`mail_add_label`, `mail_remove_label`, `mail_set_read`, `mail_set_starred`.
 
 Rejected alternative (kept for the record): `jorgenclaw/proton-mcp` — vendored at
 `repos/proton-mcp/` (squashed subtree, upstream `main` @ `3739129`), audited 2026-11-05 →
@@ -380,11 +384,14 @@ password + 2FA material: bigger blast radius, ToS-gray).
 
 **Phase 3 — UI exposure `openclaw.plato-splunk.media`:**
 
-10. [ ] `features/openclaw/catalog.nix`: `openclaw` vhost (`backend.reverseProxy.port = 18789`,
+10. [x] `features/openclaw/catalog.nix`: `openclaw` vhost (`backend.reverseProxy.port = 18789`,
         `tls.cert.shared`, `dns.tailnet`, `managedBy = { caddy = true; dns = true; }`) +
         `catalogDns` entry in `service-registry.nix` → Technitium provisioning on aedilis picks
-        it up automatically (upsert). Deploy aedilis + mini; verify A/AAAA resolve to mini's
-        tailnet address and `https://openclaw.plato-splunk.media` serves the Control UI (token).
+        it up automatically (upsert). Verified via eval: A/AAAA `openclaw.plato-splunk.media` →
+        mini tailnet addrs in aedilis `ensureDnsRecords.zones`; mini `catalog-sites.caddy`
+        renders `https://openclaw.plato-splunk.media { reverse_proxy 127.0.0.1:18789 }`.
+        **Deploy order: aedilis FIRST (DNS must resolve before mini's Caddy requests the cert
+        via step-ca HTTP-01), then mini.**
 
 ## Open Questions — ALL RESOLVED (2026-11-05)
 

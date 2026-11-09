@@ -159,6 +159,7 @@ let
     mini-jellyfin = mkCatalogDns "mini-jellyfin" "jellyfin" "mini";
     mini-jellyfin-metrics = mkCatalogDns "mini-jellyfin-metrics" "mini-jellyfin-metrics" "mini";
     mini-caddy-metrics = mkCatalogDns "mini-caddy-metrics" "mini-caddy-metrics" "mini";
+    openclaw = mkCatalogDns "openclaw" "openclaw" "mini";
     # nixos services
     opencode = mkCatalogDns "opencode" "opencode" "nixos";
     # aedilis services

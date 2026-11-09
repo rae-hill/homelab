@@ -90,8 +90,20 @@
           gateway: {
             mode: "local",
             port: 18789,
-            bind: "loopback", // WS control + Control UI on 127.0.0.1 only
-            auth: { mode: "token" }, // token supplied via OPENCLAW_GATEWAY_TOKEN env
+            bind: "loopback", // WS control + Control UI on 127.0.0.1 only; Caddy fronts it
+            // Reverse-proxy requirements (verified vs v2026.10.5 docs: gateway/security/
+            // network-exposure.md, config-gateway.md, rate-limiting.md):
+            // - trustedProxies: without it, same-host proxy traffic gets 403
+            //   proxy_attribution_required (loopback socket + XFF from unlisted proxy).
+            // - publicOrigin: feeds controlUi.allowedOrigins — plato-splunk.media is NOT in
+            //   the auto-accepted set (loopback/RFC1918/.ts.net/.local/CGNAT), so browser
+            //   origin checks would reject the vhost without it.
+            publicOrigin: "https://openclaw.plato-splunk.media",
+            trustedProxies: ["127.0.0.1"],
+            auth: { mode: "token" }, // token supplied via OPENCLAW_GATEWAY_TOKEN env;
+            // NOT trusted-proxy mode: our Caddy is a plain TLS terminator, not identity-aware
+            // (docs: "When NOT to use trusted-proxy"). /v1/* bearer = full operator access —
+            // treat the vhost as admin-grade exposure on the tailnet.
             reload: { mode: "off" }, // Nix generations swap the file; no hot reload
           },
           logging: {
@@ -116,12 +128,12 @@
                 env: {
                   PROTON_BRIDGE_USERNAME: "''${PROTON_BRIDGE_USERNAME}",
                   PROTON_BRIDGE_PASSWORD: "''${PROTON_BRIDGE_PASSWORD}",
-                  # Read-only by default. To enable labeling: set "read,label" AND list the
-                  # exact label names allowed (comma-separated), e.g. "Receipts,Important".
-                  # The server hides label tools entirely unless "label" is enabled, and
-                  # rejects non-whitelisted labels (policy_denied) — see
-                  # packages/proton-mail-mcp + docs/openclaw-mini-plan.md.
-                  PROTON_MCP_OPERATIONS: "read",
+                  # Read + label (jacob 2026-11-09). Whitelist = exact Proton label names
+                  # (case-sensitive, comma-separated; spaces OK, slashes/NUL rejected at
+                  # startup). Enforced 3x: tool visibility gates, handler checks, IMAP layer —
+                  # see packages/proton-mail-mcp + docs/openclaw-mini-plan.md.
+                  PROTON_MCP_OPERATIONS: "read,label",
+                  PROTON_MCP_ALLOWED_LABELS: "Declined,Applied,Needs Follow-Up,Job Hunt",
                 },
                 toolFilter: { include: ["mail_*"] },
               },

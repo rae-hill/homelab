@@ -5,6 +5,61 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 3: labeling enabled, PHASE 3 vhost + DNS implemented, main-checkout yarn verified
+
+### Changes (all validated via eval; committed this session)
+
+- **Labeling ENABLED** (`features/openclaw/service.nix` → `mcp.servers.protonmail.env`):
+  `PROTON_MCP_OPERATIONS: "read,label"`, `PROTON_MCP_ALLOWED_LABELS: "Declined,Applied,Needs
+  Follow-Up,Job Hunt"` (jacob's exact label names — case-sensitive match against Proton labels;
+  spaces fine, CSV splits on commas only; `mail_list_labels` will show which exist on the account,
+  `mail_add_label` creates missing label folders via IMAP CREATE).
+- **Phase 3 vhost**: new `features/openclaw/catalog.nix` (`flake.modules.darwin.openclaw-catalog`,
+  imported from complete.nix) → `homelab.catalog.openclaw`: subdomain `openclaw`, host mini,
+  `backend.reverseProxy.port = 18789`, `tls.cert.shared` (Caddy-native ACME via step-ca; NO mTLS —
+  tailnet-only name + gateway token auth), `dns.tailnet`, managedBy caddy+dns.
+- **Technitium provisioning**: `service-registry.nix` catalogDns += `openclaw = mkCatalogDns
+  "openclaw" "openclaw" "mini";` → verified in aedilis eval: A `100.111.29.21` + AAAA
+  `fd7a:115c:a1e0::db01:1d31` for `openclaw.plato-splunk.media` in
+  `services.technitium-server-complete.provision.ensureDnsRecords.zones`.
+- **Mini Caddy fragment verified**: `catalog-sites.caddy` renders
+  `https://openclaw.plato-splunk.media { reverse_proxy 127.0.0.1:18789 }`.
+- **Gateway config hardened for the reverse proxy** (research subagent
+  `ses_e3ea3dbd3ffeaf228UvW5yrZm1`, docs verified at tag v2026.10.5):
+  - `gateway.trustedProxies: ["127.0.0.1"]` — WITHOUT this, same-host proxied traffic gets
+    HTTP 403 `proxy_attribution_required` / WS auth failure (docs: rate-limiting.md "Unconfigured
+    same-host reverse proxies"). The #1 would-be failure.
+  - `gateway.publicOrigin: "https://openclaw.plato-splunk.media"` — feeds `controlUi.allowedOrigins`;
+    custom domains are NOT auto-accepted (only loopback/RFC1918/link-local/.local/.ts.net/CGNAT),
+    so browser origin checks would reject the vhost without it. Do NOT use `["*"]` or
+    `dangerouslyAllowHostHeaderOriginFallback`.
+  - Kept `auth.mode: "token"` — `trusted-proxy` mode is for identity-aware proxies only (docs
+    "When NOT to use": plain TLS terminators). Kept `bind: "loopback"` (correct when proxied).
+  - Caddy side needs nothing extra (WS Upgrade + XFF rebuild automatic). HSTS could be added at
+    the vhost later (single TLS termination point) — skipped for now.
+- **yarn/hashes in main checkout** (`~/git/homelab`): `yarn install` (devshell) → link-step only,
+  tree clean afterward; `update-missing-hashes` → no change. FOD hash
+  `sha256-qVDumxrjcdoORTq1Q0HooA0levjmDwsMsacZOeFokjk=` (session 2) still current. Nothing to update.
+- Plan doc: phase-3 step 10 checked; tool-name drift fixed (`mail_set_read`/`mail_set_starred`,
+  - `mail_list_labels`); label decision recorded. port-assignments note updated (vhost active).
+
+### jacob: deploy notes (updated)
+
+- **Deploy ORDER matters now: aedilis FIRST** (`remote-build-aedilis` devshell command) so
+  Technitium serves `openclaw.plato-splunk.media` → mini's tailnet IP **before** mini's Caddy
+  requests the step-ca cert (HTTP-01: CA resolves the name and hits mini's auto-`:80` challenge
+  listener — same mechanism jellyfin already uses). Then mini: `darwin-rebuild switch --flake
+  ~/git/homelab#mini`.
+- First proxied browser visit to `https://openclaw.plato-splunk.media`: paste the gateway token
+  ("Gateway secret") + **one-time device pairing approval on mini** (loopback auto-approve does
+  NOT apply through a proxy — docs: connect-and-pair.md). Then `openclaw security audit`.
+- Treat the vhost as admin-grade exposure: `/v1/*` bearer = full operator access (tailnet-only
+  DNS + token auth are the boundary).
+- Strict-schema reminder: `publicOrigin`/`trustedProxies` key names verified against v2026.10.5
+  docs, but run `openclaw config validate` on mini post-deploy (exit 78 = unknown key).
+
+---
+
 ## 2026-11-09 — Version decision: openclaw stays on nixpkgs 2026.10.5 (jacob, confirmed)
 
 - Upstream is ahead: **v2026.11.2** latest stable tag (v2026.11.5-beta.1 published; also
