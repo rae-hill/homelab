@@ -120,8 +120,11 @@ Gateway binds 127.0.0.1 (default) and stays there — mini's Caddy terminates th
 - **Phase 1:** access locally via `openclaw dashboard` or Tailscale SSH port-forward. Update
   `docs/port-assignments.md` (Mini table: 18789, 127.0.0.1).
 - **Phase 3 (DECIDED):** `openclaw.plato-splunk.media` → mini tailnet address → mini Caddy →
-  127.0.0.1:18789, same darwin-catalog pattern as `jellyfin` (plain shared cert + the gateway's
-  own token auth; mTLS optional — browser UX favors token-only on a tailnet-only name).
+  127.0.0.1:18789, same darwin-catalog pattern as `jellyfin`. **mTLS-gated** (jacob 2026-11-09:
+  "lock agents down with mTLS"; iPad/iPhone hold client certs): `tls.gate.mtls.trustPoolFile`
+  = step-ca root → rendered `client_auth require_and_verify`; server cert stays Caddy-native
+  ACME (`cert.shared`). Gateway token auth remains active behind mTLS (two factors: cert +
+  token). Devices without a client cert fail the TLS handshake (by design).
 - **Technitium provisioning (jacob's requirement):** DNS flows from the flake-level `catalogDns`
   aggregate in `service-registry.nix` — the `homelab-service-dns` generator (aedilis-only) folds
   it and upserts records into Technitium via `technitium-provisioning`. Add

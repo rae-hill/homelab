@@ -5,6 +5,30 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 4: mTLS enabled on the openclaw vhost; secrets staged by jacob
+
+- **jacob filled in all five sops secrets** in `secrets/mini.yaml` (his confirmation; contents
+  never seen by agents — by design).
+- **mTLS on `openclaw.plato-splunk.media`** (jacob: "lock agents down with mTLS"; iPad + iPhone
+  hold client certs): `features/openclaw/catalog.nix` now sets `tls.gate.mtls.trustPoolFile =
+  config.constants.ca.rootCert` + `tls.cert.shared = {}` — identical gate to mini's metrics
+  vhosts. Rendered fragment verified via eval:
+  `tls { client_auth { mode require_and_verify; trust_pool file { pem_file <store>/certs/alford-root.crt } } }`
+  - `reverse_proxy 127.0.0.1:18789`, server cert via Caddy-native ACME (global `acme_ca` →
+    step-ca). Gateway **token auth stays on behind mTLS** (cert = device factor, token = operator
+    factor). Devices without a client cert now fail the TLS handshake — intended.
+- ⚠ **Gotcha recorded:** `config.constants.*` lives in the FLAKE-PARTS config — `rootCert` must
+  be bound in the file-level module let (outer `{ config, ... }:`), NOT inside the
+  `flake.modules.darwin.*` module body whose `config` is the darwin system config (eval error
+  "attribute 'constants' missing"). Same structure as `mini-jellyfin/catalog.nix`.
+- Mini toplevel eval ✓ after the change. Deploy order unchanged: **aedilis first** (DNS before
+  HTTP-01), then mini. Post-deploy browser flow: client-cert handshake → paste gateway token →
+  one-time device pairing approval on mini.
+- Also this session (earlier): `doSTARTTLS: true` hardening in proton-mail-mcp (commit
+  `dfcee921b2b8`) — STARTTLS now REQUIRED, never cleartext fallback.
+
+---
+
 ## 2026-11-09 — Session 3: labeling enabled, PHASE 3 vhost + DNS implemented, main-checkout yarn verified
 
 ### Changes (all validated via eval; committed this session)
