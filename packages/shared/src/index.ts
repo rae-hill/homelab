@@ -1,3 +1,5 @@
 export * as Constants from "./constants.js"
 export * as PrintConfig from "./print-config/index.js"
+export * as ResumeContent from "./resume-content/index.js"
+export * as Schemas from "./schemas/index.js"
 export * as Utils from "./utils.js"

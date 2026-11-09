@@ -1,8 +1,12 @@
-import type { PrintConfig } from "shared"
+import { ABOUT_ME_DEFAULT, BLURB_DEFAULT } from "./defaults.js"
+import type { ContentState } from "./types.js"
 
-type ContentState = PrintConfig.ContentState
-type ExperienceContent = PrintConfig.ExperienceContent
-type ProjectContent = PrintConfig.ProjectContent
+export { ABOUT_ME_DEFAULT, BLURB_DEFAULT }
+
+/** Frozen version tag for the default content state. Patches persist in localStorage (tailor
+ * entries) and decode against this base, so changing the default is a versioned contract
+ * change. */
+export const CONTENT_DEFAULTS_VERSION = "v1" as const
 
 function bullets(entryId: string, texts: ReadonlyArray<string>) {
   return texts.map((text, i) => ({
@@ -12,11 +16,7 @@ function bullets(entryId: string, texts: ReadonlyArray<string>) {
   }))
 }
 
-/**
- * The default experience content — the previous static `experiences` data, now the
- * editable Default. Bullet strings are lifted into `{ id, text, visible }`.
- */
-const experience: ReadonlyArray<ExperienceContent> = [
+const experience = [
   {
     id: "nutrien",
     company: "Nutrien (P3-Uplift)",
@@ -133,11 +133,7 @@ const experience: ReadonlyArray<ExperienceContent> = [
   },
 ]
 
-/**
- * The default project content — the previous static `projects` data. `icon` / `iconColor`
- * are intentionally omitted (derived statically at render time; not editable).
- */
-const projects: ReadonlyArray<ProjectContent> = [
+const projects = [
   {
     id: "nixos-homelab",
     title: "NixOS declarative homelab with Grafana, OpenTelemetry, and Prometheus",
@@ -197,8 +193,11 @@ const projects: ReadonlyArray<ProjectContent> = [
   },
 ]
 
-/** The default content slice — the editable "Default" for the resume. */
-export const initialContentState: ContentState = {
+/** The default content state — lifted from `packages/resume/src/state/print-config/content-defaults.ts`,
+ * extended with blurb and aboutMe defaults. */
+export const INITIAL_CONTENT_STATE: ContentState = {
+  blurb: BLURB_DEFAULT,
+  aboutMe: ABOUT_ME_DEFAULT,
   experience,
   projects,
   skills: ["Foo", "Bar"],

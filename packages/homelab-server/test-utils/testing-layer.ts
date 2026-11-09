@@ -42,6 +42,7 @@ const TestConfigProvider = ConfigProvider.layer(
     INTERMEDIATE_CERT_CRT: path.join(certsDir, "intermediate_ca_2.crt"),
     KANIDM_OPENID_PROVIDER_URL: "https://kanidm.test/oauth2/openid/test/.well-known/openid-configuration",
     SERIAL_NUMBERS_FILE: path.join(privateDir, "serial-numbers.json"),
+    OPENROUTER_API_KEY_FILE: path.join(privateDir, "openrouter-key"),
   }),
 )
 

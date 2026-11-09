@@ -66,8 +66,13 @@ in
     originUrl = "https://homelab-api.plato-splunk.media";
     privateKeySecretPath = config.sops.secrets.homelab_api_jwk_password.path;
     serialNumbersFile = config.sops.templates."serial-numbers-file".path;
+    # OpenRouter API key for POST /resume/tailor (resume-tailor feature). Exported as
+    # OPENROUTER_API_KEY_FILE via the homelab-api-env template; null on praeconinus
+    # keeps the tailor dark there by design.
+    openRouterApiKeyFile = config.sops.secrets.homelab_api_openrouter_key.path;
     # Headless chrome for POST /resume/print (remote-printing feature). Chrome makes the
     # best PDFs; the wrapper resolves its own runtime deps via absolute store paths.
+    # resumeSiteUrl defaults to the tailnet resume-site vhost via features/resume-site.
     chromeExecutable = "${pkgs.google-chrome}/bin/google-chrome-stable";
     apiKeys = {
       jacob = {
@@ -89,6 +94,11 @@ in
     privateKeyPasswordFile = config.sops.secrets.homelab_api_jwk_password.path;
     apiKeys = config.services.homelab-api.apiKeys;
   };
+
+  # The loopback resume-site vhost was replaced by the tailnet catalog entry
+  # https://resume.plato-splunk.media (features/resume-site, imported in
+  # hosts/augustus.nix) — it also points services.homelab-api.resumeSiteUrl at
+  # itself, so nothing to configure here.
 
   services.restic.backups.postgres = {
     user = "restic";

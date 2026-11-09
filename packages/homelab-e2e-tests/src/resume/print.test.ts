@@ -14,6 +14,14 @@ import {
   TEST_LIMITED_API_KEY,
 } from "../../test-utils/index.js"
 
+/**
+ * The success test launches headless chrome (server-side) and renders the LIVE
+ * resume site, so it only runs where CHROME_EXECUTABLE is set — the devshell
+ * provides it (and scripts/e2e.sh mirrors a value from .env-serve-test);
+ * CI runners don't, so the test skips there and puppeteer never launches.
+ */
+const describeWithChrome = (process.env.CHROME_EXECUTABLE ?? "").length > 0 ? describe : describe.skip
+
 const ENDPOINT_URL = new URL(`${BASE_URL}/resume/print`)
 
 /**
@@ -72,6 +80,8 @@ const fixtureConfig: PrintConfig.PersistedConfig = {
     description: { kind: "Blurb", textAlign: "center" },
   },
   content: {
+    blurb: "Agentic developer seeking a software engineering or DevOps role.",
+    aboutMe: "Dedicated to the craft of principled engineering.",
     experience: [
       {
         id: "acme",
@@ -192,9 +202,9 @@ describe("POST /resume/print", () => {
       }).pipe(Effect.provide(E2ETestLayer)))
   })
 
-  describe("success", () => {
+  describeWithChrome("success", () => {
     /**
-     * Server environment requirements for this test (see .env-local of the dev server):
+     * Server environment requirements for this test (bootstrapped by scripts/e2e.sh — see scripts/stage-e2e-secrets.mjs):
      * - CHROME_EXECUTABLE: path to a chrome/chromium binary (e.g. `which google-chrome`)
      * - RESUME_SITE_URL: a resume build that supports ?importPrintSettings and sets
      *   html[data-print-ready] — either the local vite dev server

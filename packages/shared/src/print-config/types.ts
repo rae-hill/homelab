@@ -9,7 +9,7 @@ import type { Schema } from "effect"
 
 import type * as S from "./schema.js"
 
-/* ---- Content ------------------------------------------------------------------------- */
+/* ---- Content (re-exported from ResumeContent for compatibility) -------------------------- */
 
 export type BulletPoint = Schema.Schema.Type<typeof S.BulletPoint>
 export type ExperienceContent = Schema.Schema.Type<typeof S.ExperienceContent>

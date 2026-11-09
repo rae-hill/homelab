@@ -5,16 +5,9 @@ import { LuMapPin } from "react-icons/lu"
 import { MdMailOutline, MdOutlineVerified } from "react-icons/md"
 import { PiGraduationCap } from "react-icons/pi"
 import { VscGithub } from "react-icons/vsc"
-import { useFeaturedMode, useHeadingConfig, useToggles } from "../../../state/print-config"
+import { useContent, useFeaturedMode, useHeadingConfig, useToggles } from "../../../state/print-config"
 import { IconText } from "../icon-text"
 import * as Links from "../links"
-
-/** Personal summary paragraph shown when the header description mode is `Blurb`. */
-const BLURB = "Agentic developer, multilingual full-stack engineer, DevOps architect, and mathematician " +
-  "seeking a software engineering or DevOps role. Experienced in applying AI to solve " +
-  "complex problems and improve user workflows. Proficient in TypeScript, Python, frontend " +
-  "frameworks, systems design, and backend microservice architecture. Skilled at building secure, " +
-  "distributed, scalable, observable systems with strong performance characteristics."
 
 /** Terse pipe-separated tagline lines shown when the mode is `SkillList`. */
 const SKILL_LINES: ReadonlyArray<string> = [
@@ -26,6 +19,7 @@ export function ResumeHeading() {
   const { toggles } = useToggles()
   const { featuredMode } = useFeaturedMode()
   const { heading } = useHeadingConfig()
+  const { content } = useContent()
   const {
     contactAlign,
     contactGap,
@@ -128,7 +122,7 @@ export function ResumeHeading() {
               opacity={0.9}
               textAlign={description.textAlign}
             >
-              {BLURB}
+              {content.blurb}
             </Text>
           )
           : SKILL_LINES.map((line) => (

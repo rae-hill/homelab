@@ -38,6 +38,8 @@ export const BadRequestReasonsSchema = Schema.Literals([
   "eap-client-username-required",
   "acme-invalid-client-identifier",
   "dns-ssid-required",
+  "resume-tailor-base-version-mismatch",
+  "resume-tailor-quota-exceeded",
 ])
 
 export class BadRequest extends Schema.TaggedError<BadRequest>()(

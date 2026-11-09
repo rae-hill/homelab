@@ -1,5 +1,5 @@
-import { Effect, Schema } from "effect"
-import { type LazyArg } from "effect/Function"
+import { Schema } from "effect"
+import { Schemas } from "shared"
 import { JsonUnknown } from "./JsonUnknown.js"
 
 export const OptionalStringOrArray = Optional(
@@ -24,8 +24,5 @@ export function Optional<A, E, RD, RE>(schema: Schema.Codec<A, E, RD, RE>) {
   )
 }
 
-export function OptionalWithDefault<A, E, RD, RE>(schema: Schema.Codec<A, E, RD, RE>, _default: LazyArg<A>) {
-  return schema.pipe(
-    Schema.withDecodingDefaultTypeKey(Effect.sync(_default)),
-  )
-}
+/** Re-exported from shared for backward compatibility. */
+export const OptionalWithDefault = Schemas.OptionalWithDefault

@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { BulletPoint, ContentState, ExperienceContent, ProjectContent } from "../resume-content/schema.js"
 
 /**
  * Effect v4 schemas for the print-config state — the single source of truth. All TS types
@@ -127,39 +128,9 @@ export const HeadingConfig = Schema.Struct({
   description: HeaderDescription,
 })
 
-/* ---- Content ------------------------------------------------------------------------- */
+/* ---- Content (moved to resume-content; re-exported for compatibility) -------------------- */
 
-export const BulletPoint = Schema.Struct({
-  id: Schema.String,
-  text: Schema.String,
-  visible: Schema.Boolean,
-})
-
-export const ExperienceContent = Schema.Struct({
-  id: Schema.String,
-  company: Schema.String,
-  location: Schema.String,
-  roles: Schema.Array(
-    Schema.Struct({ title: Schema.String, date: Schema.String }),
-  ),
-  description: Schema.String,
-  bulletPoints: Schema.Array(BulletPoint),
-  tags: Schema.Array(Schema.String),
-})
-
-export const ProjectContent = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  description: Schema.String,
-  githubLink: Schema.String,
-  tags: Schema.Array(Schema.String),
-})
-
-export const ContentState = Schema.Struct({
-  experience: Schema.Array(ExperienceContent),
-  projects: Schema.Array(ProjectContent),
-  skills: Schema.Array(Schema.String),
-})
+export { BulletPoint, ContentState, ExperienceContent, ProjectContent }
 
 /* ---- Top-level state ----------------------------------------------------------------- */
 

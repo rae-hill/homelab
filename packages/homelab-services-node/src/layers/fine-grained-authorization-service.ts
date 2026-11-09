@@ -116,6 +116,7 @@ class FineGrainedAuthorizationServiceImpl
         "OAuth_Token": () => Effect.succeed(true as const),
         "OAuth_ClaimCheck": () => Effect.succeed(true as const),
         "Resume_Print": () => Effect.succeed(true as const),
+        "Resume_Tailor": () => Effect.succeed(true as const),
       }),
     )
   }

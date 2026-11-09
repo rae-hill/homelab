@@ -1,0 +1,31 @@
+{
+  "name": "homelab-services-browser",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Browser runtime service layer implementations for homelab (localStorage-backed tailor entry store + preset snapshot)",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint src test",
+    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "test": "vitest run",
+    "circular": "yarn madge --circular ./src/index.ts",
+    "test:watch": "vitest watch"
+  },
+  "dependencies": {
+    "effect": "^4.1.x",
+    "homelab-services": "workspace:*",
+    "shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "^4.1.x",
+    "@types/node": "^24",
+    "madge": "^8.0.0",
+    "vite": "^8.3.5",
+    "vitest": "^5.x"
+  }
+}

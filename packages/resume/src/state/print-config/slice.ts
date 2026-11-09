@@ -259,6 +259,28 @@ export const printConfigSlice = createSlice({
     applyConfig(state, action: PayloadAction<PrintConfigState>) {
       return { ...action.payload, editingEnabled: state.editingEnabled }
     },
+    /**
+     * Apply tailored content from the AI tailor response. Sets ONLY state.content,
+     * preserving all layout, toggles, featuredMode, heading, and editingEnabled.
+     * Used by the auto-apply flow after a successful tailor request.
+     */
+    applyTailoredContent(state, action: PayloadAction<ContentState>) {
+      state.content = castDraft(action.payload)
+    },
+    /**
+     * Set the blurb (personal summary shown in heading when description mode is Blurb).
+     * Used by the Heading tab's editing UI.
+     */
+    setBlurb(state, action: PayloadAction<string>) {
+      state.content.blurb = action.payload
+    },
+    /**
+     * Set the aboutMe paragraph (shown in the About Me section).
+     * Used by the Heading tab's editing UI.
+     */
+    setAboutMe(state, action: PayloadAction<string>) {
+      state.content.aboutMe = action.payload
+    },
     reset() {
       return initialPrintConfigState
     },

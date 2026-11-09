@@ -81,7 +81,14 @@ export function requestResumePdf(
  * Trigger a browser download of the PDF bytes. Pure DOM side effect, kept separate so the
  * Effect above stays free of `document` access.
  */
-export function downloadPdf(bytes: Uint8Array, filename = "rae-hill-resume.pdf"): void {
+export function downloadPdf(bytes: Uint8Array, filename_?: string): void {
+  const today = new Date()
+  const days = (today.getDay() + 1).toString().padStart(2, "0")
+  const months = (today.getMonth() + 1).toString().padStart(2, "0")
+  const year = today.getFullYear()
+  const rhex = Math.random().toString(16).substring(2, 10)
+  const filename = filename_ ?? `resume-rae-hill-${year}-${months}-${days}-${rhex}.pdf`
+
   const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement("a")

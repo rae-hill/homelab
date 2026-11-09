@@ -10,6 +10,15 @@
 
 const CONFETTI_SRC = "https://run.confettipage.com/here.js"
 
+/**
+ * Hostnames where the confetti vendor is allowed to run. The `data-confetticode`
+ * configs below are domain-bound (issued for the public site / local dev); on
+ * any other origin (e.g. the tailnet print mirror resume.plato-splunk.media)
+ * the vendor errors and shows "wrong domain" popups — so don't inject there.
+ * The server-side print flow additionally DNS-blocks the vendor host.
+ */
+const CONFETTI_ALLOWED_HOSTNAMES = new Set(["resume.rae-hill.dev", "localhost", "127.0.0.1"])
+
 /** Production confetti config (from the old `NODE_ENV === 'production'` branch). */
 const CONFETTI_CODE_PROD =
   "U2FsdGVkX19e1ZCylxErKWAmZ2rtoOHJVXfhwqvCZodwh3rhFg+h9KoZwpe5aUqdDZiJ9rSUStVBObqr2fzYC0Gb9fBAMFdM/CleSL7EvRIiBkMcxAdOPR4TA/c1P2RNRGIh0BxpC/zE8AbOhK8SJGMIQ5P6twz+3i3gqcipQ09mrhes6w36tcAJDFC7h16pwWv5eiUbl/aGielAqRxTb/7GstQk3BYNgEbDCeFRjJdRPP2zy6GKGesOnouywtXKfHhHsTwwzsK80O4tvrQax9KBlobIQvwRWGjemS3qwi/wKv3cz/mhmWmj1bip/ftNTDgNZDgHrGnnPG25I0ECh+9NNWrYNnKsGL3YHFDWE5x1Aiz9rSAlpdTnSJ0E/QxEBW6WJhaYNG4bxfAJbFOmKH8bw8FovAeWob3wcNFIERZgM0q7KEW43lT3ghg5asRcIzUNJXMfwSq1u4k6Qr5DUSIrNavuhBVq1Dbrfm3TGp5g7Itv82g2JYhMxVx6Ej1Crxf8lQbIcDyzHI1PSs/x/VtiMb7qD0mtMYy0DpIK7T8P+7unERQPqFGyQX9w0mTgB3J0Fj2OPogyqygN7Nh03eSSEUV7SSVi75Q5WHAdHEi3ts4+a93Fl9Z+zBnIDbpbAiVne8GBQ6T3Dih1iyCvgVQr4EyrcWtrSS0xTxTDvpmBUqU9nGF/ssdx8nM2kZ9QO+X+X2rHj+BobI7cTulohIOpGcN6jpawjda/zQPsIEFpo6ZxujJsgB6WJwRUzkl7"
@@ -28,7 +37,12 @@ export function setupEnvironmentSideEffects(): void {
     globalThis.console.log = function noLogsInProductionPlease() {}
   }
 
-  // Inject the confetti vendor script (both environments, with the per-env code).
+  // Inject the confetti vendor script (both environments, with the per-env code) —
+  // only on domains its code is issued for (see CONFETTI_ALLOWED_HOSTNAMES).
+  if (!CONFETTI_ALLOWED_HOSTNAMES.has(window.location.hostname)) {
+    return
+  }
+
   const script = document.createElement("script")
   script.src = CONFETTI_SRC
   script.async = true

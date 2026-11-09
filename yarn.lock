@@ -8487,6 +8487,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"homelab-services-browser@workspace:*, homelab-services-browser@workspace:packages/homelab-services-browser":
+  version: 0.0.0-use.local
+  resolution: "homelab-services-browser@workspace:packages/homelab-services-browser"
+  dependencies:
+    "@effect/vitest": "npm:^4.1.x"
+    "@types/node": "npm:^24"
+    effect: "npm:^4.1.x"
+    homelab-services: "workspace:*"
+    madge: "npm:^8.0.0"
+    shared: "workspace:*"
+    vite: "npm:^8.3.5"
+    vitest: "npm:^5.x"
+  languageName: unknown
+  linkType: soft
+
 "homelab-services-node@workspace:*, homelab-services-node@workspace:packages/homelab-services-node":
   version: 0.0.0-use.local
   resolution: "homelab-services-node@workspace:packages/homelab-services-node"
@@ -11921,6 +11936,8 @@ __metadata:
     "@vitejs/plugin-react": "npm:6.1.2"
     effect: "npm:4.1.2"
     homelab-api: "workspace:*"
+    homelab-services: "workspace:*"
+    homelab-services-browser: "workspace:*"
     next-themes: "npm:^0.4.6"
     react: "npm:^18.3.1"
     react-dom: "npm:^18.3.1"

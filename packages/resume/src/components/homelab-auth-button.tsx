@@ -1,4 +1,4 @@
-import { Button, HStack, IconButton, Text } from "@chakra-ui/react"
+import { Button, HStack, IconButton, Tag } from "@chakra-ui/react"
 import { LuLogIn, LuLogOut } from "react-icons/lu"
 
 import { useHomelabAuth, useHomelabReachability, useLogin, useLogout } from "../state/homelab"
@@ -22,9 +22,11 @@ export function HomelabAuthButton() {
   if (auth.status === "signedIn") {
     return (
       <HStack gap={1}>
-        <Text m={0} textStyle="xs" color="fg.muted" maxW="12rem" truncate>
-          {auth.email ?? "Signed in"}
-        </Text>
+        <Tag.Root>
+          <Tag.Label m={0} textStyle="xs" maxW="12rem" truncate>
+            {auth.email ?? "Signed in"}
+          </Tag.Label>
+        </Tag.Root>
         <IconButton aria-label="Sign out" variant="ghost" size="md" onClick={logout}>
           <LuLogOut style={{ width: "1.25rem", height: "1.25rem" }} />
         </IconButton>

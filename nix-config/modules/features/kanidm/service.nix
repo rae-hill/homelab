@@ -77,9 +77,8 @@ in
 
             "homelab.admins" = { };
             "homelab.access" = { };
-
-            # Remote-printing for the resume SPA (claim-map → Resume_Print role).
-            "resume.printing" = { };
+            "homelab.resume.printing" = { };
+            "homelab.resume.tailoring" = { };
 
             "habitsync.access" = { };
 
@@ -118,40 +117,16 @@ in
                 "habitsync.access"
               ];
             };
+            # TODO: Remove deadname
             jacob = {
               displayName = "Jacob Alford";
               mailAddresses = [ "jacob@plato-splunk.media" ];
               groups = [
-                "radius.access"
-                "radius.access_home"
-                "radius.access_private"
-
-                "openwebui.admins"
-                "openwebui.access"
-
-                "nextcloud.admins"
-                "nextcloud.access"
-
-                "jellyfin.admins"
-                "jellyfin.access"
-
-                "home-assistant.access"
-                "home-assistant.admins"
-
                 "planka.access"
                 "planka.project_owner"
                 "planka.admins"
 
                 "step-ca.access"
-
-                "homelab.admins"
-
-                "resume.printing"
-
-                "grafana.access"
-                "grafana.admins"
-
-                "technitium.admins"
               ];
             };
             rae = {
@@ -180,8 +155,8 @@ in
                 "step-ca.access"
 
                 "homelab.admins"
-
-                "resume.printing"
+                "homelab.resume.printing"
+                "homelab.resume.tailoring"
 
                 "habitsync.access"
 

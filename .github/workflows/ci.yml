@@ -60,6 +60,26 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=8192
 
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        uses: ./.github/actions/setup
+      # scripts/e2e.sh bootstraps the machine-local server fixtures itself
+      # (generated, non-secret: .env-serve-test + private/ keys — see
+      # scripts/stage-e2e-secrets.mjs), builds the rolldown bundle, starts the
+      # server on :54328, and runs the suite against it (server logs land in
+      # .e2e-log-dump.txt). Deliberately NO Nix and NO chrome here:
+      # CHROME_EXECUTABLE is unset on runners, so the live resume-print
+      # success test self-skips and puppeteer never launches a browser.
+      - name: Run e2e suite (bundled server)
+        run: bash scripts/e2e.sh
+        env:
+          DISABLE_NETWORK_TESTS: "true"
+
   nix-check:
     name: Nix Flake Check
     runs-on: ubuntu-latest
