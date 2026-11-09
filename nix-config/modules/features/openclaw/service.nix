@@ -128,10 +128,10 @@
                 env: {
                   PROTON_BRIDGE_USERNAME: "''${PROTON_BRIDGE_USERNAME}",
                   PROTON_BRIDGE_PASSWORD: "''${PROTON_BRIDGE_PASSWORD}",
-                  # Read + label (jacob 2026-11-09). Whitelist = exact Proton label names
-                  # (case-sensitive, comma-separated; spaces OK, slashes/NUL rejected at
-                  # startup). Enforced 3x: tool visibility gates, handler checks, IMAP layer —
-                  # see packages/proton-mail-mcp + docs/openclaw-mini-plan.md.
+                  // Read + label (jacob 2026-11-09). Whitelist = exact Proton label names
+                  // (case-sensitive, comma-separated; spaces OK, slashes/NUL rejected at
+                  // startup). Enforced 3x: tool visibility gates, handler checks, IMAP layer —
+                  // see packages/proton-mail-mcp + docs/openclaw-mini-plan.md.
                   PROTON_MCP_OPERATIONS: "read,label",
                   PROTON_MCP_ALLOWED_LABELS: "Declined,Applied,Needs Follow-Up,Job Hunt",
                 },

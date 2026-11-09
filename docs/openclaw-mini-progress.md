@@ -5,6 +5,32 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 5: mini deployed; JSON5 `#`-comment bug fixed (config parse failure)
+
+- **mini built + deployed successfully** after jacob added the missing `kagi_api_key` to
+  `secrets/mini.yaml` (the earlier `manifest.json.drv` exit-1 was sops-nix's checkPhase
+  (`sops-install-secrets -check-mode=sopsfile`) rejecting a declared-but-absent key — diagnosed
+  by comparing `secretNames` in service.nix against mini.yaml's plaintext key names).
+- **Bug (mine):** the protonmail env comment block in the rendered `openclaw.json` used `#`
+  comments — JSON5 allows ONLY `//` and `/* */`. `openclaw config validate` failed:
+  "JSON5: invalid character '#' at 45:11" ⇒ gateway crash-looped (exit 78 + KeepAlive).
+  Fixed to `//` in `features/openclaw/service.nix`.
+- **NEW VALIDATION RULE for future agents: after ANY edit to the rendered openclaw.json text,
+  parse-check it locally before deploy:**
+  ```sh
+  nix eval --raw '.#darwinConfigurations.mini.config.environment.etc."openclaw/openclaw.json".text' > /tmp/opencode/openclaw-rendered.json5
+  nix develop --command zsh -c "node -e \"require('json5').parse(require('fs').readFileSync('/tmp/opencode/openclaw-rendered.json5','utf8'));console.log('PARSE_OK')\""
+  ```
+  (json5 is a transitive dep in node_modules). Parse stage only — schema validation still needs
+  `openclaw config validate` on mini.
+- Post-fix verification: parse ✓ (keys gateway/logging/agents/mcp; servers kagi+protonmail;
+  `${VAR}` placeholders intact in protonmail env).
+- jacob: rebuild on mini (fast — only the config/wrapper generation changes; openclaw itself is
+  cached), then `openclaw config validate` + `openclaw gateway status` + check
+  `~/Library/Logs/openclaw/gateway.log`.
+
+---
+
 ## 2026-11-09 — Session 4: mTLS enabled on the openclaw vhost; secrets staged by jacob
 
 - **jacob filled in all five sops secrets** in `secrets/mini.yaml` (his confirmation; contents
