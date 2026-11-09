@@ -108,8 +108,11 @@ class ImapMailServiceImpl implements ImapMailServiceDef {
         const client = new ImapFlow({
           host: env.bridgeHost,
           port: env.bridgePort,
-          // secure=false → ImapFlow opportunistically upgrades via STARTTLS (Bridge default).
+          // secure=false + doSTARTTLS=true → REQUIRED STARTTLS upgrade (Bridge default mode).
+          // Without doSTARTTLS, ImapFlow is only opportunistic: a stripped STARTTLS capability
+          // would silently continue CLEARTEXT (docs: types.d.ts doSTARTTLS) — fail closed instead.
           secure: env.bridgeTlsMode === "implicit",
+          doSTARTTLS: env.bridgeTlsMode === "starttls",
           // Loopback-only unless a CA file pins the Bridge self-signed cert (guarded in Env).
           tls: caPem !== undefined ? { ca: [caPem] } : { rejectUnauthorized: false },
           auth: { user: env.bridgeUsername, pass: env.bridgePassword },

@@ -40,6 +40,12 @@ Newest entries first. Agents: append, don't rewrite history.
 - **yarn/hashes in main checkout** (`~/git/homelab`): `yarn install` (devshell) → link-step only,
   tree clean afterward; `update-missing-hashes` → no change. FOD hash
   `sha256-qVDumxrjcdoORTq1Q0HooA0levjmDwsMsacZOeFokjk=` (session 2) still current. Nothing to update.
+- **STARTTLS hardening** (jacob question → verified vs imapflow 2.x types.d.ts): `doSTARTTLS:
+  true` now REQUIRED for starttls mode — without it ImapFlow is opportunistic and would continue
+  CLEARTEXT with only a warning if STARTTLS were stripped. Bridge default mode = STARTTLS
+  (127.0.0.1:1143, self-signed cert; `PROTON_BRIDGE_TLS_MODE=implicit` if the Bridge "Connection
+  mode" toggle is switched to SSL). Trust: `rejectUnauthorized: false` ONLY for loopback hosts
+  (Env refuses non-loopback without `PROTON_BRIDGE_TLS_CA_FILE` pinning the Bridge cert).
 - Plan doc: phase-3 step 10 checked; tool-name drift fixed (`mail_set_read`/`mail_set_starred`,
   - `mail_list_labels`); label decision recorded. port-assignments note updated (vhost active).
 
