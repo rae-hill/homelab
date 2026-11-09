@@ -5,6 +5,24 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Version decision: openclaw stays on nixpkgs 2026.10.5 (jacob, confirmed)
+
+- Upstream is ahead: **v2026.11.2** latest stable tag (v2026.11.5-beta.1 published; also
+  v2026.10.10, v2026.11.1 since ours) — checked via `git ls-remote` tags.
+- BUT current `nixos-unstable` HEAD **still packages 2026.10.5** (verified against
+  raw.githubusercontent package.nix) — a `nix flake update nixpkgs-unstable` today gains nothing.
+  Our locked unstable (rev `31ecbaca`) also has 2026.10.5.
+- Derivation takes `version ? "2026.10.5"` but hardcodes `src.hash` + `pnpmDepsHash` for that tag
+  ⇒ riding v2026.11.2 now would need `overrideAttrs` with self-computed hashes (multi-GB pnpm FOD,
+  manual hash upkeep per bump, drift from nixpkgs-maintained packaging + our vendored corroboration).
+- **DECISION: deploy 2026.10.5** (matches our v2026.10.3–10.5 config-schema research — best-validated
+  pairing). Bump later via one-liner `nix flake update nixpkgs-unstable` once nixpkgs's updateScript
+  lands 2026.11.x (typically days). If bumped: re-run `openclaw config validate` on mini (strict
+  schema, exit 78 on drift) and re-verify `mcp.servers`/gateway keys against the new bundled docs.
+- `allowInsecurePredicate` keys on pname (not name-version), so version bumps won't break mini's eval.
+
+---
+
 ## 2026-11-09 — Session 2: merged main → worktree, fast-forwarded main (merge commit `ea2368ad46a2`)
 
 - main had advanced **38 commits** since branch point `f733fbeba7a6` (resume-tailor feature,
