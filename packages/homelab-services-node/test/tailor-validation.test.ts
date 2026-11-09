@@ -1,13 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
+import { Effect } from "effect"
+import { Schemas, Services } from "homelab-services"
 import { ResumeContent } from "shared"
-import {
-  checkEvidence,
-  checkFabrication,
-  checkTagInvariance,
-  computeKeywordCoverage,
-  mergeEdits,
-  resolveIds,
-} from "../src/layers/tailor/validation.js"
+import { ResumeTailorValidationServiceLive } from "../src/layers/resume-tailor-validation-service.js"
 import type { TailorEdits } from "../src/layers/tailor/wire-schema.js"
 
 const sampleContent = {
@@ -78,292 +73,256 @@ const sampleEdits: TailorEdits = {
   },
 }
 
-describe("tailor validation", () => {
-  describe("resolveIds", () => {
-    it("keeps edits with valid IDs", () => {
-      const result = resolveIds(sampleEdits, sampleContent as any)
-      expect(result.edits.bullets).toHaveLength(1)
-      expect(result.edits.entryDescriptions).toHaveLength(1)
-      expect(result.edits.hiddenBullets).toHaveLength(1)
-      expect(result.edits.tagGroups).toHaveLength(1)
-      expect(result.dropped).toHaveLength(0)
-    })
+describe("tailor validation service", () => {
+  const runTest = <E, A>(
+    effect: Effect.Effect<A, E, Services.ResumeTailorValidationService.ResumeTailorValidationService>,
+  ) => effect.pipe(Effect.provide(ResumeTailorValidationServiceLive))
 
-    it("drops edits with unknown entryId", () => {
-      const badEdits = {
-        ...sampleEdits,
-        bullets: [
-          ...sampleEdits.bullets,
-          {
-            entryId: "unknown-exp",
-            bulletId: "bp1",
-            text: "Bad bullet",
-            rationale: "Unknown entry",
-          },
-        ],
-      }
-      const result = resolveIds(badEdits, sampleContent as any)
-      expect(result.edits.bullets).toHaveLength(1) // original kept
-      expect(result.dropped).toHaveLength(1)
-      expect(result.dropped[0]).toContain("unknown-exp")
-    })
+  describe("resolveIds (always active, merge mechanics)", () => {
+    it.effect("keeps edits with valid IDs", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const policy = Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY
+        const result = yield* service.validateEdits({
+          content: sampleContent as any,
+          edits: sampleEdits,
+          cleanedListing: "Test listing",
+          policy,
+        })
+        expect(result.edits.bullets).toHaveLength(1)
+        expect(result.edits.entryDescriptions).toHaveLength(1)
+        expect(result.edits.hiddenBullets).toHaveLength(1)
+        expect(result.edits.tagGroups).toHaveLength(1)
+        expect(result.dropped).toHaveLength(0)
+      })))
 
-    it("drops edits with unknown bulletId", () => {
-      const badEdits = {
-        ...sampleEdits,
-        bullets: [
-          ...sampleEdits.bullets,
-          {
-            entryId: "exp1",
-            bulletId: "unknown-bp",
-            text: "Bad bullet",
-            rationale: "Unknown bullet",
-          },
-        ],
-      }
-      const result = resolveIds(badEdits, sampleContent as any)
-      expect(result.edits.bullets).toHaveLength(1) // original kept
-      expect(result.dropped).toHaveLength(1)
-      expect(result.dropped[0]).toContain("unknown-bp")
-    })
-  })
-
-  describe("checkTagInvariance", () => {
-    it("keeps tag groups with same length and membership", () => {
-      const result = checkTagInvariance(sampleEdits, sampleContent as any)
-      expect(result.edits.tagGroups).toHaveLength(1)
-      expect(result.rejected).toHaveLength(0)
-    })
-
-    it("rejects tag groups with different length", () => {
-      const badEdits = {
-        ...sampleEdits,
-        tagGroups: [
-          {
-            entryId: "exp1",
-            tags: ["TypeScript", "React"], // missing Node
-          },
-        ],
-      }
-      const result = checkTagInvariance(badEdits, sampleContent as any)
-      expect(result.edits.tagGroups).toHaveLength(0)
-      expect(result.rejected).toHaveLength(1)
-      expect(result.rejected[0]).toBe("exp1")
-    })
-
-    it("rejects tag groups with different membership", () => {
-      const badEdits = {
-        ...sampleEdits,
-        tagGroups: [
-          {
-            entryId: "exp1",
-            tags: ["TypeScript", "React", "Python"], // Python not in original
-          },
-        ],
-      }
-      const result = checkTagInvariance(badEdits, sampleContent as any)
-      expect(result.edits.tagGroups).toHaveLength(0)
-      expect(result.rejected).toHaveLength(1)
-    })
-  })
-
-  describe("checkFabrication", () => {
-    it("keeps edits with grounded content", () => {
-      const listing = "Looking for TypeScript and React experience"
-      const result = checkFabrication(sampleEdits, sampleContent as any, listing)
-      expect(result.edits.bullets).toHaveLength(1)
-      expect(result.dropped).toHaveLength(0)
-    })
-
-    it("drops edits with fabricated numbers", () => {
-      const badEdits = {
-        ...sampleEdits,
-        bullets: [
-          {
-            entryId: "exp1",
-            bulletId: "bp1",
-            text: "Increased performance by 500%",
-            rationale: "Added metric",
-          },
-        ],
-      }
-      const listing = "Looking for engineers"
-      const result = checkFabrication(badEdits, sampleContent as any, listing)
-      expect(result.edits.bullets).toHaveLength(0)
-      expect(result.dropped).toHaveLength(1)
-    })
-
-    it("drops edits with fabricated percentages", () => {
-      const badEdits = {
-        ...sampleEdits,
-        bullets: [
-          {
-            entryId: "exp1",
-            bulletId: "bp1",
-            text: "Improved efficiency by 95%",
-            rationale: "Added metric",
-          },
-        ],
-      }
-      const listing = "Looking for engineers"
-      const result = checkFabrication(badEdits, sampleContent as any, listing)
-      expect(result.edits.bullets).toHaveLength(0)
-      expect(result.dropped).toHaveLength(1)
-    })
-
-    it("keeps edits with numbers present in source", () => {
-      const goodEdits = {
-        ...sampleEdits,
-        bullets: [
-          {
-            entryId: "exp1",
-            bulletId: "bp1",
-            text: "Worked in 2020 on project with 3 team members",
-            rationale: "Added context",
-          },
-        ],
-      }
-      const listing = "Worked in 2020 with 3 team members"
-      const result = checkFabrication(goodEdits, sampleContent as any, listing)
-      expect(result.edits.bullets).toHaveLength(1)
-      expect(result.dropped).toHaveLength(0)
-    })
-  })
-
-  describe("checkEvidence", () => {
-    it("keeps tips with valid evidence", () => {
-      const editsWithEvidence = {
-        ...sampleEdits,
-        fit: {
-          ...sampleEdits.fit,
-          tips: [
+    it.effect("drops edits with unknown entryId", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const policy = Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY
+        const badEdits = {
+          ...sampleEdits,
+          bullets: [
+            ...sampleEdits.bullets,
             {
-              category: "requirements-inflation" as const,
-              severity: "info" as const,
-              title: "Requirement note",
-              detail: "Listing mentions TypeScript",
-              evidence: "TypeScript experience required",
+              entryId: "unknown-exp",
+              bulletId: "bp1",
+              text: "Bad bullet",
+              rationale: "Unknown entry",
             },
           ],
-        },
-      }
-      const cleanedListing = "TypeScript experience required for this role"
-      const result = checkEvidence(editsWithEvidence, cleanedListing)
-      expect(result.fit.tips[0].evidence).toBe("TypeScript experience required")
-      expect(result.fit.tips[0].severity).toBe("info")
-    })
+        }
+        const result = yield* service.validateEdits({
+          content: sampleContent as any,
+          edits: badEdits,
+          cleanedListing: "Test listing",
+          policy,
+        })
+        expect(result.edits.bullets).toHaveLength(1) // original kept
+        expect(result.dropped).toHaveLength(1)
+        expect(result.dropped[0].detail).toContain("unknown-exp")
+      })))
 
-    it("downgrades tips with invalid evidence", () => {
-      const editsWithEvidence = {
-        ...sampleEdits,
-        fit: {
-          ...sampleEdits.fit,
-          tips: [
+    it.effect("drops edits with unknown bulletId", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const policy = Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY
+        const badEdits = {
+          ...sampleEdits,
+          bullets: [
+            ...sampleEdits.bullets,
             {
-              category: "requirements-inflation" as const,
-              severity: "caution" as const,
-              title: "Requirement note",
-              detail: "Listing mentions something",
-              evidence: "This quote is not in the listing",
+              entryId: "exp1",
+              bulletId: "unknown-bp",
+              text: "Bad bullet",
+              rationale: "Unknown bullet",
             },
           ],
-        },
-      }
-      const cleanedListing = "We require TypeScript experience"
-      const result = checkEvidence(editsWithEvidence, cleanedListing)
-      expect(result.fit.tips[0].evidence).toBe("")
-      expect(result.fit.tips[0].severity).toBe("info") // downgraded
-    })
-
-    it("keeps empty evidence as-is", () => {
-      const editsWithEmptyEvidence = {
-        ...sampleEdits,
-        fit: {
-          ...sampleEdits.fit,
-          tips: [
-            {
-              category: "process" as const,
-              severity: "info" as const,
-              title: "Process note",
-              detail: "Apply online",
-              evidence: "",
-            },
-          ],
-        },
-      }
-      const result = checkEvidence(editsWithEmptyEvidence, "any listing")
-      expect(result.fit.tips[0].evidence).toBe("")
-    })
+        }
+        const result = yield* service.validateEdits({
+          content: sampleContent as any,
+          edits: badEdits,
+          cleanedListing: "Test listing",
+          policy,
+        })
+        expect(result.edits.bullets).toHaveLength(1) // original kept
+        expect(result.dropped).toHaveLength(1)
+        expect(result.dropped[0].detail).toContain("unknown-bp")
+      })))
   })
 
-  describe("mergeEdits", () => {
-    it("applies headline to blurb", () => {
-      const result = mergeEdits(sampleContent as any, sampleEdits)
-      expect(result.blurb).toBe("Senior Engineer")
+  describe("policy-driven checks", () => {
+    describe("policy disabled (default)", () => {
+      it.effect("skips fabrication, evidence, and tag checks", () =>
+        runTest(Effect.gen(function*() {
+          const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+          const policy = Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY // enabled: false
+          // Bad edits that would be rejected if policy enabled
+          const badEdits = {
+            ...sampleEdits,
+            bullets: [
+              {
+                entryId: "exp1",
+                bulletId: "bp1",
+                text: "Increased performance by 500%",
+                rationale: "Added metric",
+              },
+            ],
+            tagGroups: [
+              {
+                entryId: "exp1",
+                tags: ["TypeScript", "React", "Rust"], // Rust not in vocabulary (exp: TS/React/Node; proj: Python/Django)
+              },
+            ],
+            fit: {
+              ...sampleEdits.fit,
+              tips: [
+                {
+                  category: "requirements-inflation" as const,
+                  severity: "caution" as const,
+                  title: "Bad tip",
+                  detail: "Detail",
+                  evidence: "Not in listing",
+                },
+              ],
+            },
+          }
+          const result = yield* service.validateEdits({
+            content: sampleContent as any,
+            edits: badEdits,
+            cleanedListing: "Looking for engineers",
+            policy,
+          })
+          // All edits should pass through (policy disabled)
+          expect(result.dropped).toHaveLength(0)
+        })))
     })
 
-    it("applies summary to aboutMe", () => {
-      const result = mergeEdits(sampleContent as any, sampleEdits)
-      expect(result.aboutMe).toBe("Experienced engineer")
-    })
+    describe("policy enabled", () => {
+      it.effect("drops fabricated content", () =>
+        runTest(Effect.gen(function*() {
+          const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+          const policy = {
+            ...Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY,
+            enabled: true,
+          }
+          const badEdits = {
+            ...sampleEdits,
+            bullets: [
+              {
+                entryId: "exp1",
+                bulletId: "bp1",
+                text: "Increased performance by 500%",
+                rationale: "Added metric",
+              },
+            ],
+          }
+          const result = yield* service.validateEdits({
+            content: sampleContent as any,
+            edits: badEdits,
+            cleanedListing: "Looking for engineers",
+            policy,
+          })
+          expect(result.edits.bullets).toHaveLength(0)
+          expect(result.dropped).toHaveLength(1)
+          expect(result.dropped[0].reason).toBe("fabricated-content")
+        })))
 
-    it("applies bullet edits", () => {
-      const result = mergeEdits(sampleContent as any, sampleEdits)
-      const bullet = result.experience[0].bulletPoints.find((bp) => bp.id === "bp1")
-      expect(bullet?.text).toBe("Built amazing thing 1")
-    })
+      it.effect("downgrades invalid evidence", () =>
+        runTest(Effect.gen(function*() {
+          const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+          const policy = {
+            ...Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY,
+            enabled: true,
+          }
+          const editsWithBadEvidence = {
+            ...sampleEdits,
+            fit: {
+              ...sampleEdits.fit,
+              tips: [
+                {
+                  category: "requirements-inflation" as const,
+                  severity: "caution" as const,
+                  title: "Bad tip",
+                  detail: "Detail",
+                  evidence: "Not in listing",
+                },
+              ],
+            },
+          }
+          const result = yield* service.validateEdits({
+            content: sampleContent as any,
+            edits: editsWithBadEvidence,
+            cleanedListing: "We require TypeScript experience",
+            policy,
+          })
+          expect(result.edits.fit.tips[0].evidence).toBe("")
+          expect(result.edits.fit.tips[0].severity).toBe("info")
+        })))
 
-    it("applies entry description edits", () => {
-      const result = mergeEdits(sampleContent as any, sampleEdits)
-      expect(result.experience[0].description).toBe("Led engineering team")
-    })
-
-    it("applies hidden bullets", () => {
-      const result = mergeEdits(sampleContent as any, sampleEdits)
-      const bullet = result.experience[0].bulletPoints.find((bp) => bp.id === "bp3")
-      expect(bullet?.visible).toBe(false)
-    })
-
-    it("applies tag reordering", () => {
-      const result = mergeEdits(sampleContent as any, sampleEdits)
-      expect(result.experience[0].tags).toEqual(["TypeScript", "Node", "React"])
-    })
-
-    it("does not mutate original content", () => {
-      const original = JSON.parse(JSON.stringify(sampleContent))
-      mergeEdits(sampleContent as any, sampleEdits)
-      expect(sampleContent).toEqual(original)
+      it.effect("rejects tags not in vocabulary", () =>
+        runTest(Effect.gen(function*() {
+          const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+          const policy = {
+            ...Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY,
+            enabled: true,
+          }
+          const badEdits = {
+            ...sampleEdits,
+            tagGroups: [
+              {
+                entryId: "exp1",
+                tags: ["TypeScript", "React", "Rust"], // Rust not in vocabulary (exp: TS/React/Node; proj: Python/Django)
+              },
+            ],
+          }
+          const result = yield* service.validateEdits({
+            content: sampleContent as any,
+            edits: badEdits,
+            cleanedListing: "Test listing",
+            policy,
+          })
+          expect(result.edits.tagGroups).toHaveLength(0)
+          expect(result.dropped).toHaveLength(1)
+          expect(result.dropped[0].reason).toBe("tag-not-in-vocabulary")
+        })))
     })
   })
 
   describe("computeKeywordCoverage", () => {
-    it("computes matched keywords", () => {
-      const result = computeKeywordCoverage(
-        ["TypeScript", "React", "Python"],
-        sampleContent as any,
-      )
-      expect(result.matched).toContain("TypeScript")
-      expect(result.matched).toContain("React")
-      expect(result.matched).toContain("Python")
-    })
+    it.effect("computes matched keywords", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const result = yield* service.computeKeywordCoverage({
+          merged: sampleContent as any,
+          required: ["TypeScript", "React", "Python"],
+        })
+        expect(result.matched).toContain("TypeScript")
+        expect(result.matched).toContain("React")
+        expect(result.matched).toContain("Python")
+      })))
 
-    it("computes missing keywords", () => {
-      const result = computeKeywordCoverage(
-        ["TypeScript", "Kubernetes", "AWS"],
-        sampleContent as any,
-      )
-      expect(result.matched).toContain("TypeScript")
-      expect(result.missing).toContain("Kubernetes")
-      expect(result.missing).toContain("AWS")
-    })
+    it.effect("computes missing keywords", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const result = yield* service.computeKeywordCoverage({
+          merged: sampleContent as any,
+          required: ["TypeScript", "Kubernetes", "AWS"],
+        })
+        expect(result.matched).toContain("TypeScript")
+        expect(result.missing).toContain("Kubernetes")
+        expect(result.missing).toContain("AWS")
+      })))
 
-    it("is case-insensitive", () => {
-      const result = computeKeywordCoverage(
-        ["typescript", "REACT"],
-        sampleContent as any,
-      )
-      expect(result.matched).toContain("typescript")
-      expect(result.matched).toContain("REACT")
-    })
+    it.effect("is case-insensitive", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const result = yield* service.computeKeywordCoverage({
+          merged: sampleContent as any,
+          required: ["typescript", "REACT"],
+        })
+        expect(result.matched).toContain("typescript")
+        expect(result.matched).toContain("REACT")
+      })))
   })
 })

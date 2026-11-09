@@ -8,6 +8,46 @@
 
 import { Schema } from "effect"
 import { ResumeContent } from "shared"
+import { OptionalUnknown, OptionalWithDefault } from "./optionals.js"
+
+/* ---- Validation Policy (T13) --------------------------------------------------------------- */
+
+/**
+ * Validation policy for the tailor pipeline (doc 07 §B.1). All fields defaulted → the schema
+ * alone defines the permissive default policy (enabled=false skips semantic checks entirely).
+ * Extensible: new rules = new defaulted fields (old clients keep decoding; T19 adds
+ * allowedEditPaths).
+ *
+ * - enabled: master switch — false (default) → skip fabrication/evidence/tag checks
+ * - requireTagsGloballyAvailable: tag vocabulary rule (enabled=true only)
+ * - rejectFabricatedMetrics: fabrication guard (enabled=true only)
+ * - groundTipsInListing: evidence substring check (enabled=true only)
+ */
+export const TailorValidationPolicy = Schema.Struct({
+  enabled: OptionalWithDefault(Schema.Boolean, () => false),
+  requireTagsGloballyAvailable: OptionalWithDefault(Schema.Boolean, () => true),
+  rejectFabricatedMetrics: OptionalWithDefault(Schema.Boolean, () => true),
+  groundTipsInListing: OptionalWithDefault(Schema.Boolean, () => true),
+})
+
+export type TailorValidationPolicy = Schema.Schema.Type<typeof TailorValidationPolicy>
+
+/** Default validation policy (permissive: enabled=false). */
+export const DEFAULT_TAILOR_VALIDATION_POLICY: TailorValidationPolicy = Schema.decodeUnknownSync(
+  TailorValidationPolicy,
+)({})
+
+/**
+ * TailorChange: a single content mutation enriched with the previous value at the path (for
+ * the Changes tab UI). JsonPatch-native vocabulary (C3/M12). previous=null for add ops or
+ * when the path is unresolvable in the request content.
+ */
+export const TailorChange = Schema.Struct({
+  patch: ResumeContent.JsonPatchOperationSchema,
+  previous: OptionalUnknown,
+})
+
+export type TailorChange = Schema.Schema.Type<typeof TailorChange>
 
 /* ---- Request ------------------------------------------------------------------------------- */
 

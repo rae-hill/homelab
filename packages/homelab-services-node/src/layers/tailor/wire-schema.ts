@@ -83,8 +83,3 @@ export const TailorEdits = Schema.Struct({
 })
 
 export type TailorEdits = Schema.Schema.Type<typeof TailorEdits>
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-export const promptVersion = "v1-2026-11"
-export const schemaVersion = "v1"

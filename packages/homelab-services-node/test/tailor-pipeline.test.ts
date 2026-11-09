@@ -2,6 +2,11 @@ import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Layer } from "effect"
 import { Config, Services } from "homelab-services"
 import { ResumeContent } from "shared"
+import { PromptSanitizationServiceLive } from "../src/layers/prompt-sanitization-service.js"
+import { ResumeContentMergeServiceLive } from "../src/layers/resume-content-merge-service.js"
+import { ResumeListingExtractionServiceLive } from "../src/layers/resume-listing-extraction-service.js"
+import { ResumePromptConfigServiceLive } from "../src/layers/resume-prompt-config-service.js"
+import { ResumeTailorValidationServiceLive } from "../src/layers/resume-tailor-validation-service.js"
 import { TailorServiceLive } from "../src/layers/tailor-service.js"
 
 // Stub OpenRouterClientService that returns canned responses
@@ -15,7 +20,7 @@ const makeStubOpenRouterClient = (
     chat: (req: any) =>
       Effect.gen(function*() {
         // Stage 1 (cleanup) call
-        if (req.maxTokens === 4000) {
+        if (req.model === "test-cleanup-model") {
           if (shouldFailStage1) {
             return yield* Effect.fail(
               new Services.OpenRouterClientService.OpenRouterError({
@@ -94,6 +99,11 @@ const StubEnv = Layer.succeed(Config.Env.Env, {
 
 describe("tailor pipeline", () => {
   const TestLayer = TailorServiceLive.pipe(
+    Layer.provide(PromptSanitizationServiceLive),
+    Layer.provide(ResumeListingExtractionServiceLive),
+    Layer.provide(ResumePromptConfigServiceLive),
+    Layer.provide(ResumeTailorValidationServiceLive),
+    Layer.provide(ResumeContentMergeServiceLive),
     Layer.provide(StubEnv),
   )
 
