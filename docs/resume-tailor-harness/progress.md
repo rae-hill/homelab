@@ -10,19 +10,27 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 
 ## Status
 
-| Task | Doc | Scope one-liner                                                                            | Status                                                                                                                      | Commit         |
-| ---- | --- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                              | `62d248e97683` |
-| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                                                     | `0dab24d048fa` |
-| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                 | `afd402ddc11c` |
-| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                  | `db5134460c1d` |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                 | `db5134460c1d` |
-| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                  | `db5134460c1d` |
-| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                       | `5e45edd1782a` |
-| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                                                   | `1f1b8e76b862` |
-| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`) | `e30f55bb2`    |
-| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                             | `7900cdab4a17` |
-| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                                                    | —              |
+| Task | Doc | Scope one-liner                                                                                                                                   | Status                                                                                                                      | Commit         |
+| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)                                                               | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                              | `62d248e97683` |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services                                                                   | **done** (JSON-Schema emission snapshot deferred to T5)                                                                     | `0dab24d048fa` |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests                                                               | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                 | `afd402ddc11c` |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton                                                        | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                  | `db5134460c1d` |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                                                                               | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                 | `db5134460c1d` |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                                                                       | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                  | `db5134460c1d` |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice                                                              | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                       | `5e45edd1782a` |
+| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                                                                            | **done** (manual browser check still pending — no headless UI test in v1)                                                   | `1f1b8e76b862` |
+| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                                                                               | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`) | `e30f55bb2`    |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                                                                                 | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                             | `7900cdab4a17` |
+| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                                                                       | deferred                                                                                                                    | —              |
+| T12  | 07  | v2: errors.ts retirement → raw nested error JSON (logs + 500 `error` field) (M1)                                                                  | planned (doc 07 §A)                                                                                                         | —              |
+| T13  | 07  | v2: 5 service extractions — validation(policy)/listing-extraction/prompt-config(version)/sanitization(arg consts)/merge-delta (E1–E4, M9, M12/C3) | planned (doc 07 §B)                                                                                                         | —              |
+| T14  | 07  | v2: `Schemas.Tailoring` move + `Schema.fromJsonString` parsing + `HashingServiceSha256` (M2–M4)                                                   | planned (doc 07 §C)                                                                                                         | —              |
+| T15  | 07  | v2: wire — request `policy` + response `changes` (JsonPatch-native) (M7, C2)                                                                      | planned (doc 07 §D)                                                                                                         | —              |
+| T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | planned (doc 07 §E)                                                                                                         | —              |
+| T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | planned (doc 07 §F)                                                                                                         | —              |
+| T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | planned (doc 07 §G)                                                                                                         | —              |
+| T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | planned (doc 07 §H; gate = evals + owner go)                                                                                | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -104,6 +112,26 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   (TimeoutError → "Unreachable"), 10s boot-fetch timeout, probe `--max-time 10` + progress
   echoes. Rule: outbound calls to tailnet hosts ALWAYS carry `Effect.timeout`
   (precedent: `shared/src/oidc/reachability.ts`).
+- **v2 exploration facts (2026-11-09, all verified against source):** `promptVersion` lives in
+  `wire-schema.ts` (NOT prompts.ts). `ApiErrors.InternalServerError` already carries
+  `error: OptionalUnknown` — raw nested error JSON needs no schema change. `BulletPoint` is an
+  object `{id, text, visible}`; v1 "hide" = `visible:false` = a REPLACE op (why the replace-only
+  guard passed); added bullets (T16) produce ADD ops → guard must relax (T13). shared's
+  `resume-content/patch.ts` already hand-writes `JsonPatchOperationSchema`/`ContentPatchOps`
+  (effect's `JsonPatch` = types + get/apply only). `homelab-services-node` index has NO `Schemas`
+  namespace yet (Config/Layers/Shell only).
+- **Effect 4.1.2 API facts (vendored repos/effect):** `effect/crypto` `Digest.digestHex(Digest.sha256,
+  bytes)` + `Digest.layerWebCrypto` (bundle-hazard watch — the undici lesson); `Schema.fromJsonString(
+  schema)` is the JSON-string→typed helper (there is NO `Schema.parseJson` in v4); `Equal.equals`
+  does DEEP structural equality on plain objects; `Redacted.toString/toJSON` → `<redacted[:label]>`
+  (no `Secret` module in this version); `@effect/opentelemetry` spans expose a public `traceId`
+  (OtelTracer.ts:417/458) — the hook for trace-id-in-logs (T18).
+- **Grafana tracesToLogsV2 (nix-config/modules/features/grafana/service.nix:93–99) has NO `tags`
+  mapping** → Grafana derives a `service_name`-style matcher that can never match Alloy's journald
+  labels (`unit`, `hostname`, `syslevel`, `container`, `transport` — services/alloy.nix:24–67); the
+  homelab-api unit label is `homelab-api.service`. Fix = `customQuery` +
+  `{unit="homelab-api.service"} |= "$__traceID"` AND trace_id in the JSON log lines (today's
+  jsonConsoleLogger emits no trace context).
 
 ## Open items (prioritized — the work queue for the next session)
 
@@ -115,15 +143,16 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 (`e7137e69d`), CI-hang bounds landed (`b372d0713`), kanidm groups split by owner
 (`9727a4ceb1ff`).
 
-1. **Owner's tailoring-quality suggestions — TOP PRIORITY, ELICIT FIRST:** the first live run
-   succeeded but the output was sparse ("it didn't have much"); the owner has concrete
-   improvement suggestions that are NOT yet written down — start the next session by asking for
-   them. Candidate levers: stage-2 prompt guidance, cleanup-stage extractive strictness,
-   `maxTokens`, main-model choice (`OPENROUTER_MODEL` is env-overridable without a rebuild).
-   Review against doc 02 §I evals (injection + poor-fit are regression-critical); bump
-   `promptVersion` (layers/tailor/prompts.ts) whenever prompts change. Owner authorized small
-   live spend: `RUN_TAILOR_LIVE=1 e2e src/resume` needs the real key dropped into the gitignored
-   `packages/homelab-server/private/openrouter-api-key` (currently the dummy), or test via UI.
+1. **v2 work queue = doc 07 (T12–T19):** the owner's tailoring-quality suggestions were ELICITED
+   (2026-11-09) and grew into the full v2 directive set (M1–M12 + clarifications C1–C3) — plan of
+   record: `docs/resume-tailor-harness/07-v2-plan.md`. Waves: **V2-A** T12→T13→T14 (serial) →
+   **V2-B** T15→T16→T19 (T19 GATED: §H evals + owner go) ∥ T18 → **V2-C** T17; **full `e2e` suite
+   LAST** (owner directive). Quality levers the owner endorsed: permissive rewrite + added bullets
+   with a language/framework/runtime fabrication bound (T16), policy-driven validation defaulting
+   OFF (T13/T15), Changes-tab review before apply (T17). Small live spend remains owner-authorized
+   (`RUN_TAILOR_LIVE=1 e2e src/resume` + the real key in gitignored
+   `packages/homelab-server/private/openrouter-api-key`); bump `promptVersion` on any prompt change
+   (v2: it becomes the prompt-config service's `version` property).
 2. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
    fetch, probe `--max-time 10` + progress echoes). Next push should show the E2E job pass — or
    fail loudly with the log dump instead of stalling silently after "starting bundled server".
@@ -340,3 +369,30 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
   is historical; frontend degraded paths unreachable-but-kept), doc 02 merge-delta guard text
   corrected to failure semantics, README + next-agent-prompt state brought current, backlog
   trimmed (kanidm dedicated groups were done by the owner in `9727a4ceb1ff`).
+
+### 2026-11-09 — v2 planning session (owner directives → doc 07)
+
+- Owner handed off the v2 work order (15 items: 4 service extractions E1–E4, misc M1–M11) in a
+  PARALLEL WORKTREE (`nimble-otter` — the owner now runs multiple agents in separate worktrees;
+  next-agent-prompt's "work in the primary worktree" line updated accordingly). This resolves the
+  old open item 1: the quality suggestions ARE the v2 directives (permissive validation + prompt
+  liberty + visible-changes review flow).
+- Clarifications captured: **C1** confirm-modal ONLY on "Apply changes to resume" in the new
+  Changes tab ⇒ submit stops auto-applying/snapshotting (D1/D4 overridden → D13). **C2** the
+  change list is SERVER-provided (`response.changes`). Follow-up owner message delegated the
+  merge-delta design (**M12**) ⇒ **C3**: dedicated `ResumeContentMergeService` (validation =
+  SEMANTIC policy; merge = MECHANICAL + STRUCTURAL policy over the Effect JsonPatch delta);
+  `changes` are JsonPatch-native (reuse shared's `JsonPatchOperationSchema` + `previous`
+  enrichment); the owner's "Effect JsonPatches for everything" is planned as GATED **T19**
+  (feasibility verified: flattened strict-mode op schema — no unions; path-annotated prompt v3;
+  path-allowlist policy `allowedEditPaths`; gate = offline evals + injection pass + owner review).
+- Four explore subagents (qwen3.8-flash) mapped: tailor backend surface (all 6 modules + pipeline
+  internals + test inventory), observability (logger/otel redaction, Grafana/Alloy/Loki chain,
+  no trace-id in log lines), frontend (hooks snapshot sites L130–142/L202–214, entry shape, modal
+  structure), Effect 4.1.2 APIs (Redacted/Digest/fromJsonString/Equal — see Gotchas). Findings
+  written into doc 07 §Verified current state.
+- Docs updated: **07-v2-plan.md NEW (authoritative for T12–T19)**; override banners on docs
+  01–05; README (status, vision note, D1/D4 overrides, new D10–D15, wire-v2 note, doc map, v2
+  task graph, OQ6–10); next-agent-prompt.md re-pointed at doc 07.
+- **Next:** execute doc 07 waves — V2-A (T12→T13→T14), V2-B (T15→T16→T19-gated) ∥ T18, V2-C
+  (T17); per-task gate + commit `--no-verify`; FULL e2e last; keep this file current.

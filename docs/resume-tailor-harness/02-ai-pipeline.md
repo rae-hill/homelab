@@ -1,5 +1,19 @@
 # 02 — AI Pipeline: TailorService, OpenRouter Client, Validation
 
+> **V2 OVERRIDE (owner, 2026-11-09 — plan of record: [`07-v2-plan.md`](./07-v2-plan.md)):** this
+> doc describes the shipped v1 pipeline; v2 restructures it. §B's "pure internal modules under
+> `layers/tailor/`" (validation/cleanup/prompts/hygiene) become four opaque services
+> (`ResumeTailorValidationService`, `ResumeListingExtractionService`, `ResumePromptConfigService`
+> with a public `version` property, `PromptSanitizationService` with truncation constants as
+> method args). §G's validation pipeline becomes **policy-driven** (`TailorValidationPolicy`,
+> default = validation DISABLED; tag check → the "require tags globally available" policy item;
+> merge-delta guard relaxes to allow `add` ops). §F's prompt contract becomes the v1 impl of the
+> prompt-config service; v2 prompts allow rewriting + ADDING bullets (hard bound: no fabricated
+> language/framework/runtime claims). `errors.ts`/`describeErrorChain` is retired (raw nested
+> error JSON in `TailorError.error` → `InternalServerError.error`). `wire-schema.ts` moves to
+> `homelab-services-node/src/schemas/Tailoring.ts` (`Schemas.Tailoring.*`); manual `JSON.parse`
+> casts → `Schema.fromJsonString` decoding; manual sha256 → `HashingServiceSha256` (T12–T16).
+
 Covers T4→T5→T6. Doc 01 owns wire contract shapes + patch codec; this doc owns the inference
 services. Source paths verified against the tree; if this doc conflicts with source, source wins.
 

@@ -5,7 +5,9 @@ Copy everything below the line into a fresh agent session.
 ---
 
 You are continuing the **resume-tailor AI feature** in the homelab monorepo at
-`/home/jacob/git/homelab`. Work in the PRIMARY worktree on `main` — do not create worktrees.
+`/home/jacob/git/homelab`. The owner runs parallel agents in separate worktrees — work in the
+worktree your session started in (`git worktree list` / `pwd` to confirm); do not switch or
+create worktrees unless asked.
 
 ## Read first (in this order)
 
@@ -15,14 +17,17 @@ You are continuing the **resume-tailor AI feature** in the homelab monorepo at
 3. `docs/resume-tailor-harness/progress.md` — status table (every task + its commit hash),
    §Gotchas, **§Open items (your work queue)**, session log (how we got here, incl. the two
    interrupted-agent recoveries and the e2e/undici debugging story).
-4. Section docs as needed: `01-shared-state-and-contracts.md` (schemas/codec),
+4. `docs/resume-tailor-harness/07-v2-plan.md` — **the v2 plan of record (T12–T19)**: owner
+   directives M1–M12, clarifications C1–C3, verified current state, per-task designs, waves,
+   gates. Docs 01–05 carry v2 override banners; doc 07 wins on conflicts.
+5. Section docs as needed: `01-shared-state-and-contracts.md` (schemas/codec),
    `02-ai-pipeline.md` (OpenRouter two-stage pipeline, prompts, guards, evals),
    `03-api-endpoint.md` (endpoint/authz/tests), `04-frontend-ui.md` (tab/modal/redux/services),
    `05-nix-and-secrets.md` (sops/env/kanidm/deploy smoke), `06-stretch-db-and-cache.md`
    (postgres/redis stretch + seams). `resume-tailor-harness-initial-plan.md` is AI-craft
    reference ONLY — its repo facts are superseded by the README.
 
-## State of the world (as of 2026-11-08 evening)
+## State of the world (as of 2026-11-09)
 
 - **v1 is SHIPPED and field-verified.** T1–T10 DONE and committed (every hash in the
   progress.md status table — it is canonical; the 2026-11-08 session-log entries tell the
@@ -44,17 +49,30 @@ You are continuing the **resume-tailor AI feature** in the homelab monorepo at
   `openai/gpt-6-luna` (env-overridable, no rebuild needed). Absent key never breaks boot
   (Option-based env; praeconinus stays dark by design). Owner split kanidm groups
   (`9727a4ceb1ff`): `homelab.resume.printing` / `homelab.resume.tailoring`.
+- **v2 is PLANNED (owner, 2026-11-09):** `07-v2-plan.md` is the plan of record for **T12–T19** —
+  service extractions (validation-policy / listing-extraction / prompt-config with a `version`
+  property / sanitization with truncation args / merge-delta + hashing), errors.ts retirement
+  (raw nested error JSON), `Schemas.Tailoring` relocation, wire v2 (`request.policy` +
+  JsonPatch-native `response.changes`), permissive prompts v2 (hard bound: no fabricated
+  language/framework/runtime claims), frontend review-then-apply flow (Summary|Changes tabs +
+  overwrite-confirm via `Equal.equals` — no more auto-apply or "Pre-tailor:" snapshots),
+  Tempo→logs correlation + trace-id logging + `Redacted`-at-source, and GATED T19 (model-facing
+  edits → Effect JsonPatch ops + path-allowlist policy). New decisions D10–D15; D1/D4 overridden.
 
 ## Your job
 
-Work through **progress.md §Open items** in priority order. **Item 1 is the owner's
-tailoring-quality feedback** — the first live output was sparse ("didn't have much") and their
-concrete suggestions are NOT written down yet, so **ask the owner for them first**, then tune
-prompts/models against doc 02 §I evals (bump `promptVersion` when prompts change; small live
-spend is owner-authorized). Items 2–4 are verification loose ends (CI green, remaining browser
-checklist, redaction grep); item 5 is backlog. Sops remains owner-only (denied to agents).
-**Keep progress.md current** (status table + session log + gotchas) — it is the handoff chain;
-update it BEFORE your context runs low, and record any new gotcha you hit.
+**Execute the v2 plan: `docs/resume-tailor-harness/07-v2-plan.md` (T12–T19).** The old
+"elicit the owner's quality suggestions first" item is RESOLVED — the suggestions became the v2
+directives (M1–M12, 2026-11-09). Waves: **V2-A** T12→T13→T14 (serial — shared files) → **V2-B**
+T15→T16→T19 (T19 is GATED on doc 07 §H evals + explicit owner go) ∥ T18 → **V2-C** T17.
+**Full `e2e` suite runs LAST** (owner directive — subprocess-heavy). Per task: `yarn lint &&
+yarn typecheck && yarn test` green, commit `--no-verify`, update progress.md (status table +
+session log + gotchas). If a test resists diagnosis after ~2 attempts: commit, skip it with
+`TODO(v2)`, flag it in progress.md — do NOT loop (owner directive). v1 loose ends (progress.md
+§Open items 2–4) carry over: CI-green confirmation, browser checklist (T17 reworks that UI —
+re-check after), redaction grep (folds into T18 acceptance). Sops remains owner-only (denied to
+agents). **Keep progress.md current** — it is the handoff chain; update it BEFORE your context
+runs low, and record any new gotcha you hit.
 
 ## House rules that bite (full list: progress.md §Gotchas)
 
@@ -134,12 +152,14 @@ nix develop . --command bash -c 'yarn typecheck && yarn test && yarn lint'
 ## Key decisions cheat-sheet (full text: README §Confirmed decisions)
 
 D1 auto-apply + preset snapshot (`Pre-tailor: <title> — <date>`, `onCollision:"suffix"`;
-manual preset saves still default to `"overwrite"` = legacy behavior). D2 blurb/aboutMe are
+manual preset saves still default to `"overwrite"` = legacy behavior) — **OVERRIDDEN by v2 D13:
+no auto-apply, no snapshots; review-then-apply from the Changes tab**. D2 blurb/aboutMe are
 ContentState fields (defaults = the old hard-coded strings). D3 base64 JSON-Patch-only wire in
 both directions, patches vs the frozen versioned `INITIAL_CONTENT_STATE` (`v1`), the
 decode-to-ContentState schema sits in the HttpApi edge codecs (typed code never sees base64;
 entries re-encode for storage). D4 no per-edit review — server merge+guards are authoritative,
-the rendered resume is the review surface. D5 two-model pipeline: extractive-only cleanup +
+the rendered resume is the review surface (partially overridden by v2 D13: the modal's Changes
+tab is the pre-apply review surface). D5 two-model pipeline: extractive-only cleanup +
 title/company extraction (cheap), constrained ID-addressed edits + fit report (main);
 **OVERRIDDEN 2026-11-08: failures are 500s with cause chains, never degraded 200s**
 (`meta.degraded` stays in the schema, always false). D6 redux + versioned
@@ -149,5 +169,18 @@ infra by design). D9 NO cache in v1 (`meta.cacheHit` always false; caching arriv
 decorator layer with the doc-06 persistence work). Quota: 10/day/subject + 100/day global,
 `TailorQuotaExceeded` → 400. Auth: `Resume_Tailor` resource URI (middleware authenticates;
 handler calls `canCreate`; kanidm `resume.printing` group grants the role).
+
+**v2 decisions (2026-11-09, README D10–D15 / doc 07):** D10 pipeline logic behind opaque
+services (4 owner-named + `ResumeContentMergeService` + `HashingServiceSha256`; `Schemas.Tailoring`;
+`Schema.fromJsonString` parsing). D11 validation is policy-driven — `TailorValidationPolicy` on
+the wire, default = DISABLED; tag rule = `requireTagsGloballyAvailable`; delta guard allows
+`add`. D12 raw nested error JSON (`TailorError.error` → `InternalServerError.error`;
+`describeErrorChain` gone; format tests skipped `TODO(v2)`). D13 review-then-apply (Summary |
+Changes tabs; confirm modal only on apply-from-Changes-tab and only when content ≠
+`INITIAL_CONTENT_STATE` via `Equal.equals`; server-provided JsonPatch-native `changes`). D14
+prompt v2 permissiveness (rewrite + add bullets; never fabricate language/framework/runtime
+claims; `promptVersion`/`schemaVersion` → v2). D15 observability (trace_id in JSON log lines;
+Grafana `tracesToLogsV2` custom query `{unit="homelab-api.service"} |= "$__traceID"`; `Redacted`
+at source replaces manual key-pattern redaction).
 
 Good luck — and update progress.md before your context fills. :salute:
