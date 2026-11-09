@@ -91,6 +91,15 @@ describe("TailorEntryStoreService", () => {
           schemaVersion: "1.0",
         },
         error: null,
+        changes: [
+          {
+            patch: { op: "replace" as const, path: "/heading/name", value: "John" },
+            previous: "Jane",
+          },
+          {
+            patch: { op: "add" as const, path: "/experience/0/bulletPoints/-", value: "New bullet" },
+          },
+        ],
       },
     ]
 
@@ -107,6 +116,46 @@ describe("TailorEntryStoreService", () => {
     console.log("Result:", JSON.stringify(result, null, 2))
 
     expect(result).toEqual(entries)
+  })
+
+  it("should decode legacy entries (without changes field) with changes: null", async () => {
+    const { layer, storage } = makeService()
+    const now = Date.now()
+
+    // Legacy entry without the changes field (pre-v2 schema)
+    const legacyEnvelope = {
+      version: 1 as const,
+      // Type assertion: this is intentionally a legacy entry without the changes field
+      entries: [
+        {
+          id: "legacy-1",
+          status: "success" as const,
+          createdAt: now,
+          listingText: "Legacy listing",
+          jobTitle: "Legacy Job",
+          company: "Legacy Corp",
+          fit: null,
+          contentPatch: null,
+          baseVersion: "1.0.0",
+          meta: null,
+          error: null,
+        },
+      ] as any[],
+    }
+
+    storage.setItem(TAILOR_ENTRIES_STORAGE_KEY, JSON.stringify(legacyEnvelope))
+
+    const program = Effect.gen(function*() {
+      const service = yield* Services.TailorEntryStoreService.TailorEntryStoreService
+      return yield* service.load()
+    })
+
+    const result = await Effect.runPromise(program.pipe(Effect.provide(layer)))
+
+    // Should decode successfully with changes: null
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe("legacy-1")
+    expect(result[0].changes).toBeNull()
   })
 
   it("should return empty array on corrupt storage data", async () => {
@@ -139,6 +188,7 @@ describe("TailorEntryStoreService", () => {
       baseVersion: "1.0.0",
       meta: null,
       error: null,
+      changes: null,
     }))
 
     const program = Effect.gen(function*() {

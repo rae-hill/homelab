@@ -52,12 +52,14 @@ export interface TailorResponse {
   readonly baseVersion: string
   readonly fit: Schemas.ResumeTailor.FitReport
   readonly meta: Schemas.ResumeTailor.TailorMeta
+  readonly changes: ReadonlyArray<Schemas.ResumeTailor.TailorChange>
 }
 
 export function requestTailor(
   listing: string,
   content: ResumeContent.ContentState,
   baseVersion: string,
+  policy?: Schemas.ResumeTailor.TailorValidationPolicy,
 ): Effect.Effect<TailorResponse, NotSignedInError | ResumeTailorRequestError> {
   return Effect.gen(function*() {
     if (!homelabEnv.enabled) {
@@ -79,7 +81,7 @@ export function requestTailor(
     const client = yield* HttpApiClient.make(Homelab.HomelabApi, { baseUrl: homelabEnv.apiUrl })
 
     const response = yield* client.resume.tailor({
-      payload: { listing, content, baseVersion },
+      payload: { listing, content, baseVersion, policy },
       headers: { authorization: `Bearer ${idToken}` },
     }).pipe(
       Effect.mapError((error) => new ResumeTailorRequestError({ message: describeError(error) })),
@@ -92,6 +94,7 @@ export function requestTailor(
       baseVersion: response.baseVersion,
       fit: response.fit,
       meta: response.meta,
+      changes: response.changes,
     } satisfies TailorResponse
   }).pipe(
     Effect.provide(Layer.mergeAll(authLayer(), FetchHttpClient.layer)),

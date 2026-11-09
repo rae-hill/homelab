@@ -191,26 +191,6 @@ describe("PresetSnapshotService", () => {
   })
 })
 
-describe("generatePresetName", () => {
-  it("should generate preset name with correct format", () => {
-    const now = new Date("2026-11-07T14:30:45.123Z")
-    const name = Services.PresetSnapshotService.generatePresetName("Software Engineer", now)
-    expect(name).toBe("Pre-tailor: Software Engineer — 2026-11-07 14-30")
-  })
-
-  it("should use 'Untitled' when jobTitle is null", () => {
-    const now = new Date("2026-11-07T14:30:45.123Z")
-    const name = Services.PresetSnapshotService.generatePresetName(null, now)
-    expect(name).toBe("Pre-tailor: Untitled — 2026-11-07 14-30")
-  })
-
-  it("should use 'Untitled' when jobTitle is empty", () => {
-    const now = new Date("2026-11-07T14:30:45.123Z")
-    const name = Services.PresetSnapshotService.generatePresetName("   ", now)
-    expect(name).toBe("Pre-tailor: Untitled — 2026-11-07 14-30")
-  })
-})
-
 describe("save collision behavior", () => {
   const makeService = () => {
     const storage = new InMemoryStorage()

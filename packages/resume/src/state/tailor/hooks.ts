@@ -1,21 +1,19 @@
-import { Effect, Schema } from "effect"
-import { Services } from "homelab-services"
-import { useCallback } from "react"
+import { Effect, Equal, Schema } from "effect"
+import type { Schemas } from "homelab-services"
+import { useCallback, useState } from "react"
 import { ResumeContent } from "shared"
 
 import { toaster } from "../../components/chakra/toaster"
 import { requestTailor, type TailorResponse } from "../homelab/tailor"
-import { encodeBase64Config } from "../print-config/persistence"
 import { printConfigActions } from "../print-config/slice"
 import { useAppDispatch, useAppSelector } from "../print-config/store"
-import { runBrowser } from "../services"
 import { tailorActions } from "./slice"
 import type { TailorEntry } from "./types"
 
 /**
  * Granular selectors + action hooks for the tailor slice. The slice is thin (no persistence
  * logic — that's in the TailorEntryStoreService via the provider's write-through subscription).
- * Submit/recall logic is in T8 (auto-apply flow).
+ * Submit/recall logic is in T17 (review-flow: no auto-apply, no pre-tailor snapshots).
  */
 
 /** Select all tailor entries (reverse-chron — newest first). */
@@ -52,26 +50,35 @@ export function useRemoveEntry() {
 }
 
 /**
- * Submit a job listing for tailoring. Auto-apply flow (D1): on success, pre-save the current
- * config as a preset, dispatch applyTailoredContent, dispatch submitSucceeded, and toast.
- * On degraded, skip pre-save + apply and toast degraded. On error, dispatch submitFailed + toast.
+ * Submit a job listing for tailoring. v2 review flow (T17): NO auto-apply, NO pre-tailor
+ * snapshot. On success: dispatch submitSucceeded (entry now stores `changes`), open the
+ * detail modal for review, toast "Tailoring ready — review the changes." Degraded path
+ * opens the modal too (entry is still reviewable). Error path unchanged.
  */
 export function useSubmitTailor() {
   const dispatch = useAppDispatch()
-  const state = useAppSelector((s) => s.printConfig)
+  const currentContent = useAppSelector((s) => s.printConfig.content)
 
   return useCallback(
-    async (listingText: string) => {
+    async (
+      listingText: string,
+      policy?: Schemas.ResumeTailor.TailorValidationPolicy,
+    ) => {
       const id = crypto.randomUUID()
       const baseVersion = ResumeContent.CONTENT_DEFAULTS_VERSION
 
       // Dispatch pending entry.
       dispatch(tailorActions.submitStarted({ id, listingText, baseVersion }))
 
-      // Call the tailor endpoint.
+      // Call the tailor endpoint. Send the user's current content as context (the server
+      // uses it to know what they already have). The user-supplied policy is always sent
+      // (the wire schema accepts it); the server applies the permissive defaults when
+      // fields are unset.
       let response: TailorResponse
       try {
-        response = await Effect.runPromise(requestTailor(listingText, state.content, baseVersion))
+        response = await Effect.runPromise(
+          requestTailor(listingText, currentContent, baseVersion, policy),
+        )
       } catch (error) {
         // Error path.
         const message =
@@ -104,6 +111,7 @@ export function useSubmitTailor() {
       const contentPatch = Schema.encodeSync(ResumeContent.ContentPatchBase64)(response.content)
 
       // Dispatch success (sets status to "success" or "degraded" based on meta.degraded).
+      // Store the changes from the response for the Changes tab review flow.
       dispatch(tailorActions.submitSucceeded({
         id,
         response: {
@@ -113,60 +121,48 @@ export function useSubmitTailor() {
           contentPatch,
           baseVersion: response.baseVersion,
           meta: response.meta,
+          changes: response.changes,
         },
       }))
 
+      // Open the detail modal for review (both success and degraded paths).
+      dispatch(tailorActions.openDetail(id))
+
       if (response.meta?.degraded === true) {
-        // Degraded path: skip pre-save + apply, toast degraded.
+        // Degraded path: toast degraded.
         toaster.create({
           title: "Degraded response",
-          description: "Content unchanged. Snapshot NOT saved.",
+          description: "Content unchanged. Review the analysis.",
           type: "warning",
         })
         return
       }
 
-      // Success path: pre-save preset, apply tailored content, toast.
-      const presetName = Services.PresetSnapshotService.generatePresetName(
-        response.jobTitle,
-        new Date(),
-      )
-      const fullConfigBase64 = encodeBase64Config(state)
-
-      // Pre-save preset (onCollision: "suffix" → never clobbers an earlier snapshot).
-      const finalName = await runBrowser(
-        Effect.gen(function*() {
-          const service = yield* Services.PresetSnapshotService.PresetSnapshotService
-          return yield* service.save(presetName, fullConfigBase64, { onCollision: "suffix" })
-        }),
-      )
-
-      // Apply tailored content (sets state.content ONLY, preserves layout + editingEnabled).
-      dispatch(printConfigActions.applyTailoredContent(response.content))
-
+      // Success path: toast review prompt.
       toaster.create({
-        title: "Content applied",
-        description: finalName !== undefined
-          ? `Snapshot saved as "${finalName}".`
-          : "Snapshot saved.",
+        title: "Tailoring ready",
+        description: "Review the changes.",
         type: "success",
       })
     },
-    [dispatch, state],
+    [dispatch, currentContent],
   )
 }
 
 /**
- * Recall a stored entry's tailored content. Stale guard: if entry.baseVersion !== CONTENT_DEFAULTS_VERSION
- * or decode fails, toast "Stale entry — re-tailor" and return false. Otherwise, pre-save preset,
- * apply tailored content, and toast success.
+ * Apply a stored entry's tailored content with overwrite confirmation (T17/M8). Stale guard:
+ * if entry.baseVersion !== CONTENT_DEFAULTS_VERSION or decode fails, toast "Stale entry" and
+ * return false. Otherwise, check if current content equals INITIAL_CONTENT_STATE (deep structural
+ * equality via Effect's Equal.equals). If equal (pristine defaults) → apply immediately. If
+ * different → return the decoded content for the caller to show a confirmation dialog.
  */
-export function useRecallEntry() {
+export function useApplyEntry() {
   const dispatch = useAppDispatch()
-  const state = useAppSelector((s) => s.printConfig)
+  const currentContent = useAppSelector((s) => s.printConfig.content)
+  const [pendingApply, setPendingApply] = useState<ResumeContent.ContentState | null>(null)
 
-  return useCallback(
-    async (entry: TailorEntry): Promise<boolean> => {
+  const requestApply = useCallback(
+    (entry: TailorEntry): boolean => {
       // Stale guard: baseVersion mismatch.
       if (entry.baseVersion !== ResumeContent.CONTENT_DEFAULTS_VERSION) {
         toaster.create({
@@ -199,33 +195,45 @@ export function useRecallEntry() {
         return false
       }
 
-      // Pre-save preset.
-      const presetName = Services.PresetSnapshotService.generatePresetName(
-        entry.jobTitle,
-        new Date(entry.createdAt),
-      )
-      const fullConfigBase64 = encodeBase64Config(state)
+      // Check if current content equals the default (pristine) state.
+      const isPristine = Equal.equals(currentContent, ResumeContent.INITIAL_CONTENT_STATE)
 
-      const finalName = await runBrowser(
-        Effect.gen(function*() {
-          const service = yield* Services.PresetSnapshotService.PresetSnapshotService
-          return yield* service.save(presetName, fullConfigBase64, { onCollision: "suffix" })
-        }),
-      )
+      if (isPristine) {
+        // Apply immediately — no confirmation needed.
+        dispatch(printConfigActions.applyTailoredContent(decoded))
+        toaster.create({
+          title: "Tailored content applied.",
+          type: "success",
+        })
+        return true
+      }
 
-      // Apply tailored content.
-      dispatch(printConfigActions.applyTailoredContent(decoded))
-
-      toaster.create({
-        title: "Content applied",
-        description: finalName !== undefined
-          ? `Snapshot saved as "${finalName}".`
-          : "Snapshot saved.",
-        type: "success",
-      })
-
+      // Content differs from default — need confirmation.
+      setPendingApply(decoded)
       return true
     },
-    [dispatch, state],
+    [dispatch, currentContent],
   )
+
+  const confirm = useCallback(() => {
+    if (pendingApply !== null) {
+      dispatch(printConfigActions.applyTailoredContent(pendingApply))
+      toaster.create({
+        title: "Tailored content applied.",
+        type: "success",
+      })
+      setPendingApply(null)
+    }
+  }, [dispatch, pendingApply])
+
+  const cancel = useCallback(() => {
+    setPendingApply(null)
+  }, [])
+
+  return {
+    requestApply,
+    confirmationPending: pendingApply !== null,
+    confirm,
+    cancel,
+  }
 }
