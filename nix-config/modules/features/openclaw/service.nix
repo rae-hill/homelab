@@ -23,7 +23,10 @@
       ...
     }:
     let
-      openclaw = pkgs-unstable.openclaw;
+      openclaw = inputs.self.packages.aarch64-darwin.openclaw-npm;
+      # NOT pkgs-unstable.openclaw: the nixpkgs source build has permanently-mismatched
+      # Control-UI build stamps ("Stale Control UI assets") and no binary cache (insecure-marked).
+      # See features/openclaw/package.nix header for the full rationale.
       protonMailMcp = inputs.self.packages.aarch64-darwin.proton-mail-mcp;
 
       secretNames = [
