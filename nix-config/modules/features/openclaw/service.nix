@@ -153,6 +153,14 @@
         }) secretNames
       );
 
+      # Interactive CLI ergonomics: EVERY shell on mini must know the service is externally
+      # managed. The wrapper exports this for the daemon itself, but without it system-wide,
+      # `openclaw gateway status`/`doctor` run from a shell look for upstream's own LaunchAgent
+      # (ai.openclaw.gateway), don't find it, and flag our healthy launchd agent as a foreign
+      # squatter ("Port 18789 already in use", PID = nix-store node). With it, the CLI is
+      # diagnostic-only for service lifecycle (docs: gateway/index.md, install/nix.md).
+      environment.variables.OPENCLAW_SERVICE_REPAIR_POLICY = "external";
+
       # Headless persistence: the user LaunchAgent only runs inside jacob's Aqua session.
       # FileVault caveat: with FileVault on, boot stops at the unlock screen first (plan D2).
       system.defaults.loginwindow.autoLoginUser = "jacob";

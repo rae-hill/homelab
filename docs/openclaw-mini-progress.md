@@ -5,6 +5,28 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 8: "Port 18789 already in use" = CLI detection artifact; system-wide repair policy
+
+- **Symptom:** `openclaw gateway status` on mini → "Port 18789 already in use", PID = nix-store
+  node. **Not a conflict** — that PID is our launchd agent running the gateway (healthy); the
+  CLI just didn't know an external supervisor owns it: `OPENCLAW_SERVICE_REPAIR_POLICY=external`
+  was exported only inside the wrapper, not in interactive shells. Without it, status looks for
+  upstream's own LaunchAgent (`ai.openclaw.gateway`), finds none, and flags the port holder as
+  foreign.
+- **Fix:** `environment.variables.OPENCLAW_SERVICE_REPAIR_POLICY = "external"` in
+  `features/openclaw/service.nix` (system-wide on mini; eval-verified). Rebuild mini to apply;
+  then status/doctor are diagnostic-only for service lifecycle. Functional truth checks:
+  Control UI, `curl http://127.0.0.1:18789/` on mini, `~/Library/Logs/openclaw/gateway.log`.
+- **DECISION — rejected switching to openclaw self-managed daemon** (`openclaw gateway install`),
+  jacob's initial instinct, for: (1) under `OPENCLAW_NIX_MODE=1` install/self-mutation flows are
+  REFUSED by design; (2) dropping NIX mode to allow it would move secrets from sops→/run/secrets
+  (0400) to plaintext `~/.openclaw/.env`, un-manage the plist (drift, no rollback), and re-enable
+  config writers behind nix-config's back; (3) upstream's own `openclaw/nix-openclaw` HM module
+  uses this same external-agent pattern. Revisit only if upstream's external-manager support
+  degrades CLI ergonomics further.
+
+---
+
 ## 2026-11-09 — Session 7: incident — openclaw vhost cert-less after deploy (DNS-after-Caddy ordering)
 
 - **Symptom:** caddy on mini logged "no matching certificates and no custom selection logic" for
