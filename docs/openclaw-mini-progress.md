@@ -5,6 +5,46 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 6: mutability model documented (skills/plugins/state vs Nix-managed config)
+
+Doc-verified against v2026.10.5 (subagent `ses_e3e353883ffeIYACPG0eSRmH1k`; doc paths cited).
+Jacob's operating model: config = Nix-only; skills = ad-hoc OK; plugins = Nix-based only.
+
+- **Config is squashed on every gateway start** (wrapper `cat`s the Nix render over
+  `~/.openclaw/openclaw.json`); `reload.mode: "off"`; NIX_MODE refuses ALL config writers —
+  exact list (docs/install/nix.md): setup, onboarding, mutating `openclaw update`, plugin
+  install/update/uninstall/enable(+disable per cli/config.md), `doctor --fix`,
+  `doctor --generate-gateway-token`, `openclaw config set`. Refusals print a redacted merge
+  patch to apply in nix-config. Doctor `--fix --non-interactive` still repairs writable STATE
+  (SQLite/sessions/plugin state) — never the config file.
+- **State persists** (docs/help/faq/where-things-live-on-disk.md): `~/.openclaw` = channel/
+  provider state, auth profiles, sessions, logs, shared skills, workspace (default
+  `~/.openclaw/workspace`), `extensions/` (plugins), `worktrees/`, per-agent workshop-skills.
+- **Skills = file drops, zero config** (docs/tools/skills.md, skills-config.md): dir with
+  `SKILL.md` (YAML frontmatter + markdown body); discovery up to 6 levels deep; precedence
+  (highest first): `<workspace>/skills` → `<workspace>/.agents/skills` → `~/.agents/skills` →
+  `~/.openclaw/skills` (managed/local) → workshop-skills → bundled → `skills.load.extraDirs` +
+  plugin skills. `skills.load.watch` default true (hot refresh on SKILL.md change).
+  `skills.load.extraDirs` accepts absolute paths ⇒ **Nix store paths work** (lowest precedence —
+  bundled shadows same-name). Gating: `skills.entries.<key>.enabled`, `skills.allowBundled`,
+  per-agent `agents.defaults.skills` / `agents.entries.*.skills`.
+- **Plugins** (docs/gateway/config-extensions.md, cli/plugins.md): auto-discovered from
+  `~/.openclaw/extensions` + `<workspace>/.openclaw/extensions`, plus `plugins.load.paths`
+  (filesystem paths first-class; docs example = dir path) ⇒ Nix pattern: store path in
+  `plugins.load.paths` + `plugins.entries.<id>.{enabled,apiKey,env,hooks,config}` in the
+  rendered config. Caveat: hand-dropped dirs in `~/.openclaw/extensions` WOULD auto-load
+  (state dir is mutable) — for strict Nix-only, add `plugins.allow`/`deny` (deny wins) when the
+  first plugin lands.
+- **$include hybrid escape hatch** (docs/gateway/configuration/common-tasks.md) — designed but
+  NOT implemented (jacob: "don't worry about implementing"): root-level
+  `$include: "./openclaw-local.json5"`(resolves under config dir =`~/.openclaw/`, survives
+  overwrite) with Nix keys as siblings → siblings merge AFTER includes and OVERRIDE them;
+  single-file include replaces containing object; arrays deep-merge later-wins (≤10 levels);`OPENCLAW_INCLUDE_ROOTS`(`:`-sep) extends beyond config dir and those stay read-only for
+  openclaw writes. Implementation would need wrapper`touch`of an empty`{}` fragment
+  (missing include = startup failure) — ~10-line change to service.nix when wanted.
+
+---
+
 ## 2026-11-09 — Session 5: mini deployed; JSON5 `#`-comment bug fixed (config parse failure)
 
 - **mini built + deployed successfully** after jacob added the missing `kagi_api_key` to
