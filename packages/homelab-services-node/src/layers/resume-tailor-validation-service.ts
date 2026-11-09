@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect"
 import { type Schemas, Services } from "homelab-services"
 import type { ResumeContent } from "shared"
-import type { TailorEdits } from "./tailor/wire-schema.js"
+import type { TailorEdits } from "../schemas/Tailoring.js"
 
 /**
  * Validation service implementation: policy-driven semantic validation of model edits.

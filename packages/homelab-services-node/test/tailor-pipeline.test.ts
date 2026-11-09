@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Layer } from "effect"
 import { Config, Services } from "homelab-services"
 import { ResumeContent } from "shared"
+import { HashingServiceSha256Live } from "../src/layers/hashing-service-sha256.js"
 import { PromptSanitizationServiceLive } from "../src/layers/prompt-sanitization-service.js"
 import { ResumeContentMergeServiceLive } from "../src/layers/resume-content-merge-service.js"
 import { ResumeListingExtractionServiceLive } from "../src/layers/resume-listing-extraction-service.js"
@@ -104,6 +105,7 @@ describe("tailor pipeline", () => {
     Layer.provide(ResumePromptConfigServiceLive),
     Layer.provide(ResumeTailorValidationServiceLive),
     Layer.provide(ResumeContentMergeServiceLive),
+    Layer.provide(HashingServiceSha256Live),
     Layer.provide(StubEnv),
   )
 

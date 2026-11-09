@@ -3,7 +3,7 @@ import { Effect } from "effect"
 import { Schemas, Services } from "homelab-services"
 import { ResumeContent } from "shared"
 import { ResumeTailorValidationServiceLive } from "../src/layers/resume-tailor-validation-service.js"
-import type { TailorEdits } from "../src/layers/tailor/wire-schema.js"
+import type { TailorEdits } from "../src/schemas/Tailoring.js"
 
 const sampleContent = {
   ...ResumeContent.INITIAL_CONTENT_STATE,

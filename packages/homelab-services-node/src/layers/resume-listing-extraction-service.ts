@@ -1,5 +1,6 @@
-import { Clock, Duration, Effect, Layer } from "effect"
+import { Clock, Duration, Effect, Layer, Schema } from "effect"
 import { Config, Services, Utils } from "homelab-services"
+import { Schemas } from "homelab-services-node"
 
 /**
  * Listing extraction service implementation. Absorbs cleanup.ts logic (stage 1).
@@ -36,11 +37,10 @@ export const makeResumeListingExtractionService = () =>
               timeout: Duration.seconds(60),
             })
 
-            // Parse JSON response
-            const parsed = yield* Effect.try({
-              try: () => JSON.parse(response.content),
-              catch: (error) => error,
-            }).pipe(
+            // Parse JSON response via schema
+            const parsed = yield* Schema.decodeUnknownEffect(
+              Schema.fromJsonString(Schemas.Tailoring.CleanupResponse),
+            )(response.content).pipe(
               Effect.mapError((error) =>
                 new Services.ResumeListingExtractionService.ListingExtractionError({
                   message: "Stage 1 (cleanup) output was not valid JSON",

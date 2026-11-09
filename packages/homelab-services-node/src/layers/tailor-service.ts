@@ -1,6 +1,6 @@
-import { Clock, Duration, Effect, Layer } from "effect"
+import { Clock, Duration, Effect, Layer, Schema } from "effect"
 import { Config, Schemas, Services, Utils } from "homelab-services"
-import { createHash } from "node:crypto"
+import { Schemas as NodeSchemas } from "homelab-services-node"
 import type { ResumeContent as ResumeContentType } from "shared"
 
 /**
@@ -30,6 +30,7 @@ export const TailorServiceLive = Layer.effect(
     const promptConfigService = yield* Services.ResumePromptConfigService.ResumePromptConfigService
     const validationService = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
     const mergeService = yield* Services.ResumeContentMergeService.ResumeContentMergeService
+    const hashingService = yield* Services.HashingServiceSha256.HashingServiceSha256
 
     return new TailorServiceImpl(
       env,
@@ -40,6 +41,7 @@ export const TailorServiceLive = Layer.effect(
       promptConfigService,
       validationService,
       mergeService,
+      hashingService,
     )
   }),
 )
@@ -54,6 +56,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
     private readonly promptConfigService: Services.ResumePromptConfigService.ResumePromptConfigServiceDef,
     private readonly validationService: Services.ResumeTailorValidationService.ResumeTailorValidationServiceDef,
     private readonly mergeService: Services.ResumeContentMergeService.ResumeContentMergeServiceDef,
+    private readonly hashingService: Services.HashingServiceSha256.HashingServiceSha256Def,
   ) {}
 
   tailorResume(
@@ -68,10 +71,8 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
     return Effect.gen({ self: this }, function*() {
       // Compute hashes for meta
       const sanitized = this.sanitizationService.sanitize(listing)
-      const listingHash = createHash("sha256").update(sanitized).digest("hex")
-      const contentHash = createHash("sha256")
-        .update(JSON.stringify(content))
-        .digest("hex")
+      const listingHash = yield* this.hashingService.digestHex(sanitized)
+      const contentHash = yield* this.hashingService.digestHex(JSON.stringify(content))
 
       yield* Effect.logDebug("[tailor] pipeline starting", {
         listingLength: listing.length,
@@ -136,15 +137,16 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         })
         .pipe(
           Effect.flatMap((response) => {
-            // Parse JSON
-            return Effect.try({
-              try: () => JSON.parse(response.content) as Services.TailorService.TailorEdits,
-              catch: (error) =>
+            // Parse JSON via schema
+            return Schema.decodeUnknownEffect(
+              Schema.fromJsonString(NodeSchemas.Tailoring.TailorEdits),
+            )(response.content).pipe(
+              Effect.mapError((error) =>
                 new Services.TailorService.TailorError({
                   message: "Stage 2 (tailor) output was not valid JSON",
                   error: Utils.errorToJson(error),
-                }),
-            }).pipe(
+                })
+              ),
               Effect.flatMap((edits) =>
                 Clock.currentTimeMillis.pipe(
                   Effect.map((endTime) => ({

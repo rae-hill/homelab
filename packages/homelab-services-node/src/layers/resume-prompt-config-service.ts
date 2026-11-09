@@ -1,7 +1,7 @@
 import { Layer, Schema } from "effect"
 import { Services } from "homelab-services"
 import type { ResumeContent as ResumeContentType } from "shared"
-import { CleanupResponse, TailorEdits } from "./tailor/wire-schema.js"
+import { CleanupResponse, TailorEdits } from "../schemas/Tailoring.js"
 
 /**
  * Prompt-config service implementation. Absorbs prompts.ts logic with version/schemaVersion

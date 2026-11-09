@@ -1,4 +1,5 @@
 import { Layer } from "effect"
+import { HashingServiceSha256Live } from "../layers/hashing-service-sha256.js"
 import { OpenRouterClientServiceLive } from "../layers/openrouter-client-service.js"
 import { PromptSanitizationServiceLive } from "../layers/prompt-sanitization-service.js"
 import { ResumeContentMergeServiceLive } from "../layers/resume-content-merge-service.js"
@@ -29,4 +30,5 @@ export const Aggregate = TailorServiceLive.pipe(
   Layer.provide(ResumePromptConfigServiceLive),
   Layer.provide(ResumeTailorValidationServiceLive),
   Layer.provide(ResumeContentMergeServiceLive),
+  Layer.provide(HashingServiceSha256Live),
 )

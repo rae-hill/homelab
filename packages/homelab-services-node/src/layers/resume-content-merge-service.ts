@@ -1,8 +1,8 @@
 import { Effect, Layer, Schema } from "effect"
-import { Schemas, Services } from "homelab-services"
+import { type Schemas, Services } from "homelab-services"
 import { ResumeContent } from "shared"
 import type { ResumeContent as ResumeContentType } from "shared"
-import type { TailorEdits } from "./tailor/wire-schema.js"
+import type { TailorEdits } from "../schemas/Tailoring.js"
 
 /**
  * Merge service implementation: mechanical merge + structural guard over ContentDiffer delta.
