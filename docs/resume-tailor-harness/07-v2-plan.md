@@ -170,6 +170,14 @@ v1 works live but concentrates load-bearing pipeline logic in plain function mod
 
 ### A) T12 — Retire `errors.ts`: raw nested error JSON (M1)
 
+> **LANDED (`fc3364dac`)** — per owner directive (2026-11-09), serialization is
+> Effect-Schema-native, not a hand-rolled mapper: `Utils.errorToJson`/`parseErrorJson`
+> (`homelab-services/src/utils/error-json.ts`) wrap **`Schema.Defect()`** — encode: `Error` →
+> recursive `{name, message, cause?}` JSON (cycles → `"[Circular]"`; `Data.TaggedError` identity
+> survives via `name` = tag); decode: validates the JSON and rebuilds `Error`s. Trade-off: the
+> native encoder drops Error-subclass own-fields beyond name/message/cause — load-bearing context
+> belongs in `message`/`cause` (`TailorError.error` carries the pre-encoded nested JSON).
+
 - Delete `layers/tailor/errors.ts`; remove all 12 `describeErrorChain` call sites
   (`tailor-service.ts` ×9, `cleanup.ts` ×2, `openrouter-client-service.ts` ×1).
 - Failure shape stays `TailorError{message, error}` — but `message` becomes a SHORT stage context
@@ -575,6 +583,13 @@ Execution protocol (owner directives): conserve tokens — delegate to cheap sub
 file scopes; coordinator reviews. If a test resists diagnosis after ~2 attempts: **commit, mark the
 test skipped with `TODO(v2)`, flag it in progress.md** — do not loop. Update `progress.md` (status
 table + session log + gotchas) after every task.
+
+**Seeding private test values (owner directive, 2026-11-09):** never hand-place files under
+`packages/*/private/` — run **`yarn seed:test-secrets`** (consolidates the reusable
+`scripts/stage-test-secrets.mjs` + `scripts/stage-e2e-secrets.mjs`; idempotent, never overwrites).
+REQUIRED first step in any fresh worktree/checkout — the gitignored fixtures (hmac-secret,
+jwk.json, api-keys.json, dummy openrouter key, `.env-serve-test`) are absent there and `yarn test`
+cascade-fails without them (627 errors observed). CI runs the unit seeder itself (ci.yml).
 
 ## Test plan
 

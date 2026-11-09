@@ -78,6 +78,10 @@ runs low, and record any new gotcha you hit.
 
 - **YARN-only monorepo** (berry 4.14.1). node/yarn exist ONLY inside the devshell: run everything
   as `nix develop . --command bash -c '…'` from the repo root. NEVER npm/npx.
+- **Fresh worktree? Run `yarn seed:test-secrets` FIRST** — the gitignored `packages/*/private/`
+  fixtures (hmac-secret, jwk.json, api-keys, dummy openrouter key, `.env-serve-test`) are staged
+  by the reusable scripts (owner directive: NEVER hand-place private test values). Without them
+  `yarn test` cascade-fails (627 errors observed).
 - Commits: `git commit --no-verify -m "…"` (the husky hook breaks agent shells); stage only what
   you touched; one commit per completed task; never push unless asked.
 - The harness auto-formats every file you edit — never run formatters manually.

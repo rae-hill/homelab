@@ -7,6 +7,7 @@
   "packageManager": "yarn@4.14.1",
   "scripts": {
     "clean": "node scripts/clean.mjs",
+    "seed:test-secrets": "node scripts/stage-test-secrets.mjs && node scripts/stage-e2e-secrets.mjs",
     "build": "yarn workspaces foreach -Apt run build",
     "typecheck": "yarn workspaces foreach -Apt run typecheck",
     "test": "yarn workspaces foreach -Apt run test",

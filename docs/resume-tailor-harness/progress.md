@@ -23,7 +23,7 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                                                                               | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`) | `e30f55bb2`    |
 | T10  | 03  | e2e tests (vitest; live-AI gated)                                                                                                                 | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                             | `7900cdab4a17` |
 | T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                                                                       | deferred                                                                                                                    | —              |
-| T12  | 07  | v2: errors.ts retirement → raw nested error JSON (logs + 500 `error` field) (M1)                                                                  | planned (doc 07 §A)                                                                                                         | —              |
+| T12  | 07  | v2: errors.ts retirement → raw nested error JSON (logs + 500 `error` field) (M1)                                                                  | **done** (Schema.Defect serializer per owner directive; old-format tests skipped TODO(v2))                                  | `fc3364dac`    |
 | T13  | 07  | v2: 5 service extractions — validation(policy)/listing-extraction/prompt-config(version)/sanitization(arg consts)/merge-delta (E1–E4, M9, M12/C3) | planned (doc 07 §B)                                                                                                         | —              |
 | T14  | 07  | v2: `Schemas.Tailoring` move + `Schema.fromJsonString` parsing + `HashingServiceSha256` (M2–M4)                                                   | planned (doc 07 §C)                                                                                                         | —              |
 | T15  | 07  | v2: wire — request `policy` + response `changes` (JsonPatch-native) (M7, C2)                                                                      | planned (doc 07 §D)                                                                                                         | —              |
@@ -132,6 +132,19 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   homelab-api unit label is `homelab-api.service`. Fix = `customQuery` +
   `{unit="homelab-api.service"} |= "$__traceID"` AND trace_id in the JSON log lines (today's
   jsonConsoleLogger emits no trace context).
+- **Fresh worktrees lack the gitignored `packages/*/private/` test fixtures** — `yarn test`
+  cascade-fails (627 errors: `private/hmac-secret` ENOENT). Fix: run **`yarn seed:test-secrets`**
+  FIRST (root package.json entry consolidating `scripts/stage-test-secrets.mjs` +
+  `scripts/stage-e2e-secrets.mjs`; idempotent, never overwrites). CI runs the unit seeder itself
+  (ci.yml:58); `e2e.sh` runs the e2e seeder. Owner directive: private test values are ALWAYS
+  seeded by reusable scripts, never hand-placed.
+- **`Schema.Defect()` (Effect 4.1.2) is the built-in unknown⇄Json codec for failure values**
+  (`SchemaTransformation.defectFromJson`): encode = `Error` → recursive `{name, message, cause?}`
+  (cycles → `"[Circular]"`; stack only with `{includeStack:true}`; non-Errors via the
+  Inspectable-aware JSON formatter); decode = JSON with string `message` rebuilds as `Error`.
+  `Data.TaggedError` sets `prototype.name = tag` (internal/core.ts:711) so tags survive encoding,
+  but own-fields beyond name/message/cause are DROPPED. Recursive schemas elsewhere:
+  `Schema.suspend(() => ...)`. There is NO `Cause.toJSON` in v4.
 
 ## Open items (prioritized — the work queue for the next session)
 
@@ -396,3 +409,26 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
   task graph, OQ6–10); next-agent-prompt.md re-pointed at doc 07.
 - **Next:** execute doc 07 waves — V2-A (T12→T13→T14), V2-B (T15→T16→T19-gated) ∥ T18, V2-C
   (T17); per-task gate + commit `--no-verify`; FULL e2e last; keep this file current.
+
+### 2026-11-09 (second) — v2 implementation begins: T12 landed + worktree-seeding gotcha
+
+- **T12 done** (`fc3364dac`, cancelled-agent recovery + coordinator rework): the owner cancelled
+  the first subagent mid-run with a design directive — error serialization must go through Effect
+  Schema decode/encode ("validating the object… serialization that's built into effect"), not a
+  hand-rolled mapper. Audit of the partial tree showed the agent's call-site work was complete and
+  coherent (all 12 `describeErrorChain` sites converted to short-context `message` +
+  `error: Utils.errorToJson(raw)`; errors.test.ts skipped; handler passing `error: err.error`), so
+  it was KEPT; only the serializer internals were replaced with the native **`Schema.Defect()`**
+  codec (`Utils.errorToJson` = `Schema.encodeSync`, `parseErrorJson` = `Schema.decodeUnknownSync` —
+  behavior + trade-offs in Gotchas). 6 co-located tests added
+  (`homelab-services/src/utils/error-json.test.ts`); handler test upgraded from TODO to a real
+  structured-passthrough assertion; `errors.ts` deleted. Gate green: typecheck ✓, tests ✓
+  (services-node 720+1todo, homelab-server 64, homelab-services 15), lint 0 errors.
+- **Seeding discovery (owner directive "re-usable scripts to seed the private testing values"):**
+  the first gate run failed with 627 cascading errors — fresh worktrees lack the gitignored
+  `packages/*/private/` fixtures. The reusable seeders ALREADY existed
+  (`scripts/stage-test-secrets.mjs` — unit tests, used by CI; `scripts/stage-e2e-secrets.mjs` —
+  e2e, used by e2e.sh); what was missing is a discoverable entry point + workflow wiring. Added
+  root **`yarn seed:test-secrets`** (runs both, idempotent) and documented it in doc 07 §Execution
+  protocol + next-agent-prompt house rules. Ran it: both packages seeded, gate green.
+- **Next:** T13 (five service extractions — the big one) via subagent dispatch.
