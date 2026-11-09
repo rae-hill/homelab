@@ -5,6 +5,57 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 9: Control-UI "stale assets" root-caused in vendored source; fixed via pinned build-identity env; openclaw vendored as subtree
+
+- **jacob chose GitHub-source packaging (option A)** over the npm artifact (option B, kept as
+  validated fallback: `flake.packages.*.openclaw-npm` + vendored lockfile, commit `465b39c48c3f`).
+- **Vendored** `repos/openclaw/` subtree @ tag `v2026.10.5` (shallow fetch + `subtree add
+  --squash`, squashed from `1b58cb9a1b4f` — matches the release commit in the official
+  build-info.json). Registered in AGENTS.md + effect-services skill tables (`c85e2d6755`).
+  ⚠ **Context-injection note:** repos/openclaw ships its own AGENTS.md files (root + scripts/ +
+  src subdirs) which the opencode harness AUTO-LOADS as instructions in this worktree. They
+  govern upstream openclaw development (PR gates, Octopool, scripts/pr, pnpm workflows) and DO
+  NOT apply to homelab tasks — ignore them; `repos/` is read-only reference per our AGENTS.md.
+- **Root cause of "Stale Control UI assets" (all file refs = repos/openclaw @ v2026.10.5):**
+  - Check: `src/infra/control-ui-assets.ts:332-334` — extracts buildId from index.html stamp
+    (regex `^([a-zA-Z0-9._-]{1,96})-[a-f0-9]{64}$`; stamp = `<buildId>-<64hex asset hash>`),
+    fails "stale" unless it equals `dist/build-info.json`'s buildId (or is literally `"dev"`).
+  - Server stamp: `scripts/write-build-info.ts` (runs in `pnpm build`) — honors env
+    `GIT_COMMIT`/`GIT_SHA` (must be full 40-hex, throws otherwise), `OPENCLAW_BUILD_TIMESTAMP`
+    (strict ISO-8601 UTC, regex-validated + canonicalized), `OPENCLAW_CONTROL_UI_RELEASE_BUILD`
+    ("1" adds `-release-` segment), `OPENCLAW_CONTROL_UI_BUILD_ID` (direct override).
+  - UI stamp: `scripts/ui.mts` → `resolveBuildIdentityEnvironment`
+    (`scripts/lib/build-identity.mts`): if `OPENCLAW_BUILD_TIMESTAMP` or
+    `OPENCLAW_CONTROL_UI_BUILD_ID` set externally → identity pinned from env. ELSE the reuse
+    path requires `existing.commit === buildEnv.GIT_COMMIT` — in the Nix sandbox there's no git
+    (commit null both sides but format/timestamp differ) → regenerates with a FRESH `new Date()`
+    minutes after `pnpm build` wrote build-info.json → guaranteed mismatch. Two different
+    fallback formatters explain the odd strings in jacob's log (UI omits the year:
+    `2026.10.5-11-09T19-06-59.368Z` vs expected `2026.10.5-2026-11-09T19-04-30.279Z`).
+  - Shared derivation: `ui/src/build-info-normalizers.ts` ("Shared build identity normalization
+    for the runtime artifact and Vite config"): buildId = `[version, release?, commit12,
+    builtAt].filter(Boolean).join("-")` sanitized to `[a-zA-Z0-9._-]`, ≤96 chars, fallback
+    "dev". `ui/vite.config.ts` consumes the same env → identical buildId when env is pinned.
+- **Fix (service.nix):** `pkgs-unstable.openclaw.overrideAttrs` adding
+  `env.GIT_COMMIT = "1b58cb9a1b4f4353e1add63c8506db4d890962e8"` (tag sha) +
+  `env.OPENCLAW_BUILD_TIMESTAMP = "2026-10-18T17:23:40.943Z"` (official release builtAt) —
+  both phases derive buildId `2026.10.5-1b58cb9a1b4f-2026-10-18T17-23-40.943Z`; our
+  build-info.json becomes byte-equivalent to the published artifact's. No sed/patching of
+  outputs. Bump procedure in service.nix comment (ls-remote tag sha + published builtAt).
+- **Verification COMPLETE (linux build of the overridden derivation):** build-info.json buildId =
+  `2026.10.5-1b58cb9a1b4f-2026-10-18T17-23-40.943Z` (identical to official release); index.html
+  stamp = same buildId + `-010f9999…fda6` where the 64-hex asset hash is BYTE-IDENTICAL to the
+  npm-published artifact's — the pinned-identity source build reproduces the official Control UI
+  bit-for-bit; `openclaw --version` ✓ (no node nag; nixpkgs wraps nodejs-slim_24). On mini the
+  pnpmDeps FOD is UNCHANGED by overrideAttrs (cached from first build) — rebuild = install +
+  build + ui:build only (~30-60 min, one-time per version bump; no binary cache: insecure-marked).
+- Side findings this session: npm artifact validated end-to-end as fallback (`openclaw
+  --version` ✓, stamps consistent by construction); `openclaw gateway status` "port in use" was
+  the missing system-wide `OPENCLAW_SERVICE_REPAIR_POLICY` (session 8); node-26 vs node-24 both
+  draw a cosmetic "unsupported Node" nag (CLI check stricter than engines range — ignored).
+
+---
+
 ## 2026-11-09 — Session 8: "Port 18789 already in use" = CLI detection artifact; system-wide repair policy
 
 - **Symptom:** `openclaw gateway status` on mini → "Port 18789 already in use", PID = nix-store

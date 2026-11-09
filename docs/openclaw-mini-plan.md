@@ -28,28 +28,37 @@ control (channels TBD — OpenClaw supports WhatsApp, Telegram, Discord, Slack, 
 
 ## Service Details
 
-| Property     | Value                                                                            |
-| ------------ | -------------------------------------------------------------------------------- |
-| Service name | `openclaw`                                                                       |
-| Package      | `pkgs-unstable.openclaw` (v2026.10.3; nixpkgs-26.05 has stale 2026.5.7)          |
-| Run command  | `openclaw gateway run` (foreground, launchd-managed)                             |
-| Run as       | user `jacob` (`launchd.user.agents` → `~/Library/LaunchAgents`)                  |
-| Port         | `18789` (TCP, **127.0.0.1 only** — gateway WS + OpenAI-compat HTTP + Control UI) |
-| Config       | `/etc/openclaw/openclaw.json` (JSON5, Nix-managed) via `OPENCLAW_CONFIG_PATH`    |
-| State        | `~/.openclaw/` (mutable: sessions, credentials, workspace)                       |
-| Secrets      | sops `nix-config/secrets/mini.yaml` → env vars (never in config text)            |
-| Gateway auth | token on by default; `OPENCLAW_GATEWAY_TOKEN` from sops                          |
-| Host         | mini                                                                             |
+| Property     | Value                                                                                                                                                          |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Service name | `openclaw`                                                                                                                                                     |
+| Package      | `pkgs-unstable.openclaw` v2026.10.5 **source build + pinned build-identity env** (Control-UI stamp fix, see D1; npm-artifact fallback `openclaw-npm` retained) |
+| Run command  | `openclaw gateway run` (foreground, launchd-managed)                                                                                                           |
+| Run as       | user `jacob` (`launchd.user.agents` → `~/Library/LaunchAgents`)                                                                                                |
+| Port         | `18789` (TCP, **127.0.0.1 only** — gateway WS + OpenAI-compat HTTP + Control UI)                                                                               |
+| Config       | `/etc/openclaw/openclaw.json` (JSON5, Nix-managed) via `OPENCLAW_CONFIG_PATH`                                                                                  |
+| State        | `~/.openclaw/` (mutable: sessions, credentials, workspace)                                                                                                     |
+| Secrets      | sops `nix-config/secrets/mini.yaml` → env vars (never in config text)                                                                                          |
+| Gateway auth | token on by default; `OPENCLAW_GATEWAY_TOKEN` from sops                                                                                                        |
+| Host         | mini                                                                                                                                                           |
 
 ---
 
 ## Decisions
 
-### D1 — Package from `pkgs-unstable`
+### D1 — Package from `pkgs-unstable` (+ REVISED 2026-11-09: pinned build identity)
 
 OpenClaw moves fast (upstream verified `mcp.servers` native MCP support at v2026.10.3; the
 26.05 package is v2026.5.7 and may lack it). Wire `pkgs-unstable` into mini's `darwinSystem`
 `specialArgs`, mirroring the Linux hosts (`hosts/nixos.nix` line 10):
+
+**Revision (session 9):** the stock nixpkgs source build ships a **broken Control UI** —
+`pnpm build` and `pnpm ui:build` stamp different wall-clock buildIds, and the gateway's
+freshness check (`src/infra/control-ui-assets.ts`) then refuses the assets ("Stale Control UI
+assets"). Fix: `overrideAttrs` pinning `GIT_COMMIT` (tag sha) + `OPENCLAW_BUILD_TIMESTAMP`
+(official release builtAt) — both phases honor the same env via
+`ui/src/build-info-normalizers.ts`, producing identical buildIds (full mechanism + bump
+procedure: progress log session 9 + service.nix comments). A validated npm-artifact fallback
+(`flake.packages.*.openclaw-npm`) exists if a future bump breaks the source path.
 
 ```nix
 # hosts/mini.nix

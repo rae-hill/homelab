@@ -23,10 +23,36 @@
       ...
     }:
     let
-      openclaw = inputs.self.packages.aarch64-darwin.openclaw-npm;
-      # NOT pkgs-unstable.openclaw: the nixpkgs source build has permanently-mismatched
-      # Control-UI build stamps ("Stale Control UI assets") and no binary cache (insecure-marked).
-      # See features/openclaw/package.nix header for the full rationale.
+      # OpenClaw from nixpkgs-unstable SOURCE, with the Control-UI build-stamp mismatch fixed
+      # by pinning the build identity env. Why the pin is required (verified against vendored
+      # repos/openclaw @ v2026.10.5):
+      #   - The gateway refuses to serve the Control UI when dist/control-ui/index.html's stamp
+      #     disagrees with dist/build-info.json's buildId ("Stale Control UI assets",
+      #     src/infra/control-ui-assets.ts:332-334).
+      #   - `pnpm build` (scripts/write-build-info.ts) and `pnpm ui:build` (scripts/ui.mts →
+      #     resolveBuildIdentityEnvironment) each fall back to new Date() when no identity env
+      #     is set — in the Nix sandbox they stamp DIFFERENT wall-clock ids minutes apart
+      #     (and the ui.mts reuse path fails on `existing.commit !== buildEnv.GIT_COMMIT`
+      #     because the sandbox has no git). Result: stock nixpkgs openclaw's Control UI is
+      #     permanently "stale".
+      #   - Both sides honor GIT_COMMIT (full 40-hex) + OPENCLAW_BUILD_TIMESTAMP (ISO-8601 UTC)
+      #     via the SAME normalizer (ui/src/build-info-normalizers.ts), so pinning them yields
+      #     identical buildIds — the way upstream CI builds releases. Values = the official
+      #     v2026.10.5 release identity (tag commit + published build-info builtAt), making our
+      #     build-info byte-equivalent to the npm artifact's.
+      # On version bump: set GIT_COMMIT to the new tag's full sha
+      # (`git ls-remote https://github.com/openclaw/openclaw.git 'refs/tags/vX^{}'`) and
+      # OPENCLAW_BUILD_TIMESTAMP to the published artifact's builtAt (npm registry
+      # openclaw-<ver> tarball → dist/build-info.json) — or any fixed valid ISO timestamp
+      # (consistency between the two phases is what matters).
+      # Fallback if a future bump breaks the source path: flake package `openclaw-npm`
+      # (features/openclaw/package.nix) wraps the published npm artifact — validated working.
+      openclaw = pkgs-unstable.openclaw.overrideAttrs (prev: {
+        env = (prev.env or { }) // {
+          GIT_COMMIT = "1b58cb9a1b4f4353e1add63c8506db4d890962e8"; # tag v2026.10.5
+          OPENCLAW_BUILD_TIMESTAMP = "2026-10-18T17:23:40.943Z"; # official release builtAt
+        };
+      });
       protonMailMcp = inputs.self.packages.aarch64-darwin.proton-mail-mcp;
 
       secretNames = [
