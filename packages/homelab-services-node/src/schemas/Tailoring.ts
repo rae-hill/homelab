@@ -42,6 +42,12 @@ const TailorHiddenBullet = Schema.Struct({
   rationale: Schema.String,
 })
 
+const TailorAddedBullet = Schema.Struct({
+  entryId: Schema.String,
+  text: Schema.String,
+  rationale: Schema.String,
+})
+
 const TailorTagGroup = Schema.Struct({
   entryId: Schema.String,
   tags: Schema.Array(Schema.String),
@@ -80,6 +86,7 @@ export const TailorEdits = Schema.Struct({
   bullets: Schema.Array(TailorBullet),
   entryDescriptions: Schema.Array(TailorEntryDescription),
   hiddenBullets: Schema.Array(TailorHiddenBullet),
+  addedBullets: Schema.Array(TailorAddedBullet),
   tagGroups: Schema.Array(TailorTagGroup),
   fit: FitReport,
 })

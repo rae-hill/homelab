@@ -53,6 +53,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -78,6 +79,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -103,6 +105,7 @@ describe("resume content merge service", () => {
           bullets: [{ entryId: "exp1", bulletId: "bp1", text: "Rewritten bullet", rationale: "matches listing" }],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -129,6 +132,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [{ entryId: "exp1", bulletId: "bp2", rationale: "less relevant to the role" }],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -155,6 +159,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [{ entryId: "exp1", description: "New description" }],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -180,6 +185,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [{ entryId: "exp1", tags: ["Node", "TypeScript", "React"] }],
           fit: {
             verdict: "strong" as const,
@@ -206,6 +212,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -221,6 +228,43 @@ describe("resume content merge service", () => {
         })
         expect(sampleContent).toEqual(original)
       })))
+
+    it.effect("applies addedBullets to experience with correct id scheme", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeContentMergeService.ResumeContentMergeService
+        const edits = {
+          headline: null,
+          summary: null,
+          bullets: [],
+          entryDescriptions: [],
+          hiddenBullets: [],
+          addedBullets: [
+            { entryId: "exp1", text: "New bullet one", rationale: "matches listing" },
+            { entryId: "exp1", text: "New bullet two", rationale: "also matches" },
+          ],
+          tagGroups: [],
+          fit: {
+            verdict: "strong" as const,
+            summary: "Great fit",
+            tips: [],
+            keywordCoverage: { required: [] },
+          },
+        }
+        const result = yield* service.merge({
+          content: sampleContent as any,
+          edits,
+          policy: policyOff,
+        })
+        // Sample content has 3 bullets (bp1, bp2, bp3), so new ones should be exp1__b3, exp1__b4
+        const exp = result.merged.experience[0]
+        expect(exp.bulletPoints).toHaveLength(5)
+        expect(exp.bulletPoints[3].id).toBe("exp1__b3")
+        expect(exp.bulletPoints[3].text).toBe("New bullet one")
+        expect(exp.bulletPoints[3].visible).toBe(true)
+        expect(exp.bulletPoints[4].id).toBe("exp1__b4")
+        expect(exp.bulletPoints[4].text).toBe("New bullet two")
+        expect(exp.bulletPoints[4].visible).toBe(true)
+      })))
   })
 
   describe("structural guard", () => {
@@ -233,6 +277,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -255,14 +300,15 @@ describe("resume content merge service", () => {
     it.effect("allows add ops with default policy (enabled=false)", () =>
       runTest(Effect.gen(function*() {
         const service = yield* Services.ResumeContentMergeService.ResumeContentMergeService
-        // This test is conceptual - in v1 we don't have add ops yet (T16 adds them)
-        // But we can test the policy logic
         const edits = {
           headline: null,
           summary: null,
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [
+            { entryId: "exp1", text: "New bullet", rationale: "matches listing" },
+          ],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -276,8 +322,16 @@ describe("resume content merge service", () => {
           edits,
           policy: policyOff,
         })
-        // With enabled=false, add ops would be allowed
+        // With enabled=false, add ops should be allowed
         expect(result.merged).toBeDefined()
+        // Delta should contain at least one add op
+        expect(result.delta.some((op) => op.op === "add")).toBe(true)
+        // Changes should include the add op with previous: null
+        const addChange = result.changes.find((c) => c.patch.op === "add")
+        expect(addChange).toBeDefined()
+        if (addChange) {
+          expect(addChange.previous).toBeNull()
+        }
       })))
 
     it.effect("rejects remove ops always (v2)", () =>
@@ -293,6 +347,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -321,6 +376,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -337,6 +393,37 @@ describe("resume content merge service", () => {
         // Should succeed because no add ops are produced
         expect(result.merged).toBeDefined()
       })))
+
+    it.effect("rejects addedBullets when policy enabled (strict mode)", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeContentMergeService.ResumeContentMergeService
+        const edits = {
+          headline: null,
+          summary: null,
+          bullets: [],
+          entryDescriptions: [],
+          hiddenBullets: [],
+          addedBullets: [
+            { entryId: "exp1", text: "New bullet", rationale: "matches listing" },
+          ],
+          tagGroups: [],
+          fit: {
+            verdict: "strong" as const,
+            summary: "Great fit",
+            tips: [],
+            keywordCoverage: { required: [] },
+          },
+        }
+        const result = yield* Effect.exit(
+          service.merge({
+            content: sampleContent as any,
+            edits,
+            policy: policyOn,
+          }),
+        )
+        // Should fail because policy.enabled=true rejects add ops
+        expect(result._tag).toBe("Failure")
+      })))
   })
 
   describe("changes enrichment", () => {
@@ -349,6 +436,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,
@@ -383,6 +471,7 @@ describe("resume content merge service", () => {
           bullets: [],
           entryDescriptions: [],
           hiddenBullets: [],
+          addedBullets: [],
           tagGroups: [],
           fit: {
             verdict: "strong" as const,

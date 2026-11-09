@@ -58,6 +58,13 @@ const makeStubOpenRouterClient = (
                 bullets: [],
                 entryDescriptions: [],
                 hiddenBullets: [],
+                addedBullets: [
+                  {
+                    entryId: "nutrien",
+                    text: "Led cross-functional team in designing scalable async data pipelines",
+                    rationale: "Matches listing requirement for pipeline architecture experience",
+                  },
+                ],
                 tagGroups: [],
                 fit: {
                   verdict: "strong",
@@ -157,6 +164,21 @@ describe("tailor pipeline", () => {
       expect(firstChange.patch.op).toBe("replace")
       expect(firstChange.patch.path).toBeDefined()
       expect(firstChange.previous).toBeDefined()
+
+      // T16: addedBullets should produce an add op in changes
+      const addOps = result.changes.filter((c) => c.patch.op === "add")
+      expect(addOps.length).toBeGreaterThan(0)
+
+      // Verify the added bullet is present in the content
+      const nutrienEntry = result.content.experience.find((e) => e.id === "nutrien")
+      expect(nutrienEntry).toBeDefined()
+      if (nutrienEntry) {
+        const addedBullet = nutrienEntry.bulletPoints.find((bp) =>
+          bp.text === "Led cross-functional team in designing scalable async data pipelines"
+        )
+        expect(addedBullet).toBeDefined()
+        expect(addedBullet?.visible).toBe(true)
+      }
     }).pipe(
       Effect.provide(
         TestLayer.pipe(
@@ -393,6 +415,7 @@ describe("tailor pipeline", () => {
                 ],
                 entryDescriptions: [],
                 hiddenBullets: [],
+                addedBullets: [],
                 tagGroups: [],
                 fit: {
                   verdict: "partial",

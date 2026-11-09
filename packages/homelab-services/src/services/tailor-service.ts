@@ -34,6 +34,11 @@ export interface TailorEdits {
     readonly bulletId: string
     readonly rationale: string
   }>
+  readonly addedBullets: ReadonlyArray<{
+    readonly entryId: string
+    readonly text: string
+    readonly rationale: string
+  }>
   readonly tagGroups: ReadonlyArray<{
     readonly entryId: string
     readonly tags: ReadonlyArray<string>

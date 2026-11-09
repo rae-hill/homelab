@@ -57,6 +57,7 @@ const sampleEdits: TailorEdits = {
       rationale: "Less relevant",
     },
   ],
+  addedBullets: [],
   tagGroups: [
     {
       entryId: "exp1",
@@ -149,6 +150,32 @@ describe("tailor validation service", () => {
         expect(result.dropped).toHaveLength(1)
         expect(result.dropped[0].detail).toContain("unknown-bp")
       })))
+
+    it.effect("drops addedBullets with unknown entryId (even when policy disabled)", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+        const policy = Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY // enabled: false
+        const badEdits = {
+          ...sampleEdits,
+          addedBullets: [
+            {
+              entryId: "unknown-exp",
+              text: "New bullet",
+              rationale: "Unknown entry",
+            },
+          ],
+        }
+        const result = yield* service.validateEdits({
+          content: sampleContent as any,
+          edits: badEdits,
+          cleanedListing: "Test listing",
+          policy,
+        })
+        expect(result.edits.addedBullets).toHaveLength(0)
+        expect(result.dropped).toHaveLength(1)
+        expect(result.dropped[0].reason).toBe("unknown-id")
+        expect(result.dropped[0].detail).toContain("unknown-exp")
+      })))
   })
 
   describe("policy-driven checks", () => {
@@ -224,6 +251,34 @@ describe("tailor validation service", () => {
             policy,
           })
           expect(result.edits.bullets).toHaveLength(0)
+          expect(result.dropped).toHaveLength(1)
+          expect(result.dropped[0].reason).toBe("fabricated-content")
+        })))
+
+      it.effect("drops fabricated addedBullets (highest fabrication risk)", () =>
+        runTest(Effect.gen(function*() {
+          const service = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+          const policy = {
+            ...Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY,
+            enabled: true,
+          }
+          const badEdits = {
+            ...sampleEdits,
+            addedBullets: [
+              {
+                entryId: "exp1",
+                text: "Achieved 99.9% uptime using Kubernetes",
+                rationale: "Matches listing",
+              },
+            ],
+          }
+          const result = yield* service.validateEdits({
+            content: sampleContent as any,
+            edits: badEdits,
+            cleanedListing: "Looking for engineers",
+            policy,
+          })
+          expect(result.edits.addedBullets).toHaveLength(0)
           expect(result.dropped).toHaveLength(1)
           expect(result.dropped[0].reason).toBe("fabricated-content")
         })))

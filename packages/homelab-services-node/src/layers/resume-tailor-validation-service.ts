@@ -141,6 +141,16 @@ const resolveIds = (
     return true
   })
 
+  // Filter addedBullets
+  const validAdded = edits.addedBullets.filter((a) => {
+    const exists = entryIds.has(a.entryId)
+    if (!exists) {
+      dropped.push(a.entryId)
+      return false
+    }
+    return true
+  })
+
   // Filter tagGroups
   const validTags = edits.tagGroups.filter((t) => {
     const exists = entryIds.has(t.entryId)
@@ -157,6 +167,7 @@ const resolveIds = (
       bullets: validBullets,
       entryDescriptions: validDescriptions,
       hiddenBullets: validHidden,
+      addedBullets: validAdded,
       tagGroups: validTags,
     },
     dropped,
@@ -257,11 +268,24 @@ const checkFabrication = (
     return true
   })
 
+  // Check addedBullets (new bullets are highest fabrication risk)
+  const validAdded = edits.addedBullets.filter((a) => {
+    const suspectTerms = extractSuspectTerms(a.text)
+    for (const term of suspectTerms) {
+      if (!source.includes(term.toLowerCase())) {
+        dropped.push(`added:${a.entryId}`)
+        return false
+      }
+    }
+    return true
+  })
+
   return {
     edits: {
       ...edits,
       bullets: validBullets,
       entryDescriptions: validDescriptions,
+      addedBullets: validAdded,
     },
     dropped,
   }

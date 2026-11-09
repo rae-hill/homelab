@@ -58,6 +58,18 @@ export const makeResumeContentMergeService = () =>
           }
         }
 
+        // Apply added bullets (append to bulletPoints)
+        const addedForEntry = args.edits.addedBullets.filter((ab) => ab.entryId === exp.id)
+        if (addedForEntry.length > 0) {
+          const baseLength = newBullets.length
+          const newAdditions = addedForEntry.map((ab, idx) => ({
+            id: `${exp.id}__b${baseLength + idx}`,
+            text: ab.text,
+            visible: true,
+          }))
+          newBullets = [...newBullets, ...newAdditions]
+        }
+
         newExp = { ...newExp, bulletPoints: newBullets }
 
         // Apply tag group reordering

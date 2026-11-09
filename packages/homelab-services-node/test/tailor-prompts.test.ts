@@ -12,13 +12,13 @@ describe("resume prompt config service", () => {
     it.effect("exposes version (the former promptVersion constant)", () =>
       runTest(Effect.gen(function*() {
         const service = yield* Services.ResumePromptConfigService.ResumePromptConfigService
-        expect(service.version).toBe("v1-2026-11")
+        expect(service.version).toBe("v2-2026-11")
       })))
 
     it.effect("exposes schemaVersion", () =>
       runTest(Effect.gen(function*() {
         const service = yield* Services.ResumePromptConfigService.ResumePromptConfigService
-        expect(service.schemaVersion).toBe("v1")
+        expect(service.schemaVersion).toBe("v2")
       })))
   })
 
@@ -127,6 +127,7 @@ describe("resume prompt config service", () => {
         expect(schema.required).toContain("bullets")
         expect(schema.required).toContain("entryDescriptions")
         expect(schema.required).toContain("hiddenBullets")
+        expect(schema.required).toContain("addedBullets")
         expect(schema.required).toContain("tagGroups")
         expect(schema.required).toContain("fit")
       })))
@@ -142,6 +143,18 @@ describe("resume prompt config service", () => {
         expect(schema.properties.bullets.items.required).toContain("bulletId")
         expect(schema.properties.bullets.items.required).toContain("text")
         expect(schema.properties.bullets.items.required).toContain("rationale")
+      })))
+
+    it.effect("emits JSON schema for addedBullets array", () =>
+      runTest(Effect.gen(function*() {
+        const service = yield* Services.ResumePromptConfigService.ResumePromptConfigService
+        const format = service.buildTailorResponseFormat()
+        const schema = format.json_schema.schema as any
+        expect(schema.properties.addedBullets.type).toBe("array")
+        expect(schema.properties.addedBullets.items.type).toBe("object")
+        expect(schema.properties.addedBullets.items.required).toContain("entryId")
+        expect(schema.properties.addedBullets.items.required).toContain("text")
+        expect(schema.properties.addedBullets.items.required).toContain("rationale")
       })))
 
     it.effect("emits JSON schema for fit report", () =>
