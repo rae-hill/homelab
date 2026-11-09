@@ -5,6 +5,25 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 7: incident — openclaw vhost cert-less after deploy (DNS-after-Caddy ordering)
+
+- **Symptom:** caddy on mini logged "no matching certificates and no custom selection logic" for
+  openclaw.plato-splunk.media; TLS handshake → `tlsv1 alert internal error`. jellyfin fine.
+- **Diagnosis (from workstation, curl + controls):** mini-caddy-metrics (same cert-less mTLS
+  `tls { client_auth }` form) HAS a valid step-ca cert ⇒ rendered form is fine. DNS resolves NOW
+  but didn't when mini's Caddy restarted (aedilis was rebuilt after mini — reversed checklist
+  order). step-ca ACME http-01 needs the name resolvable at issuance; Caddy does NOT retry failed
+  issuance for static sites until reload/restart. step-ca policy = `*.plato-splunk.media`
+  wildcard (services/step-ca.nix:59) ⇒ not a blocker.
+- **Fix:** `sudo launchctl kickstart -k system/org.nixos.caddy` on mini (daemon Label verified:
+  `org.nixos.caddy`); expect "certificate obtained successfully" in /etc/caddy/logs/caddy.err.log.
+- **LESSON for every future vhost addition:** deploy **aedilis first** (Technitium record must be
+  live), THEN the app host — or restart that host's Caddy after DNS lands. If a vhost is
+  cert-less after deploy: check DNS resolution first, then kickstart caddy; don't suspect the
+  mTLS/rendered form (proven working).
+
+---
+
 ## 2026-11-09 — Session 6: mutability model documented (skills/plugins/state vs Nix-managed config)
 
 Doc-verified against v2026.10.5 (subagent `ses_e3e353883ffeIYACPG0eSRmH1k`; doc paths cited).
