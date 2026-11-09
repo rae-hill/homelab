@@ -1,4 +1,4 @@
-import { Effect, FileSystem, flow, HashMap, Layer, Option, Schema, Tuple } from "effect"
+import { Effect, FileSystem, flow, HashMap, Layer, Option, Redacted, Schema, Tuple } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { Config, Schemas, StartupErrors, Utils } from "homelab-services"
 import type { JWTVerifyGetKey } from "jose"
@@ -20,6 +20,7 @@ export const IssuerJwkResolverLive = Layer.effect(
         flow(
           fs.readFile,
           Effect.map(Utils.trimBufferNewlines),
+          Effect.map(Redacted.make),
         ),
       ),
       Effect.transposeOption,
@@ -36,7 +37,7 @@ export const IssuerJwkResolverLive = Layer.effect(
                 try() {
                   return flattenedDecrypt(
                     localPrivateJwkEnrypted,
-                    jwkSecret,
+                    Redacted.value(jwkSecret),
                     {
                       keyManagementAlgorithms: ["PBES2-HS256+A128KW"],
                       maxPBES2Count: 1_000_000,
@@ -52,6 +53,7 @@ export const IssuerJwkResolverLive = Layer.effect(
             Effect.andThen(
               Schema.decodeEffect(Schemas.OAuth.JWKFromUint8Array),
             ),
+            Effect.map(Redacted.make),
           ),
       ),
       Effect.transposeOption,
@@ -75,7 +77,9 @@ export const IssuerJwkResolverLive = Layer.effect(
         ([localPrivateJwk, localPublicJwk]) =>
           Effect.tryPromise({
             try() {
-              return importJWK(Utils.fixJwkForJose(localPrivateJwk), localPublicJwk.alg, { extractable: false })
+              return importJWK(Utils.fixJwkForJose(Redacted.value(localPrivateJwk)), localPublicJwk.alg, {
+                extractable: false,
+              })
             },
             catch(error) {
               return new StartupErrors.JWKPrivateKeyImportError({
