@@ -384,6 +384,14 @@ test with a known vector (`"abc"` → `ba7816bf…`).
 
 ### D) T15 — Wire v2: `policy` in, `changes` out (M7 backend, C2)
 
+> **LANDED (`6d9def5f1`)** — one deviation: `policy` uses `Schema.optionalKey` (optional on BOTH
+> wire sides; Type side `policy?: TailorValidationPolicy`) rather than a defaulted required field
+> — a required Type-side policy would force every typed client to pass one. The orchestrator
+> applies `DEFAULT_TAILOR_VALIDATION_POLICY` when the arg is undefined; partial wire policies
+> still materialize per-field defaults (the inner `OptionalWithDefault` combinator). Also fixed
+> en route: the Shell.Tailor flat-provide leak (nested the extraction deps) and a package
+> self-import cycle (relative `../schemas/Tailoring.js` imports) — see progress.md §Gotchas.
+
 - `Schemas.ResumeTailor.ResumeTailorRequest` gains optional **`policy`**
   (`TailorValidationPolicy`, defaulted → omitting it selects the permissive default).
 - `Schemas.ResumeTailor.ResumeTailorResponse` gains **`changes: Array(TailorChange)`**:

@@ -83,7 +83,9 @@ runs low, and record any new gotcha you hit.
   by the reusable scripts (owner directive: NEVER hand-place private test values). Without them
   `yarn test` cascade-fails (627 errors observed).
 - Commits: `git commit --no-verify -m "…"` (the husky hook breaks agent shells); stage only what
-  you touched; one commit per completed task; never push unless asked.
+  you touched; one commit per completed task; never push unless asked. **NEVER `git stash` /
+  `checkout -- <path>` / `restore` / `reset`** — the coordinator owns tree state; if you feel the
+  need to stash, STOP and report instead (an agent was cancelled for attempting it, 2026-11-09).
 - The harness auto-formats every file you edit — never run formatters manually.
 - `git add` NEW files before any `nix eval`/`nix build` (flakes read the git tree; untracked =
   invisible; a half-tracked tree caused a resume-site build failure once already). The
