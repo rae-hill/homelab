@@ -419,6 +419,13 @@ refinement round would post back.
 
 ### E) T16 — Prompt v2: creative liberty within fabrication bounds (M10)
 
+> **LANDED (`0c603a34e`)** — as specced, with one schema-driven deviation: `ProjectContent` has no
+> `bulletPoints`, so `addedBullets` applies to EXPERIENCE entries only (ids
+> `${entryId}__b${baseLength+idx}`, `visible: true`). Strict policy (`enabled=true`) rejects the
+> resulting `add` ops (v1 replace-only); the default policy allows them. Offline eval fixtures
+> (doc 02 §I suite) were never implemented on disk — the injection/poor-fit eval work folds into
+> the T19 gate. Versions: `v2-2026-11` / `v2`.
+
 - Model-facing `Schemas.Tailoring.TailorEdits` extends with
   **`addedBullets: Array(Struct({ entryId, text, rationale }))`** (strict-mode rules preserved:
   all-required, `additionalProperties:false`). The MERGE SERVICE appends them to the addressed
@@ -444,6 +451,16 @@ refinement round would post back.
   fabrication guard is OFF — prompt-level bounds + Changes-tab review are the controls.
 
 ### F) T17 — Frontend v2: review flow, policy UI, Summary|Changes tabs (M7 UI, M8, M11, C1)
+
+> **LANDED (`3987b85f6`)** — as specced: submit stores the entry (incl. `changes`) + opens the
+> modal (degraded included — reviewable); Tabs Summary|Changes with op-badge/path/previous→value
+> rendering; apply lives in the Changes tab with the `Equal.equals(currentContent,
+> INITIAL_CONTENT_STATE)` pristine check gating the confirm dialog; `useRecallEntry` →
+> `useApplyEntry` (requestApply/confirm/pendingApply); the policy switches always send the full
+> policy object; `generatePresetName` deleted (0 refs), `resolveCollision`/suffix API kept; entry
+> `changes` absent-tolerant (legacy → null). Gate incl. `yarn workspace resume build` ✓. Manual
+> browser checklist (owner): tabs render, confirm only when non-pristine, policy toggles disable
+> correctly, legacy entries show the pre-v2 notice.
 
 - **Submit flow** (`state/tailor/hooks.ts` `useSubmitTailor`): delete the pre-save snapshot block;
   **no auto-apply**. On success: dispatch `submitSucceeded` (entry now stores `changes` from the
@@ -474,6 +491,15 @@ refinement round would post back.
   `onCollision:"suffix"` API, and manual preset behavior untouched.
 
 ### G) T18 — Observability: Tempo→logs, trace-id in logs, Redacted at source (M5, M6)
+
+> **LANDED (`052cda611`)** — trace_id/span_id extracted from `fiber.cache.span` in the JSON logger
+> (Effect core's `Tracer.Span` exposes both — vendored Tracer.ts:394-398; the OtelTracer sets them
+> from the OTel span context). Grafana `tracesToLogsV2` customQuery eval-verified on augustus.
+> Redacted-at-source: hmac secret + JWK decryption secret + decrypted private JWK wrapped
+> (`Redacted.value` only at crypto boundaries); manual key-pattern redaction deleted from logger.ts
+> and otel.ts (plain `BatchSpanProcessor`). **Field-verified offline via the e2e log dump: 222
+> request-scoped lines carry `"trace_id"`, 0 contain `sk-or-`.** Deploy-time acceptance (owner):
+> live Tempo "View logs for this span" click + the doc 05 §9 journalctl grep on augustus.
 
 - **Grafana provisioning** (`nix-config/modules/features/grafana/service.nix` tracesToLogsV2):
   switch to a deterministic custom query keyed on the label Loki actually has:

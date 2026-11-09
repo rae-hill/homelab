@@ -27,9 +27,9 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | T13  | 07  | v2: 5 service extractions — validation(policy)/listing-extraction/prompt-config(version)/sanitization(arg consts)/merge-delta (E1–E4, M9, M12/C3) | **done** (interrupted-agent recovery + coordinator fixes: extraction env-model bug, test layer-capture pattern, policy/rationale fixtures) | `2714b1a77`    |
 | T14  | 07  | v2: `Schemas.Tailoring` move + `Schema.fromJsonString` parsing + `HashingServiceSha256` (M2–M4)                                                   | **done** (native effect/crypto Digest; hash values unchanged — equivalence tests)                                                          | `ebf9b9037`    |
 | T15  | 07  | v2: wire — request `policy` + response `changes` (JsonPatch-native) (M7, C2)                                                                      | **done** (policy = `Schema.optionalKey` BOTH sides — typed clients may omit; + shell-leak & self-import-cycle fixes)                       | `6d9def5f1`    |
-| T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | planned (doc 07 §E)                                                                                                                        | —              |
-| T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | planned (doc 07 §F)                                                                                                                        | —              |
-| T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | planned (doc 07 §G)                                                                                                                        | —              |
+| T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | **done** (addedBullets experience-only — projects have no bulletPoints; strict policy rejects adds)                                        | `0c603a34e`    |
+| T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | **done** (no auto-apply/snapshots; generatePresetName removed; legacy entries decode changes:null)                                         | `3987b85f6`    |
+| T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | **done** (fiber.cache.span extraction; grafana customQuery eval-verified; 222 trace_id lines + 0 sk-or- in the e2e log dump)               | `052cda611`    |
 | T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | planned (doc 07 §H; gate = evals + owner go)                                                                                               | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
@@ -175,7 +175,11 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 (`e7137e69d`), CI-hang bounds landed (`b372d0713`), kanidm groups split by owner
 (`9727a4ceb1ff`).
 
-1. **v2 work queue = doc 07 (T12–T19):** the owner's tailoring-quality suggestions were ELICITED
+1. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
+   full e2e green (15 files, 112✓+1 skip, exit 0). Remaining: T19 — GATED (needs explicit owner
+   go; its §H eval gate must first build the doc 02 §I fixtures, which don't exist on disk) + the
+   owner deploy-time checklist (Tempo link click, augustus redaction grep, browser pass over the
+   new review UI, CI push).** The owner's tailoring-quality suggestions were ELICITED
    (2026-11-09) and grew into the full v2 directive set (M1–M12 + clarifications C1–C3) — plan of
    record: `docs/resume-tailor-harness/07-v2-plan.md`. Waves: **V2-A** T12→T13→T14 (serial) →
    **V2-B** T15→T16→T19 (T19 GATED: §H evals + owner go) ∥ T18 → **V2-C** T17; **full `e2e` suite
@@ -493,3 +497,36 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 - Gates after each task: typecheck ✓ / tests ✓ (730 + 1 todo) / lint 0 errors / circular ✓.
 - **Next:** T16 (prompt v2 permissiveness + addedBullets + version bumps + evals), then T17
   (frontend), T18 (observability), T19 gated (owner go needed), FULL e2e last.
+
+### 2026-11-09 (fourth) — T16–T18 landed + FULL e2e green: ungated v2 work COMPLETE
+
+- **T16 done** (`0c603a34e`, qwen3.7-plus subagent, clean completion): prompt v2 creative liberty —
+  rewrite bullets/descriptions toward the listing + `addedBullets` for requirement-matching
+  additions; HARD BOUND per owner M10: never claim a language/framework/runtime absent from the
+  candidate content, no invented metrics/employers/titles/dates. Schema + def interface in sync
+  (conformance gate), merge appends addedBullets with `${entryId}__b${baseLength+idx}` ids
+  (EXPERIENCE ONLY — projects have no bulletPoints; justified deviation), validation's fabrication
+  scan covers added text, strict policy (enabled=true) rejects `add` ops, versions bumped
+  `v2-2026-11`/`v2`, JSON-Schema emission snapshot updated. NOTE: doc 02 §I's offline eval fixtures
+  were never implemented on disk — that work folds into the T19 gate.
+- **T18 done** (`052cda611`, subagent + coordinator review): Grafana `tracesToLogsV2` → customQuery
+  `{unit="homelab-api.service"} |= "$__traceID"` (nix-eval verified against augustus); JSON log
+  lines gain `trace_id`/`span_id` from `fiber.cache.span` (core `Tracer.Span` exposes both —
+  vendored Tracer.ts:394-398); manual key-pattern redaction REMOVED (logger.ts pattern +
+  RedactingSpanProcessor → plain BatchSpanProcessor); hmac secret + JWK decryption secret +
+  decrypted private JWK wrapped in `Redacted`, unwrapped only at crypto boundaries. Offline
+  acceptance from the e2e log dump: **222 `"trace_id"` lines, 0 `sk-or-`**.
+- **T17 done** (`3987b85f6`, subagent + coordinator review): review-then-apply — no auto-apply, no
+  "Pre-tailor:" snapshots (`generatePresetName` deleted; `resolveCollision`/suffix API kept for
+  manual presets); details modal = Tabs **Summary | Changes** (op badge + path + previous→value;
+  legacy entries → "No changes recorded"); "Apply changes to resume" in the Changes tab; overwrite
+  confirm dialog only when `Equal.equals(content, INITIAL_CONTENT_STATE)` is FALSE; entry `changes`
+  nullable/absent-tolerant (envelope stays v1); policy switches UI → `payload.policy`. Resume
+  production build ✓.
+- **FULL e2e suite GREEN (owner directive: saved for last):** 15 files, 112 passed + 1 skipped
+  (live-AI gated), exit 0. The rolldown bundle handles `effect/crypto` fine (no undici repeat);
+  the bundled server boots + health-passes with all v2 layers.
+- **Remaining:** T19 (GATED — owner go + §H eval gate, which includes building the missing eval
+  fixtures); owner deploy-time checklist: redeploy augustus (nix grafana change + server), live
+  Tempo "View logs for this span" click, `journalctl -u homelab-api | grep -c 'sk-or-'` → 0,
+  browser pass over the new review UI, CI push should be green-or-loud.

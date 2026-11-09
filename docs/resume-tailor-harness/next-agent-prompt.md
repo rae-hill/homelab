@@ -49,7 +49,8 @@ create worktrees unless asked.
   `openai/gpt-6-luna` (env-overridable, no rebuild needed). Absent key never breaks boot
   (Option-based env; praeconinus stays dark by design). Owner split kanidm groups
   (`9727a4ceb1ff`): `homelab.resume.printing` / `homelab.resume.tailoring`.
-- **v2 is PLANNED (owner, 2026-11-09):** `07-v2-plan.md` is the plan of record for **T12–T19** —
+- **v2 is LANDED through T18 (2026-11-09):** `07-v2-plan.md` remains the plan of record; T12–T18
+  are DONE (hashes in progress.md's status table; full e2e green: 15 files, 112✓+1 skip) —
   service extractions (validation-policy / listing-extraction / prompt-config with a `version`
   property / sanitization with truncation args / merge-delta + hashing), errors.ts retirement
   (raw nested error JSON), `Schemas.Tailoring` relocation, wire v2 (`request.policy` +
@@ -61,18 +62,18 @@ create worktrees unless asked.
 
 ## Your job
 
-**Execute the v2 plan: `docs/resume-tailor-harness/07-v2-plan.md` (T12–T19).** The old
-"elicit the owner's quality suggestions first" item is RESOLVED — the suggestions became the v2
-directives (M1–M12, 2026-11-09). Waves: **V2-A** T12→T13→T14 (serial — shared files) → **V2-B**
-T15→T16→T19 (T19 is GATED on doc 07 §H evals + explicit owner go) ∥ T18 → **V2-C** T17.
-**Full `e2e` suite runs LAST** (owner directive — subprocess-heavy). Per task: `yarn lint &&
+**Remaining v2 work: T19 (GATED) + owner deploy-time checklist.** T12–T18 landed 2026-11-09
+(hashes in progress.md; full e2e green). **T19** (model-facing edits → Effect JsonPatch ops,
+doc 07 §H) starts ONLY after the owner's explicit go; its gate requires building the doc 02 §I
+eval fixtures first (they don't exist on disk). Deploy-time checklist (owner, after augustus
+redeploy): live Tempo "View logs for this span" click, `journalctl -u homelab-api --since "-1
+hour" | grep -c 'sk-or-'` → 0, browser pass over the new review UI (tabs, confirm-only-when-
+non-pristine, policy switches, legacy-entry notice), CI push green-or-loud. Per task: `yarn lint &&
 yarn typecheck && yarn test` green, commit `--no-verify`, update progress.md (status table +
 session log + gotchas). If a test resists diagnosis after ~2 attempts: commit, skip it with
-`TODO(v2)`, flag it in progress.md — do NOT loop (owner directive). v1 loose ends (progress.md
-§Open items 2–4) carry over: CI-green confirmation, browser checklist (T17 reworks that UI —
-re-check after), redaction grep (folds into T18 acceptance). Sops remains owner-only (denied to
-agents). **Keep progress.md current** — it is the handoff chain; update it BEFORE your context
-runs low, and record any new gotcha you hit.
+`TODO(v2)`, flag it in progress.md — do NOT loop (owner directive). Sops remains owner-only
+(denied to agents). **Keep progress.md current** — it is the handoff chain; update it BEFORE your
+context runs low, and record any new gotcha you hit.
 
 ## House rules that bite (full list: progress.md §Gotchas)
 
