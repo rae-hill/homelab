@@ -1,10 +1,9 @@
 import { Clock, Duration, Effect, Layer } from "effect"
-import { Config, Services } from "homelab-services"
+import { Config, Services, Utils } from "homelab-services"
 import { createHash } from "node:crypto"
 import { ResumeContent } from "shared"
 import type { ResumeContent as ResumeContentType } from "shared"
 import { runCleanupStage } from "./tailor/cleanup.js"
-import { describeErrorChain } from "./tailor/errors.js"
 import { sanitize, truncate } from "./tailor/hygiene.js"
 import { buildTailorMessages, buildTailorResponseFormat } from "./tailor/prompts.js"
 import {
@@ -89,12 +88,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       ).pipe(
         Effect.catch((err) =>
           Effect.flatMap(
-            Effect.logError(`Stage 1 (cleanup) failed: ${describeErrorChain(err)}`),
+            Effect.logError("Stage 1 (cleanup) failed"),
             () =>
               Effect.fail(
                 new Services.TailorService.TailorError({
-                  message: `Stage 1 (cleanup) failed: ${describeErrorChain(err)}`,
-                  error: err,
+                  message: "Stage 1 (cleanup) failed",
+                  error: Utils.errorToJson(err),
                 }),
               ),
           )
@@ -131,8 +130,8 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
               try: () => JSON.parse(response.content) as TailorEdits,
               catch: (error) =>
                 new Services.TailorService.TailorError({
-                  message: `Stage 2 (tailor) output was not valid JSON: ${describeErrorChain(error)}`,
-                  error,
+                  message: "Stage 2 (tailor) output was not valid JSON",
+                  error: Utils.errorToJson(error),
                 }),
             }).pipe(
               Effect.flatMap((edits) =>
@@ -151,12 +150,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
           }),
           Effect.catch((err) =>
             Effect.flatMap(
-              Effect.logError(`Stage 2 (tailor) failed: ${describeErrorChain(err)}`),
+              Effect.logError("Stage 2 (tailor) failed"),
               () =>
                 Effect.fail(
                   new Services.TailorService.TailorError({
-                    message: `Stage 2 (tailor) failed: ${describeErrorChain(err)}`,
-                    error: err,
+                    message: "Stage 2 (tailor) failed",
+                    error: Utils.errorToJson(err),
                   }),
                 ),
             )
@@ -274,12 +273,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         }
         // Wrap unexpected typed errors
         return Effect.flatMap(
-          Effect.logError(`Tailor pipeline failed: ${describeErrorChain(error)}`),
+          Effect.logError("Tailor pipeline failed"),
           () =>
             Effect.fail(
               new Services.TailorService.TailorError({
-                message: `Tailor pipeline failed: ${describeErrorChain(error)}`,
-                error,
+                message: "Tailor pipeline failed",
+                error: Utils.errorToJson(error),
               }),
             ),
         )
@@ -287,12 +286,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       Effect.catchDefect((defect) => {
         // Catch defects (uncaught exceptions) and wrap them
         return Effect.flatMap(
-          Effect.logError(`Tailor pipeline failed: ${describeErrorChain(defect)}`),
+          Effect.logError("Tailor pipeline failed"),
           () =>
             Effect.fail(
               new Services.TailorService.TailorError({
-                message: `Tailor pipeline failed: ${describeErrorChain(defect)}`,
-                error: defect,
+                message: "Tailor pipeline failed",
+                error: Utils.errorToJson(defect),
               }),
             ),
         )

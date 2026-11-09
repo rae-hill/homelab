@@ -1,6 +1,5 @@
 import { Clock, Duration, Effect } from "effect"
-import { Services } from "homelab-services"
-import { describeErrorChain } from "./errors.js"
+import { Services, Utils } from "homelab-services"
 import { buildCleanupMessages, buildCleanupResponseFormat } from "./prompts.js"
 import type { CleanupResponse } from "./wire-schema.js"
 
@@ -70,8 +69,8 @@ export const runCleanupStage = (
                   Effect.catch((parseErr) =>
                     Effect.fail(
                       new Services.TailorService.TailorError({
-                        message: `Stage 1 (cleanup) output was not valid JSON: ${describeErrorChain(parseErr)}`,
-                        error: parseErr,
+                        message: "Stage 1 (cleanup) output was not valid JSON",
+                        error: Utils.errorToJson(parseErr),
                       }),
                     )
                   ),
@@ -88,7 +87,7 @@ export const runCleanupStage = (
           ),
           Effect.catch((error) =>
             Effect.flatMap(
-              Effect.logError(`Stage 1 (cleanup) failed: ${describeErrorChain(error)}`),
+              Effect.logError("Stage 1 (cleanup) failed"),
               () => Effect.fail(error),
             )
           ),

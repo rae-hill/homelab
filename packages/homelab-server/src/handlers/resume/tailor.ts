@@ -45,6 +45,7 @@ export const handleResumeTailor = Effect.fn("handleResumeTailor")(
       Match.tag("TailorError", (err) =>
         new ApiErrors.InternalServerError({
           message: err.message,
+          error: err.error,
         })),
       Match.orElse((_) => _),
     ),
