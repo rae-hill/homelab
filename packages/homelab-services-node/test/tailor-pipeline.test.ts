@@ -137,6 +137,26 @@ describe("tailor pipeline", () => {
       expect(result.meta.listingHash).toBeDefined()
       expect(result.meta.promptVersion).toBeDefined()
       expect(result.meta.schemaVersion).toBeDefined()
+
+      // T15: changes field should be present and contain replace operations
+      expect(result.changes).toBeDefined()
+      expect(Array.isArray(result.changes)).toBe(true)
+      expect(result.changes.length).toBeGreaterThan(0)
+
+      // Verify the changes contain replace operations with previous values
+      const replaceOps = result.changes.filter((c) => c.patch.op === "replace")
+      expect(replaceOps.length).toBeGreaterThan(0)
+
+      // At least one change should have a previous value (the original text)
+      const changesWithPrevious = result.changes.filter((c) => c.previous !== undefined)
+      expect(changesWithPrevious.length).toBeGreaterThan(0)
+
+      // Verify the structure of a change entry
+      const firstChange = result.changes[0]
+      expect(firstChange.patch).toBeDefined()
+      expect(firstChange.patch.op).toBe("replace")
+      expect(firstChange.patch.path).toBeDefined()
+      expect(firstChange.previous).toBeDefined()
     }).pipe(
       Effect.provide(
         TestLayer.pipe(
@@ -334,6 +354,93 @@ describe("tailor pipeline", () => {
       Effect.provide(
         TestLayer.pipe(
           Layer.provide(failingClient),
+          Layer.provide(StubQuotaService),
+        ),
+      ),
+    )
+  })
+
+  it.effect("strict policy (enabled: true) reaches validation and drops fabricated metrics", () => {
+    // Stub dispatching on model (like makeStubOpenRouterClient): stage 2 returns an edit
+    // with a fabricated metric ("300%" appears in neither content nor listing)
+    const strictClient = Layer.succeed(
+      Services.OpenRouterClientService.OpenRouterClientService,
+      {
+        chat: (req: any) =>
+          req.model === "test-cleanup-model"
+            ? Effect.succeed({
+              content: JSON.stringify({
+                cleanedListing: "Software Engineer role",
+                jobTitle: "Software Engineer",
+                company: null,
+              }),
+              finishReason: "stop",
+              usage: { promptTokens: 100, completionTokens: 50 },
+            })
+            : Effect.succeed({
+              content: JSON.stringify({
+                headline: null,
+                summary: null,
+                bullets: [
+                  {
+                    // real IDs from INITIAL_CONTENT_STATE — must NOT be dropped by ID
+                    // resolution, so the fabrication check is what rejects it
+                    entryId: "nutrien",
+                    bulletId: "nutrien__b0",
+                    text: "Increased performance by 300% through optimization",
+                    rationale: "Matches listing requirement for performance optimization",
+                  },
+                ],
+                entryDescriptions: [],
+                hiddenBullets: [],
+                tagGroups: [],
+                fit: {
+                  verdict: "partial",
+                  summary: "Good match",
+                  tips: [],
+                  keywordCoverage: { required: [] },
+                },
+              }),
+              finishReason: "stop",
+              usage: { promptTokens: 100, completionTokens: 50 },
+            }),
+      },
+    )
+
+    return Effect.gen(function*() {
+      const service = yield* Services.TailorService.TailorService
+      const content = ResumeContent.INITIAL_CONTENT_STATE
+
+      // Call with strict policy (enabled: true)
+      const result = yield* service.tailorResume(
+        "user@example.com",
+        "Software Engineer role",
+        content,
+        "v1",
+        {
+          enabled: true,
+          requireTagsGloballyAvailable: true,
+          rejectFabricatedMetrics: true,
+          groundTipsInListing: true,
+        },
+      )
+
+      // With strict policy, the fabricated metric "300%" should be dropped
+      // The changes array should not contain this bullet modification
+      expect(result.changes).toBeDefined()
+      expect(Array.isArray(result.changes)).toBe(true)
+
+      // Verify no changes contain the fabricated metric text
+      const changesWithMetric = result.changes.filter((c) =>
+        c.patch.op === "replace" &&
+        typeof c.patch.value === "string" &&
+        c.patch.value.includes("300%")
+      )
+      expect(changesWithMetric).toHaveLength(0)
+    }).pipe(
+      Effect.provide(
+        TestLayer.pipe(
+          Layer.provide(strictClient),
           Layer.provide(StubQuotaService),
         ),
       ),

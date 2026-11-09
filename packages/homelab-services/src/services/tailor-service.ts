@@ -1,6 +1,6 @@
 import { Context, Data, Effect } from "effect"
 import type { ResumeContent } from "shared"
-import type { ResumeTailorResponse } from "../schemas/resume-tailor.js"
+import type { ResumeTailorResponse, TailorValidationPolicy } from "../schemas/resume-tailor.js"
 
 export const TailorServiceId = "homelab-api/services/tailor/TailorService"
 
@@ -89,6 +89,7 @@ export interface TailorServiceDef {
    * - `content`: the user's current content — already decoded from the wire patch to a
    *   `ContentState` by the payload codec at the HttpApi edge.
    * - `baseVersion`: already validated against `CONTENT_DEFAULTS_VERSION` by the handler.
+   * - `policy`: optional validation policy (defaults to permissive: enabled=false).
    *
    * Pipeline failures are typed `TailorError` failures (mapped to 500 by the handler)
    * with upstream causes rendered into `message`; quota stays a separate 400. Full
@@ -99,6 +100,7 @@ export interface TailorServiceDef {
     listing: string,
     content: ResumeContent.ContentState,
     baseVersion: string,
+    policy?: TailorValidationPolicy,
   ) => Effect.Effect<TailorResult, TailorError | TailorQuotaExceeded>
 }
 

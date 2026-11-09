@@ -1,6 +1,6 @@
 import { Clock, Duration, Effect, Layer, Schema } from "effect"
 import { Config, Services, Utils } from "homelab-services"
-import { Schemas } from "homelab-services-node"
+import { CleanupResponse } from "../schemas/Tailoring.js"
 
 /**
  * Listing extraction service implementation. Absorbs cleanup.ts logic (stage 1).
@@ -39,7 +39,7 @@ export const makeResumeListingExtractionService = () =>
 
             // Parse JSON response via schema
             const parsed = yield* Schema.decodeUnknownEffect(
-              Schema.fromJsonString(Schemas.Tailoring.CleanupResponse),
+              Schema.fromJsonString(CleanupResponse),
             )(response.content).pipe(
               Effect.mapError((error) =>
                 new Services.ResumeListingExtractionService.ListingExtractionError({

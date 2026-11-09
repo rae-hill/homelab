@@ -58,11 +58,13 @@ export type TailorChange = Schema.Schema.Type<typeof TailorChange>
  *   middle-truncation ~20k chars is the TailorService's job)
  * - content: user's current resume content as a base64 JSON Patch vs defaults
  * - baseVersion: CONTENT_DEFAULTS_VERSION from shared (server rejects mismatches with 4xx)
+ * - policy: optional validation policy (defaults to permissive: enabled=false)
  */
 export const ResumeTailorRequest = Schema.Struct({
   listing: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200_000)),
   content: ResumeContent.ContentPatchBase64,
   baseVersion: Schema.String,
+  policy: Schema.optionalKey(TailorValidationPolicy),
 })
 
 export type ResumeTailorRequest = Schema.Schema.Type<typeof ResumeTailorRequest>
@@ -171,6 +173,7 @@ export type TailorMeta = Schema.Schema.Type<typeof TailorMeta>
  * - baseVersion: CONTENT_DEFAULTS_VERSION (matches request)
  * - fit: fit report (verdict, summary, tips, keyword coverage)
  * - meta: per-stage metadata (tokens, latency, models, degraded flag, hashes, versions)
+ * - changes: structured list of JsonPatch mutations (single source of truth for Changes tab)
  */
 export const ResumeTailorResponse = Schema.Struct({
   jobTitle: Schema.String,
@@ -179,6 +182,7 @@ export const ResumeTailorResponse = Schema.Struct({
   baseVersion: Schema.String,
   fit: FitReport,
   meta: TailorMeta,
+  changes: Schema.Array(TailorChange),
 })
 
 export type ResumeTailorResponse = Schema.Schema.Type<typeof ResumeTailorResponse>

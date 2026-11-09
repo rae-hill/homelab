@@ -43,6 +43,41 @@ describe("resume-tailor schemas", () => {
       const result = Schema.decodeUnknownResult(ResumeTailorRequest)(fixture)
       expect(Result.isFailure(result)).toBe(true)
     })
+
+    it("should omit policy from the wire and leave it undefined when absent", () => {
+      const fixture = {
+        listing: "Software Engineer at Acme Corp",
+        content: ResumeContent.INITIAL_CONTENT_STATE,
+        baseVersion: "v1",
+      }
+
+      const encoded = Schema.encodeSync(ResumeTailorRequest)(fixture)
+      expect((encoded as Record<string, unknown>).policy).toBeUndefined()
+
+      const decoded = Schema.decodeSync(ResumeTailorRequest)(encoded)
+      // The server applies DEFAULT_TAILOR_VALIDATION_POLICY when the arg is undefined
+      expect(decoded.policy).toBeUndefined()
+    })
+
+    it("should decode a wire request with a partial policy to the fully defaulted policy", () => {
+      // decodeUnknown = the server edge: raw JSON in, defaults materialized
+      const wireContent = Schema.encodeSync(ResumeContent.ContentPatchBase64)(
+        ResumeContent.INITIAL_CONTENT_STATE,
+      )
+      const decoded = Schema.decodeUnknownSync(ResumeTailorRequest)({
+        listing: "Software Engineer at Acme Corp",
+        content: wireContent,
+        baseVersion: "v1",
+        policy: { enabled: true },
+      })
+
+      expect(decoded.policy).toEqual({
+        enabled: true,
+        requireTagsGloballyAvailable: true,
+        rejectFabricatedMetrics: true,
+        groundTipsInListing: true,
+      })
+    })
   })
 
   describe("ResumeTailorResponse", () => {
@@ -88,6 +123,12 @@ describe("resume-tailor schemas", () => {
           promptVersion: "v1",
           schemaVersion: "v1",
         },
+        changes: [
+          {
+            patch: { op: "replace" as const, path: "/blurb", value: "Tailored blurb for Acme Corp" },
+            previous: "Original blurb text",
+          },
+        ],
       }
 
       const encoded = Schema.encodeSync(ResumeTailorResponse)(fixture)
@@ -136,6 +177,12 @@ describe("resume-tailor schemas", () => {
           promptVersion: "v1",
           schemaVersion: "v1",
         },
+        changes: [
+          {
+            patch: { op: "replace" as const, path: "/aboutMe", value: "Updated about me" },
+            previous: "Original about me",
+          },
+        ],
       }
 
       const encoded = Schema.encodeSync(ResumeTailorResponse)(fixture)
@@ -177,6 +224,12 @@ describe("resume-tailor schemas", () => {
           promptVersion: "v1",
           schemaVersion: "v1",
         },
+        changes: [
+          {
+            patch: { op: "replace" as const, path: "/blurb", value: "Tailored blurb for Acme Corp" },
+            previous: "Original blurb",
+          },
+        ],
       }
 
       const encoded = Schema.encodeSync(ResumeTailorResponse)(fixture)

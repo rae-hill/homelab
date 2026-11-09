@@ -1,7 +1,7 @@
 import { Clock, Duration, Effect, Layer, Schema } from "effect"
 import { Config, Schemas, Services, Utils } from "homelab-services"
-import { Schemas as NodeSchemas } from "homelab-services-node"
 import type { ResumeContent as ResumeContentType } from "shared"
+import { TailorEdits as TailorEditsWire } from "../schemas/Tailoring.js"
 
 /**
  * Real TailorService implementation composing the two-stage AI pipeline.
@@ -64,6 +64,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
     listing: string,
     content: ResumeContentType.ContentState,
     baseVersion: string,
+    policy?: Schemas.ResumeTailor.TailorValidationPolicy,
   ): Effect.Effect<
     Services.TailorService.TailorResult,
     Services.TailorService.TailorError | Services.TailorService.TailorQuotaExceeded
@@ -139,7 +140,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
           Effect.flatMap((response) => {
             // Parse JSON via schema
             return Schema.decodeUnknownEffect(
-              Schema.fromJsonString(NodeSchemas.Tailoring.TailorEdits),
+              Schema.fromJsonString(TailorEditsWire),
             )(response.content).pipe(
               Effect.mapError((error) =>
                 new Services.TailorService.TailorError({
@@ -182,14 +183,14 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       })
 
       // 5. Validation pipeline (via ResumeTailorValidationService)
-      // Use default permissive policy (enabled=false) — T15 adds policy parameter
-      const policy = Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY
+      // Use the policy passed in, or fall back to the permissive default (enabled=false)
+      const effectivePolicy = policy ?? Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY
 
       const validation = yield* this.validationService.validateEdits({
         content,
         edits: stage2Result.edits,
         cleanedListing,
-        policy,
+        policy: effectivePolicy,
       }).pipe(
         Effect.catch((err) =>
           Effect.flatMap(
@@ -217,7 +218,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       const mergeResult = yield* this.mergeService.merge({
         content,
         edits,
-        policy,
+        policy: effectivePolicy,
       }).pipe(
         Effect.catch((err) =>
           Effect.flatMap(
@@ -234,7 +235,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       )
 
       const mergedContent = mergeResult.merged
-      // Note: mergeResult.delta and mergeResult.changes are available for T15 wire changes
+      const changes = mergeResult.changes
 
       // 5f. Keyword coverage (via ResumeTailorValidationService)
       const coverage = yield* this.validationService.computeKeywordCoverage({
@@ -296,6 +297,7 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
           promptVersion: this.promptConfigService.version,
           schemaVersion: this.promptConfigService.schemaVersion,
         },
+        changes,
       }
     }).pipe(
       Effect.annotateLogs({

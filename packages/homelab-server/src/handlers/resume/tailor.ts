@@ -31,6 +31,7 @@ export const handleResumeTailor = Effect.fn("handleResumeTailor")(
       listing,
       content,
       baseVersion,
+      args.payload.policy,
     )
   },
   Effect.tapError(Effect.logError),
