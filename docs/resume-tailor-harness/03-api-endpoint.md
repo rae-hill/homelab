@@ -1,5 +1,11 @@
 # 03 — API Endpoint: `POST /resume/tailor`
 
+> **Override note (2026-11-08):** pipeline failures are 500s with the nested cause chain
+> rendered into the error message (doc 02 banner, `cdc7b6db8`) — the live service no longer
+> produces degraded results, so "degraded is a 200" text below is historical. The
+> degraded-passthrough handler test remains as a stub-level check that the handler passes
+> service successes through unmodified.
+
 ## Purpose & Scope
 
 Task **T3** (endpoint def + schemas + handler + authz chain + unit tests) and the e2e half of **T10**.

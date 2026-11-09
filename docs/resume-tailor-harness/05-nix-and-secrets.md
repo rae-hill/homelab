@@ -1,9 +1,11 @@
 # 05 — Nix & Secrets (T9): OpenRouter Key, Env Plumbing, Kanidm Role, Feature Flag
 
-> **STATUS (2026-11-08): T9 COMPLETE.** §1 sops secret added by owner (`7077d7b2b444`); §3
-> augustus wiring landed + eval-verified (`e30f55bb2`). §5 kanidm: owner went beyond Option A —
-> dedicated groups `homelab.resume.printing` / `homelab.resume.tailoring` (`9727a4ceb1ff`); the
-> `resume.printing` name below is historical. Deploy is the remaining step.
+> **STATUS (2026-11-08): T9 COMPLETE + DEPLOYED + FIELD-VERIFIED.** §1 sops secret added by
+> owner (`7077d7b2b444`); §3 augustus wiring landed + eval-verified (`e30f55bb2`). §5 kanidm:
+> owner went beyond Option A — dedicated groups `homelab.resume.printing` /
+> `homelab.resume.tailoring` (`9727a4ceb1ff`); the `resume.printing` name below is historical.
+> Owner deployed and confirmed live tailoring works. Remaining: redaction grep (Test Plan) —
+> see progress.md §Open items.
 
 ## Purpose & Scope
 

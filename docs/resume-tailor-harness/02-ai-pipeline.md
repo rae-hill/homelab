@@ -275,7 +275,8 @@ Order matters. Run server-side before anything reaches the client:
 8. **Merge-delta assertion + response content** — assert the delta between the REQUEST content and
    the merged content is replace-only: `Schema.toDifferJsonPatch(ContentStateCodec).diff(requestContent, merged)`
    must contain only `op:"replace"` (given guards 2–3 hold lengths/membership, anything else is a
-   merge bug — reject to degraded). `ContentStateCodec` owned by doc 01
+   merge bug — reject as a `TailorError` failure → 500, per the 2026-11-08 override).
+   `ContentStateCodec` owned by doc 01
    (`packages/shared/src/resume-content/schema.ts`). NOTE: the RESPONSE patch (vs
    `INITIAL_CONTENT_STATE`, computed by the edge codec — doc 01 §D) may legitimately contain
    `add`/`remove` ops reflecting the user's OWN structural edits (their content arrived as a patch

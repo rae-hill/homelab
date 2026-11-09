@@ -107,40 +107,39 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
 
 ## Open items (prioritized — the work queue for the next session)
 
-1. ~~**OWNER — sops secret:**~~ **DONE (2026-11-08):** owner added `homelab_api_openrouter_key`
-   to `nix-config/secrets/augustus.yaml` (`7077d7b2b444`); the §3 wiring landed agent-side
-   (`e30f55bb2`) and is eval-verified: secret path `/run/secrets/homelab_api_openrouter_key`,
-   env template renders `OPENROUTER_API_KEY_FILE=…`, praeconinus stays `null` (dark).
-   **Deploy pending** for the key to reach the running service.
-2. ~~**OWNER — model slugs (README OQ1):**~~ **RESOLVED (owner, 2026-11-08):** slugs pinned as
-   real code defaults in `packages/homelab-server/src/env.ts` (`cc692e5ea`): stage 2 =
-   `anthropic/claude-sonnet-5.5`, stage 1 (cleanup) = `openai/gpt-6-luna`. Version-pinned, never
-   aliases; env-overridable (`OPENROUTER_MODEL` / `OPENROUTER_CLEANUP_MODEL`) — no nix
-   env-template lines needed. Live calls still blocked on item 1 (no key provisioned).
-3. **Live smoke (needs REDEPLOY of `e7137e69d`):** owner deployed + field-tested 2026-11-08:
-   the new 500-chain immediately surfaced the real failure — OpenRouter 404. Root cause:
-   `new URL("/chat/completions", …/api/v1)` dropped the base path (fixed `e7137e69d`, verified
-   404→401 against the real API, zero spend; local `private/openrouter-api-key` is still the
-   DUMMY so no local live run yet — owner offered $10 budget: either drop the real key into
-   that gitignored file for `RUN_TAILOR_LIVE=1 e2e src/resume`, or retest via UI after
-   redeploy). Then review quality vs doc 02 §I (injection + poor-fit regression-critical);
-   tune prompts if needed — bump `promptVersion` (layers/tailor/prompts.ts) when you do.
-4. **Manual browser check of the Tailoring tab** (no headless UI test in v1): tab visible; submit
-   gated when signed out; pending entry → success; auto-apply + "Pre-tailor: …" preset snapshot
-   toast; details modal (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe
-   editable in Heading tab and rendering on the resume; print output contains no tailor data.
-5. **Deploy (nix side ready):** all wiring committed (`e30f55bb2` + owner's `7077d7b2b444` /
-   `9727a4ceb1ff` kanidm group split — both groups + claim maps + memberships deploy together).
-   → deploy augustus (dirty-tree guard requires committed tree ✓) → doc 05 Test Plan smoke steps
-   3–7, including the redaction grep
-   (`journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0). Verify in Tempo:
-   per-request root spans resolve and carry log events (`c9f54b838`).
-6. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
+**v1 is SHIPPED and field-verified (owner, 2026-11-08 evening):** live tailoring works
+end-to-end on augustus against real OpenRouter; Tempo traces confirmed good (root spans
+resolve, log events visible); the degraded→500 cause chain proved itself in production the
+same day (it surfaced the URL-join 404 that the old code hid as a degraded 200). Sops secret +
+wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 fixed
+(`e7137e69d`), CI-hang bounds landed (`b372d0713`), kanidm groups split by owner
+(`9727a4ceb1ff`).
+
+1. **Owner's tailoring-quality suggestions — TOP PRIORITY, ELICIT FIRST:** the first live run
+   succeeded but the output was sparse ("it didn't have much"); the owner has concrete
+   improvement suggestions that are NOT yet written down — start the next session by asking for
+   them. Candidate levers: stage-2 prompt guidance, cleanup-stage extractive strictness,
+   `maxTokens`, main-model choice (`OPENROUTER_MODEL` is env-overridable without a rebuild).
+   Review against doc 02 §I evals (injection + poor-fit are regression-critical); bump
+   `promptVersion` (layers/tailor/prompts.ts) whenever prompts change. Owner authorized small
+   live spend: `RUN_TAILOR_LIVE=1 e2e src/resume` needs the real key dropped into the gitignored
+   `packages/homelab-server/private/openrouter-api-key` (currently the dummy), or test via UI.
+2. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
+   fetch, probe `--max-time 10` + progress echoes). Next push should show the E2E job pass — or
+   fail loudly with the log dump instead of stalling silently after "starting bundled server".
+3. **Manual browser checklist (partially confirmed by the owner's live run):** still
+   unconfirmed — "Pre-tailor: …" preset snapshot toast; details modal
+   (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe editable in Heading
+   tab and rendering on the resume; print output contains no tailor data.
+4. **Redaction grep unconfirmed** (doc 05 Test Plan): on augustus,
+   `journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0.
+5. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
    point"); doc 06 stretch phase — postgres persistence + category-keyed bases + cache decorator
    (owner wants to do persistence together); "update entry from current content" nicety (README
    OQ4); frozen-base registry mechanics (doc 01 §B — only needed when defaults change);
-   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change); kanidm
-   dedicated `resume.tailoring` group (doc 05 OQ1 — only if print/tailor ACLs must diverge).
+   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change). (Kanidm
+   dedicated tailor group — DONE by owner `9727a4ceb1ff`: `homelab.resume.printing` +
+   `homelab.resume.tailoring`.)
 
 ## Session log
 
@@ -327,3 +326,17 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   fail loudly now), then live smoke (item 3) + redaction grep + Tempo check (root spans resolve,
   span events visible). Local live-run option: owner drops the real key into gitignored
   `packages/homelab-server/private/openrouter-api-key` → `RUN_TAILOR_LIVE=1 e2e src/resume`.
+
+### 2026-11-08 (evening, second) — OWNER FIELD VERIFICATION: v1 works live 🎉
+
+- Owner redeployed with the URL fix and confirmed: **tailoring succeeded end-to-end against
+  real OpenRouter**, and **Tempo traces are working great** (root spans resolve; span-event logs
+  visible) — the observability fix is field-confirmed, not just ConsoleSpanExporter-verified.
+- Feedback: the first live result was SPARSE ("it didn't have much"); the owner has concrete
+  improvement suggestions to hand off — they are NOT written down anywhere yet. **Open item 1
+  for the next session: elicit them first**, then tune prompts/models against doc 02 §I evals
+  (bump `promptVersion` on any prompt change).
+- Handoff docs swept for staleness: override banners added to docs 03 + 04 (degraded-flow text
+  is historical; frontend degraded paths unreachable-but-kept), doc 02 merge-delta guard text
+  corrected to failure semantics, README + next-agent-prompt state brought current, backlog
+  trimmed (kanidm dedicated groups were done by the owner in `9727a4ceb1ff`).

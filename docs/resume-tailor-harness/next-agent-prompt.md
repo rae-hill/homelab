@@ -22,34 +22,39 @@ You are continuing the **resume-tailor AI feature** in the homelab monorepo at
    (postgres/redis stretch + seams). `resume-tailor-harness-initial-plan.md` is AI-craft
    reference ONLY — its repo facts are superseded by the README.
 
-## State of the world (as of 2026-11-07)
+## State of the world (as of 2026-11-08 evening)
 
-- **T1–T10 are DONE and committed** (every hash in the progress.md status table — it is
-  canonical; see also the 2026-11-08 session-log entries for the post-v1 fix wave).
-- Validation all green at last run: root `yarn typecheck`, full `yarn test` (800+ unit tests),
-  `yarn lint` (0 errors), `yarn workspace resume build`, FULL `e2e` suite (15 files, 112 passed,
-  1 skipped = the `RUN_TAILOR_LIVE`-gated live-AI test), `nix build .#homelab-api .#homelab-ui
-  .#resume-site`.
-- The feature is **code-complete, key-provisioned, and wired — pending DEPLOY**: owner added the
-  sops secret (`7077d7b2b444`), agent landed the augustus wiring (`e30f55bb2`, eval-verified).
-  Model slugs pinned in env.ts (`cc692e5ea`): stage 2 `anthropic/claude-sonnet-5.5`, stage 1
-  `openai/gpt-6-luna`. Absent key never breaks server boot (Option-based env; praeconinus stays
-  dark by design).
+- **v1 is SHIPPED and field-verified.** T1–T10 DONE and committed (every hash in the
+  progress.md status table — it is canonical; the 2026-11-08 session-log entries tell the
+  post-v1 fix-wave story). The owner deployed to augustus and confirmed **live tailoring works
+  end-to-end against real OpenRouter** and **Tempo traces are good** (root spans resolve, log
+  events visible).
+- Validation all green at last run: root `yarn typecheck`, full `yarn test` (870+ unit tests),
+  `yarn lint` (0 errors), FULL `e2e` suite incl. CI-mode (15 files, 111–112 passed + skips =
+  the `RUN_TAILOR_LIVE`-gated live-AI test and, with `DISABLE_NETWORK_TESTS=true`, the health
+  test), shellcheck gate, `nix build .#homelab-api .#homelab-ui .#resume-site`, and the
+  augustus nix evals (secret path + env template + praeconinus-dark).
 - **Degraded results no longer exist (owner override of D5, 2026-11-08, `cdc7b6db8`):** pipeline
   failures are 500s with the nested cause chain in the message (`describeErrorChain`); the
-  OpenRouter client recovers non-2xx bodies past `filterStatusOk`. Observability fixed
-  (`c9f54b838`): per-request root spans resolve in Tempo; Effect logs appear as span events.
-- T9 is COMPLETE: nix option/env-template/kanidm-claim/enum-drift-fix + owner sops secret +
-  augustus wiring all committed. Owner also split kanidm groups (`9727a4ceb1ff`):
-  `homelab.resume.printing` / `homelab.resume.tailoring` (rae-only membership).
+  OpenRouter client recovers non-2xx bodies past `filterStatusOk`. This proved itself in
+  production the same day — it surfaced the URL-join 404 (`e7137e69d`) that the old code hid.
+  Observability fixed (`c9f54b838`). CI-e2e-hang bounds landed (`b372d0713`).
+- Secrets/slugs live: owner sops secret (`7077d7b2b444`) + augustus wiring (`e30f55bb2`);
+  slugs pinned in env.ts (`cc692e5ea`): stage 2 `anthropic/claude-sonnet-5.5`, stage 1
+  `openai/gpt-6-luna` (env-overridable, no rebuild needed). Absent key never breaks boot
+  (Option-based env; praeconinus stays dark by design). Owner split kanidm groups
+  (`9727a4ceb1ff`): `homelab.resume.printing` / `homelab.resume.tailoring`.
 
 ## Your job
 
-Work through **progress.md §Open items** in priority order. Items 1–2 need the OWNER (sops is
-denied to agents; slug choice is an owner decision — ask if the owner is present, otherwise
-prepare everything around them). Items 3–5 need real credentials/deploy permission. Item 6 is
-backlog. **Keep progress.md current** (status table + session log + gotchas) — it is the
-handoff chain; update it BEFORE your context runs low, and record any new gotcha you hit.
+Work through **progress.md §Open items** in priority order. **Item 1 is the owner's
+tailoring-quality feedback** — the first live output was sparse ("didn't have much") and their
+concrete suggestions are NOT written down yet, so **ask the owner for them first**, then tune
+prompts/models against doc 02 §I evals (bump `promptVersion` when prompts change; small live
+spend is owner-authorized). Items 2–4 are verification loose ends (CI green, remaining browser
+checklist, redaction grep); item 5 is backlog. Sops remains owner-only (denied to agents).
+**Keep progress.md current** (status table + session log + gotchas) — it is the handoff chain;
+update it BEFORE your context runs low, and record any new gotcha you hit.
 
 ## House rules that bite (full list: progress.md §Gotchas)
 

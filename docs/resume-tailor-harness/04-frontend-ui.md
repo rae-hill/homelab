@@ -2,6 +2,12 @@
 
 Status: **planning** (2026-11). Covers T7 and T8. Authoritative on D1, D4, D6: see [`README.md`](./README.md).
 
+> **Override note (2026-11-08):** the server no longer returns degraded results — failures
+> arrive as 500s whose message carries the cause chain, flowing through the existing
+> `submitFailed` + error-toast path (so users now SEE why a tailor failed). The `"degraded"`
+> status/badge/toast described below still exists in the code — unreachable from the live
+> server, kept harmless for pre-override localStorage entries. Do not build new UI on it.
+
 ## Purpose & Scope
 
 **A) Tailoring tab**: Add `"tailoring"` to `TABS` (`print-config-fab.tsx` line 84). Tab body: listing textarea + char counter (warn near ~20k truncation) + Submit + honest "Working… {elapsed}s" status + error surface. Gate: `useCanTailorResume` checking `signedIn + reachable + Resume_Tailor` role (doc 05 owns constant).
