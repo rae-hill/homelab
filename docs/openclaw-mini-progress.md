@@ -5,6 +5,31 @@ Newest entries first. Agents: append, don't rewrite history.
 
 ---
 
+## 2026-11-09 — Session 2: merged main → worktree, fast-forwarded main (merge commit `ea2368ad46a2`)
+
+- main had advanced **38 commits** since branch point `f733fbeba7a6` (resume-tailor feature,
+  new `homelab-services-browser` workspace, OpenRouter fixes, e2e/test-fixture tooling, AGENTS.md
+  e2e guidance update).
+- **Conflicts (only 3 files, all resolved mechanically):** `homelab-api/package.nix` +
+  `homelab-ui/package.nix` (both sides refreshed the shared `fetchYarnBerryDeps` hash — main for
+  the new workspace, this branch for imapflow/postal-mime) and `yarn.lock` (auto-merged cleanly;
+  revalidated with `yarn install` — link-step only, no drift).
+- **Resolution:** merged lockfile → single recomputed shared FOD hash
+  **`sha256-qVDumxrjcdoORTq1Q0HooA0levjmDwsMsacZOeFokjk=`** set in homelab-api, homelab-ui, AND
+  openclaw/mail-mcp-package.nix. `missing-hashes.json` unchanged.
+- **Validation after merge:** root typecheck ✓ · root lint ✓ (0 errors) · ALL unit tests ✓
+  (733 homelab-services-node + 18 proton-mail-mcp + rest) · `nix build .#homelab-api` ✓ ·
+  shellcheck gate ✓ · mini toplevel eval ✓ · aarch64-darwin proton-mail-mcp eval ✓.
+- ⚠ **Fresh-worktree gotcha (from main's new tooling):** unit tests in homelab-services-node need
+  machine-local fixtures — run `node scripts/stage-test-secrets.mjs` once per checkout (stages
+  gitignored `private/hmac-secret` + `private/jwk.json`; 627 tests fail without it). e2e uses
+  `scripts/stage-e2e-secrets.mjs` via the devshell `e2e` command.
+- main fast-forwarded to the merge result; worktree HEAD == main.
+- Deploy checklist for phases 1+2 unchanged (part 4 below); jacob to add the FIVE sops keys +
+  install Proton Bridge on mini.
+
+---
+
 ## 2026-11-05 — Session 1 (part 4): PHASE 2 IMPLEMENTED — packages/proton-mail-mcp — committed `4d5be4757`
 
 ### What landed
