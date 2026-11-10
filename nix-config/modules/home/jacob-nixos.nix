@@ -114,6 +114,7 @@ in
             teams-for-linux
             vivaldi-nvidia
             clipboard-jh
+            signal-desktop
           ];
 
           dconf = {
