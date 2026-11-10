@@ -530,3 +530,17 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
   fixtures); owner deploy-time checklist: redeploy augustus (nix grafana change + server), live
   Tempo "View logs for this span" click, `journalctl -u homelab-api | grep -c 'sk-or-'` → 0,
   browser pass over the new review UI, CI push should be green-or-loud.
+
+### 2026-11-10 — v2 merged into main
+
+- Merged v2 (`e768b221e0`) into main as merge commit `f26b0758f9`. Main had advanced with the
+  owner's openclaw work (`bae5248233`, 5 unpushed commits) — ZERO file overlap, clean ort merge;
+  their side carried the yarn.lock + fetchYarnBerryDeps hash updates (v2 never touched the
+  lockfile). Original v2 commit hashes (status table) remain valid on main — merge, not rebase,
+  chosen deliberately for that reason.
+- Post-merge validation IN THE PRIMARY worktree: full gates green (typecheck; all workspaces
+  incl. openclaw's proton-mail-mcp — 735 services-node + 65 homelab-server + suite total; lint 0
+  errors; circular ✓); augustus grafana eval shows the tracesToLogsV2 customQuery ✓; FULL e2e
+  15 files, 112✓ + 1 skip (live-AI gated), exit 0.
+- main is 6 ahead of origin/main (5 openclaw + the merge) — PUSH PENDING owner decision.
+- The `nimble-otter` opencode worktree is fully merged and can be removed.
