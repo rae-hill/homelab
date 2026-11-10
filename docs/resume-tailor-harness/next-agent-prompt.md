@@ -64,8 +64,9 @@ create worktrees unless asked.
 
 **Remaining v2 work: T19 (GATED) + owner deploy-time checklist.** T12–T18 landed 2026-11-09
 (hashes in progress.md; full e2e green). **T19** (model-facing edits → Effect JsonPatch ops,
-doc 07 §H) starts ONLY after the owner's explicit go; its gate requires building the doc 02 §I
-eval fixtures first (they don't exist on disk). Deploy-time checklist (owner, after augustus
+doc 07 §H) is DEFERRED by the owner (2026-11-09) pending v2 field verification, and starts ONLY
+after their explicit go; its gate requires building the doc 02 §I eval fixtures first (they don't
+exist on disk). Deploy-time checklist (owner, after augustus
 redeploy): live Tempo "View logs for this span" click, `journalctl -u homelab-api --since "-1
 hour" | grep -c 'sk-or-'` → 0, browser pass over the new review UI (tabs, confirm-only-when-
 non-pristine, policy switches, legacy-entry notice), CI push green-or-loud. Per task: `yarn lint &&

@@ -538,6 +538,10 @@ the derived-matcher path is dead because Alloy exposes `unit`, not `service_name
 
 ### H) T19 — Effect JsonPatch everywhere: model-facing edits switch (GATED fast-follow; M12)
 
+> **DEFERRED (owner, 2026-11-09):** field-verify v2 first (deploy, real tailoring sessions,
+> Changes-tab review experience). T19 starts only on the owner's explicit go — then the §H gate
+> applies (build the doc 02 §I eval fixtures first; they don't exist on disk).
+
 The owner's end-state (M12): the whole system speaks Effect JsonPatch — "it simplifies things a
 lot." v2 delivers the server-side half: the content wire codec is already JsonPatch (doc 01), and
 the merge delta/guard/`changes` become JsonPatch-native (§B.5, §D). The remaining piece is the
