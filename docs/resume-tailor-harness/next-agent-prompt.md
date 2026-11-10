@@ -63,6 +63,14 @@ create worktrees unless asked.
   overwrite-confirm via `Equal.equals` — no more auto-apply or "Pre-tailor:" snapshots),
   Tempo→logs correlation + trace-id logging + `Redacted`-at-source, and GATED T19 (model-facing
   edits → Effect JsonPatch ops + path-allowlist policy). New decisions D10–D15; D1/D4 overridden.
+- **v3 (DOCX output) is LANDED through T24 (2026-11-10):** `08-docx-output-plan.md` is the plan
+  of record. `POST /resume/print?outputFormat=pdf|docx` (default pdf; dual magic-byte success
+  schemas → correct per-format Content-Type); `ResumePrintingService` (renamed from
+  `PdfPrintService`) + `DocumentRenderingServiceDocx.formatHtml` wrapping
+  `@turbodocx/html-to-docx`; docx path = puppeteer print-media capture with computed-style
+  inlining + SVG→PNG via sharp (external in rolldown; runtime closure patched + smoke-checked in
+  the homelab-api nix derivation); Chakra split menus on the Download FAB + settings Print button.
+  T19 stays backburnered. **Owner fidelity gate on the sample DOCX is the remaining step.**
 
 ## Your job
 
