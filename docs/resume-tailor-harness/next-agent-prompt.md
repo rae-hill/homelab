@@ -66,10 +66,12 @@ create worktrees unless asked.
 
 ## Your job
 
-**Current queue: v3 = doc 08 (T20–T24), DOCX output for resume printing** (owner, 2026-11-10).
-Strictly serial: T20 rename (`PdfPrintService`→`ResumePrintingService`) → T21
-`DocumentRenderingServiceDocx` + dep + bundle spike → T22 wire `outputFormat` + capture path →
-**[GATE: owner DOCX fidelity review]** → T23 frontend split menus → T24 e2e + nix hashes.
+**v3 = doc 08 (T20–T24), DOCX output for resume printing: ALL TASKS LANDED 2026-11-10** (hashes
+in progress.md's status table; full gate + FULL e2e green; nix trio green with the sharp runtime
+closure smoke-checked in-build). **Remaining: the owner DOCX fidelity gate** — sample at
+`/tmp/opencode/resume-sample.docx` (regenerate: `DOCX_SAMPLE_PATH=… e2e src/resume`); iterate the
+capture script (`services-node/src/layers/docx-html-capture.ts`: style whitelist, SVG handling,
+margins/fonts) on owner feedback, and get the OQ7 ruling (DOCX currently forces the light theme).
 **T19** (model-facing edits → Effect JsonPatch ops, doc 07 §H) remains DEFERRED by the owner
 (reconfirmed 2026-11-10 — "JsonPatch on the backburner"); it starts ONLY after their explicit go,
 and its gate requires building the doc 02 §I eval fixtures first (they don't exist on disk).

@@ -34,8 +34,8 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | T20  | 08  | v3: rename `PdfPrintService` → `ResumePrintingService` (+`ResumePrintError`), format-agnostic file/id/span names                                  | **done** (pure rename; `grep PdfPrint packages/` clean; gates + `e2e src/resume` green)                                                                                                            | `f57c00803`    |
 | T21  | 08  | v3: `DocumentRenderingServiceDocx` (`formatHtml`) + `@turbodocx/html-to-docx` + `sharp` deps + rolldown externals + bundle spike                  | **done** (makeX factory + 6 fake-injection tests incl. real-library conversion; spike: sharp external via createRequire, resolves from bundle dir + renders, server boots)                         | `ebb4ff4dd`    |
 | T22  | 08  | v3: wire `outputFormat=pdf\|docx` (dual magic-byte success schemas) + puppeteer computed-style HTML capture → docx branch                         | **done** (C4 PROVEN: typed client decoded DOCX + raw content-type e2e pulled forward; sample 121KB, 28 sharp-rasterized icons) — **fidelity gate: owner review pending** (OQ7 theme question open) | `6277c0d57`    |
-| T23  | 08  | v3: frontend — Chakra split menus (settings Print button + Download FAB), format-aware request/download, `window.print` fallback when `!canPrint` | planned (gated on T22 fidelity sign-off)                                                                                                                                                           | —              |
-| T24  | 08  | v3: e2e docx + raw content-type assertions; nix hashes + sharp runtime closure in `$out/lib/bundle/node_modules`; full suite                      | planned                                                                                                                                                                                            | —              |
+| T23  | 08  | v3: frontend — Chakra split menus (settings Print button + Download FAB), format-aware request/download, `window.print` fallback when `!canPrint` | **done** (shared `useResumeDownload` + `ResumeFormatMenuItems`; DOCX forces light theme per OQ7 recommendation; gates + resume build green)                                                        | `1e4443a9d`    |
+| T24  | 08  | v3: e2e docx + raw content-type assertions; nix hashes + sharp runtime closure in `$out/lib/bundle/node_modules`; full suite                      | **done** (nix trio + full root gate + FULL e2e 114✓+1skip all green; sharp runtime closure smoke-checks a real PNG conversion inside the build)                                                    | `634c666e1`    |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -190,6 +190,13 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
    `window.print()`). Strictly serial: T20→T21→T22→**[GATE: owner DOCX fidelity review]**→T23→T24.
    Plan of record: `docs/resume-tailor-harness/08-docx-output-plan.md`. **T19 (JsonPatch) is
    explicitly ON THE BACKBURNER (owner, 2026-11-10)** — still gated, NOT in this queue.
+   **STATUS (2026-11-10 evening): T20–T24 ALL LANDED** (hashes in the status table; full root
+   gate green, FULL e2e 15 files 114✓+1 skip, `nix build` trio green with the sharp runtime
+   closure smoke-checked inside the derivation). **Remaining: the OWNER FIDELITY GATE** — review
+   `/tmp/opencode/resume-sample.docx` (regenerate: `DOCX_SAMPLE_PATH=… e2e src/resume`) in
+   Word/LibreOffice + the target parser, rule on OQ7 (DOCX currently forces the light theme),
+   then deploy. Capture-script tuning (style whitelist, margins/fonts, SVG handling) iterates
+   on gate feedback.
 2. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
    full e2e green (15 files, 112✓+1 skip, exit 0). Remaining: T19 — GATED (needs explicit owner
    go; its §H eval gate must first build the doc 02 §I fixtures, which don't exist on disk) + the
@@ -623,3 +630,33 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 - Next: **T23** frontend split menus (proceeding in parallel with the owner fidelity review — the
   UI is orthogonal to capture-script tuning), then **T24** nix hashes (yarn.lock changed in T21!)
   - full suite. T19 remains backburnered.
+
+### 2026-11-10 (third) — v3 implementation COMPLETE: T23 + T24 landed, awaiting owner fidelity gate
+
+- **T23** (`1e4443a9d`): frontend split menus — `requestResumePdf`/`downloadPdf` → format-aware
+  `requestResumeDocument`/`downloadResumeDocument` (per-format MIME + `.docx` extension); shared
+  `useResumeDownload` hook + `ResumeFormatMenuItems` (`components/resume-download.tsx`); Download
+  FAB and the settings-dialog Print button both became Chakra v3 split menus (`Menu.Root` >
+  `Group attached` > main button + `Menu.Trigger asChild` chevron); `!canPrint` keeps the
+  `window.print()` fallback (OQ1). **OQ7 recommendation implemented: DOCX renders force the light
+  theme** (dark computed colors would inline onto Word's white page) — owner may veto.
+- **T24** (`634c666e1`): sharp deduped to `^0.34.5` — the lockfile ALREADY carried a full
+  sharp@0.34.5 + @img set (covered by 24 existing missing-hashes.json entries), while `yarn add
+  sharp` had pulled a parallel 0.35.5 tree (~24 NEW checksum-less lock entries → fetcher failure
+  "unable to find missing hash for @img/sharp-darwin-arm64@npm:0.35.5"). Aligning versions erased
+  the 0.35.5 set: zero missing-hashes churn. Hash `sha256-ZsQLgstpYPqrf6M4PL4aK5AC5wLJL2mRewZ3ooJrYZU=`
+  set in all three package.nix files. homelab-api installPhase now copies the sharp runtime
+  closure into `$out/lib/bundle/node_modules` (sharp wholesale + pure-JS deps via its
+  package.json + build-platform `@img/sharp-*` glob — hoisting puts the binaries at ROOT @img,
+  NOT nested; the first build failed on exactly that) and patchelfs the generic-linux ELFs
+  (RPATH-only: shared objects have NO `.interp`, so `--set-interpreter` fails — second build
+  failure, fixed) to glibc/libstdc++ store paths preserving the `$ORIGIN` libvips chain. A
+  fail-fast smoke check runs a real 1×1 PNG sharp conversion inside the build ("sharp runtime
+  closure OK" in the drv log) — silent augustus degradation is now impossible.
+- Validation: `nix build .#homelab-api .#homelab-ui .#resume-site` ✓; full root gate ✓ (lint 0
+  errors); FULL e2e suite ✓ 15 files, **114 passed + 1 skip** (was 112 — the two new print tests),
+  exit 0.
+- **v3 code work is COMPLETE. Remaining: owner fidelity gate** (sample at
+  `/tmp/opencode/resume-sample.docx`; regenerate with `DOCX_SAMPLE_PATH=… e2e src/resume`), OQ7
+  ruling, then owner deploy. Known cosmetic: rolldown warns IMPORT_IS_UNDEFINED for html-to-docx's
+  lru-cache default import — proven harmless (e2e docx renders green with 28 rasterized icons).
