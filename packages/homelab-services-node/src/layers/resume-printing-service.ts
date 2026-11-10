@@ -1,6 +1,8 @@
 import { Effect, flow, Layer, Match, Result } from "effect"
 import { Config, type Schemas, Services } from "homelab-services"
 import { PrintConfig } from "shared"
+import { DocumentRenderingServiceDocxLive } from "./document-rendering-service-docx.js"
+import { DOCX_CAPTURE_SCRIPT } from "./docx-html-capture.js"
 import {
   PuppeteerService,
   type PuppeteerServiceDef,
@@ -38,7 +40,16 @@ const CONFETTI_DNS_BLOCK = "--host-resolver-rules=MAP run.confettipage.com ~NOTF
 const PRINT_BACKSTOP_TIMEOUT = "4 minutes"
 
 /**
- * Puppeteer-backed PDF renderer for the resume site.
+ * Initial DOCX conversion options — deliberately minimal; margins/font/etc.
+ * are tuned from the owner fidelity review (doc 08 T22 gate).
+ */
+const DOCX_DOCUMENT_OPTIONS: Services.DocumentRenderingServiceDocx.DocxDocumentOptions = {
+  orientation: "portrait",
+}
+
+/**
+ * Puppeteer-backed document renderer for the resume site (PDF via chrome's
+ * print renderer; DOCX via full-HTML capture + `DocumentRenderingServiceDocx`).
  *
  * The chrome executable comes from `CHROME_EXECUTABLE` (the nix derivation points it at
  * the store path of `google-chrome`); the site URL from `RESUME_SITE_URL` (augustus
@@ -46,26 +57,31 @@ const PRINT_BACKSTOP_TIMEOUT = "4 minutes"
  * public GitHub Pages origin). All browser plumbing — launch, page lifecycle, event
  * handlers, log queue, cleanup finalizers — lives in `PuppeteerService`; this layer is
  * the print-domain flow: seed the config, load, await print-ready (with the font-stall
- * fallback), render the PDF, under a backstop timeout.
+ * fallback), render the document in the requested format, under a backstop timeout.
  */
 export const ResumePrintingServiceLive = Layer.effect(
   Services.ResumePrintingService.ResumePrintingService,
   Effect.gen(function*() {
     const env = yield* Config.Env.Env
     const puppeteer = yield* PuppeteerService
+    const docxRenderer = yield* Services.DocumentRenderingServiceDocx.DocumentRenderingServiceDocx
 
-    return new ResumePrintingServiceImpl(env, puppeteer)
+    return new ResumePrintingServiceImpl(env, puppeteer, docxRenderer)
   }),
-).pipe(Layer.provide(PuppeteerServiceLive))
+).pipe(Layer.provide(Layer.merge(PuppeteerServiceLive, DocumentRenderingServiceDocxLive)))
 
 class ResumePrintingServiceImpl implements Services.ResumePrintingService.ResumePrintingServiceDef {
   constructor(
     private readonly env: typeof Config.Env.Env.Service,
     private readonly puppeteer: PuppeteerServiceDef,
+    private readonly docxRenderer: Services.DocumentRenderingServiceDocx.DocumentRenderingServiceDocxDef,
   ) {}
 
-  printResume(configBase64: string, theme: Schemas.Resume.PrintTheme) {
+  printResume(configBase64: string, theme: Schemas.Resume.PrintTheme, format: Schemas.Resume.PrintOutputFormat) {
     return Effect.gen({ self: this }, function*() {
+      // Closure capture for the inner page-runner generator (it has no `this`
+      // binding of its own).
+      const docxRenderer = this.docxRenderer
       const url = new URL(this.env.resumeSiteUrl)
       url.searchParams.set("theme", theme)
 
@@ -84,7 +100,7 @@ class ResumePrintingServiceImpl implements Services.ResumePrintingService.Resume
           }),
       })
 
-      const renderPdf = this.puppeteer.withPage(
+      const renderDocument = this.puppeteer.withPage(
         {
           trackRequestsMatching: THIRD_PARTY_FONT_HOSTS,
           extraLaunchArgs: [CONFETTI_DNS_BLOCK],
@@ -97,7 +113,7 @@ class ResumePrintingServiceImpl implements Services.ResumePrintingService.Resume
 
           const renderError = (error: unknown, afterFontFallback: boolean) =>
             new Services.ResumePrintingService.ResumePrintError({
-              message: `Headless chrome failed to render the resume PDF for ${url.origin}${
+              message: `Headless chrome failed to render the resume ${format.toUpperCase()} for ${url.origin}${
                 afterFontFallback ? " (after font-stall fallback reload)" : ""
               }`,
               error,
@@ -179,6 +195,42 @@ class ResumePrintingServiceImpl implements Services.ResumePrintingService.Resume
             })
           }
 
+          if (format === "docx") {
+            // Apply the site's @media print rules before capture (same media
+            // chrome's PDF printing uses), then run the in-page capture script:
+            // prune print-hidden app chrome, replace inline SVG icons with
+            // data-URL images, and bake computed styles into inline style
+            // attributes (the converter applies no CSS cascade).
+            yield* Effect.tryPromise({
+              try() {
+                return page.emulateMediaType("print")
+              },
+              catch: (error) => renderError(error, fontFallbackUsed),
+            })
+
+            const html = yield* Effect.tryPromise({
+              try() {
+                return page.evaluate(DOCX_CAPTURE_SCRIPT) as Promise<string>
+              },
+              catch: (error) => renderError(error, fontFallbackUsed),
+            })
+
+            yield* Effect.logInfo(`[print] docx html captured: ${html.length} chars`)
+
+            const docxBytes = yield* docxRenderer.formatHtml(html, DOCX_DOCUMENT_OPTIONS).pipe(
+              Effect.mapError((error) =>
+                new Services.ResumePrintingService.ResumePrintError({
+                  message: `DOCX conversion failed: ${error.message}`,
+                  error: error.error,
+                })
+              ),
+            )
+
+            yield* Effect.logInfo(`[print] docx rendered: ${docxBytes.length} bytes`)
+
+            return docxBytes
+          }
+
           const pdfBytes = yield* Effect.tryPromise({
             async try() {
               const pdf = await page.pdf({
@@ -196,7 +248,7 @@ class ResumePrintingServiceImpl implements Services.ResumePrintingService.Resume
         }),
       )
 
-      return yield* renderPdf.pipe(
+      return yield* renderDocument.pipe(
         // Backstop so the HTTP handler always resolves even if a CDP call hangs.
         // The interrupt propagates into the scoped session: logs drain and chrome
         // is closed/killed by its finalizers regardless.

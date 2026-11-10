@@ -1,9 +1,12 @@
 import { Context, Data, Effect } from "effect"
-import type { PrintTheme } from "../schemas/resume.js"
+import type { PrintOutputFormat, PrintTheme } from "../schemas/resume.js"
 
 export const ResumePrintingServiceId = "homelab-api/services/printing/ResumePrintingService"
 
-/** Raised when headless chrome cannot render the resume PDF (launch, navigation, print). */
+/**
+ * Raised when the resume document cannot be rendered (headless-chrome launch,
+ * navigation, print/HTML capture, or DOCX conversion).
+ */
 export class ResumePrintError extends Data.TaggedError("ResumePrintError")<{
   readonly message: string
   readonly error: unknown
@@ -11,7 +14,8 @@ export class ResumePrintError extends Data.TaggedError("ResumePrintError")<{
 
 export interface ResumePrintingServiceDef {
   /**
-   * Render the resume site to a PDF with headless chrome.
+   * Render the resume site to a document of the requested format with headless
+   * chrome.
    *
    * Seeds the base64 print config into the site's localStorage key
    * (`PrintConfig.PRINT_CONFIG_LOCAL_STORAGE_KEY` from `shared`) before navigating — the
@@ -19,13 +23,21 @@ export interface ResumePrintingServiceDef {
    * `theme` query param. The config is deliberately NOT embedded as an
    * `importPrintSettings` URL param: real-world configs exceed GitHub Pages'
    * request-line limit (HTTP 414, observed on augustus). Waits for the page's
-   * print-ready signal and returns the PDF bytes. The whole render is bounded
-   * by a backstop timeout, so callers always get a resolution (logs drained,
-   * browser closed) even if the page hangs.
+   * print-ready signal, then:
+   *
+   * - `"pdf"` — prints via chrome's PDF renderer and returns the PDF bytes.
+   * - `"docx"` — captures the fully rendered HTML (print-media emulation;
+   *   computed styles inlined, since HTML→DOCX converters apply no CSS
+   *   cascade) and converts it via `DocumentRenderingServiceDocx`, returning
+   *   the DOCX bytes.
+   *
+   * The whole render is bounded by a backstop timeout, so callers always get a
+   * resolution (logs drained, browser closed) even if the page hangs.
    */
   readonly printResume: (
     configBase64: string,
     theme: PrintTheme,
+    format: PrintOutputFormat,
   ) => Effect.Effect<Uint8Array, ResumePrintError>
 }
 

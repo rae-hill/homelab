@@ -1,7 +1,8 @@
 import { assert, describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
-import { HttpBody, HttpClient } from "effect/http"
+import { Effect, Option } from "effect"
+import { Headers, HttpBody, HttpClient } from "effect/http"
 import { ApiErrors } from "homelab-services"
+import { writeFileSync } from "node:fs"
 import { PrintConfig } from "shared"
 import {
   BASE_URL,
@@ -23,6 +24,9 @@ import {
 const describeWithChrome = (process.env.CHROME_EXECUTABLE ?? "").length > 0 ? describe : describe.skip
 
 const ENDPOINT_URL = new URL(`${BASE_URL}/resume/print`)
+
+/** OOXML word-processing document (DOCX) media type. */
+const DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 /**
  * A minimal-but-complete valid persisted print config, built against the SHARED schema
@@ -123,7 +127,7 @@ describe("POST /resume/print", () => {
         const result = yield* Effect.flip(
           client.resume.print({
             payload: { config: fixtureBase64 },
-            query: { theme: "light" },
+            query: { theme: "light", outputFormat: "pdf" },
             headers: {
               dpop: dpopProof,
               authorization: `${token_type} ${access_token}`,
@@ -142,7 +146,7 @@ describe("POST /resume/print", () => {
         const result = yield* Effect.flip(
           client.resume.print({
             payload: { config: fixtureBase64 },
-            query: { theme: "light" },
+            query: { theme: "light", outputFormat: "pdf" },
             headers: {},
           }),
         )
@@ -167,7 +171,7 @@ describe("POST /resume/print", () => {
         const result = yield* Effect.flip(
           client.resume.print({
             payload: { config: "definitely-not-a-print-config" },
-            query: { theme: "light" },
+            query: { theme: "light", outputFormat: "pdf" },
             headers: {
               dpop: dpopProof,
               authorization: `${token_type} ${access_token}`,
@@ -225,7 +229,7 @@ describe("POST /resume/print", () => {
           })
           const pdf = yield* client.resume.print({
             payload: { config: fixtureBase64 },
-            query: { theme: "light" },
+            query: { theme: "light", outputFormat: "pdf" },
             headers: {
               dpop: dpopProof,
               authorization: `${token_type} ${access_token}`,
@@ -236,6 +240,85 @@ describe("POST /resume/print", () => {
           expect(Array.from(pdf.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46])
         }).pipe(Effect.provide(E2ETestLayer)),
       120_000, // chrome launch + page load + pdf render
+    )
+
+    it.live(
+      "renders a DOCX for outputFormat=docx",
+      () =>
+        Effect.gen(function*() {
+          const client = yield* makeApiClient
+          const { access_token, nonce, token_type } = yield* getToken(TEST_API_KEY)
+          const dpopProof = yield* createToken({
+            htu: ENDPOINT_URL,
+            htm: "POST",
+            nonce,
+            accessToken: access_token,
+          })
+          const docx = yield* client.resume.print({
+            payload: { config: fixtureBase64 },
+            query: { theme: "light", outputFormat: "docx" },
+            headers: {
+              dpop: dpopProof,
+              authorization: `${token_type} ${access_token}`,
+            },
+          })
+          expect(docx).toBeInstanceOf(Uint8Array)
+          // "PK\x03\x04" ZIP magic (DOCX container). That the TYPED client
+          // decoded this response at all also proves it carried the DOCX
+          // content-type: the client dispatches on the response content-type
+          // among the endpoint's declared success alternatives (doc 08 §C4).
+          expect(Array.from(docx.slice(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04])
+
+          // Optional artifact for the owner fidelity gate (doc 08 T22):
+          //   DOCX_SAMPLE_PATH=/tmp/opencode/resume-sample.docx e2e src/resume
+          const samplePath = process.env.DOCX_SAMPLE_PATH
+          if (typeof samplePath === "string" && samplePath.length > 0) {
+            writeFileSync(samplePath, docx)
+          }
+        }).pipe(Effect.provide(E2ETestLayer)),
+      180_000, // chrome launch + page load + HTML capture + docx conversion
+    )
+
+    it.live(
+      "serves the format-appropriate content type (raw HTTP)",
+      () =>
+        Effect.gen(function*() {
+          // Default (no outputFormat) → application/pdf
+          {
+            const { access_token, nonce, token_type } = yield* getToken(TEST_API_KEY)
+            const dpopProof = yield* makeAccessTokenDPoP(access_token, nonce, ENDPOINT_URL, "POST")
+            const response = yield* HttpClient.post(`${BASE_URL}/resume/print`, {
+              urlParams: { theme: "light" },
+              headers: {
+                authorization: `${token_type} ${access_token}`,
+                dpop: dpopProof,
+              },
+              body: HttpBody.jsonUnsafe({ config: fixtureBase64 }),
+            })
+            expect(response.status).toBe(200)
+            expect(Option.getOrUndefined(Headers.get(response.headers, "content-type"))).toContain(
+              "application/pdf",
+            )
+          }
+          // outputFormat=docx → the OOXML word-processing media type
+          {
+            const { access_token, nonce, token_type } = yield* getToken(TEST_API_KEY)
+            const dpopProof = yield* makeAccessTokenDPoP(access_token, nonce, ENDPOINT_URL, "POST")
+            const response = yield* HttpClient.post(`${BASE_URL}/resume/print`, {
+              urlParams: { theme: "light", outputFormat: "docx" },
+              headers: {
+                authorization: `${token_type} ${access_token}`,
+                dpop: dpopProof,
+              },
+              body: HttpBody.jsonUnsafe({ config: fixtureBase64 }),
+            })
+            expect(response.status).toBe(200)
+            expect(Option.getOrUndefined(Headers.get(response.headers, "content-type"))).toContain(
+              DOCX_CONTENT_TYPE,
+            )
+          }
+        }).pipe(Effect.provide(E2ETestLayer)),
+      240_000, // two full chrome renders
     )
   })
 })

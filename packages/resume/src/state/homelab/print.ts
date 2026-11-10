@@ -66,7 +66,7 @@ export function requestResumePdf(
 
     return yield* client.resume.print({
       payload: { config },
-      query: { theme },
+      query: { theme, outputFormat: "pdf" },
       headers: { authorization: `Bearer ${idToken}` },
     }).pipe(
       Effect.mapError((error) => new ResumePrintRequestError({ message: describeError(error) })),

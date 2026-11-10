@@ -19,13 +19,14 @@ const withResumePrinting = (
 const printArgs = (overrides?: {
   config?: string
   theme?: "light" | "dark"
+  outputFormat?: "pdf" | "docx"
 }): Homelab.ResumeEndpoints.Print.ResumePrintHandlerArgs => ({
   request: {} as any,
   endpoint: {} as any,
   group: {} as any,
   headers: {},
   payload: { config: overrides?.config ?? "eyJ0b2dnbGVzIjp7fX0=" },
-  query: { theme: overrides?.theme ?? "light" },
+  query: { theme: overrides?.theme ?? "light", outputFormat: overrides?.outputFormat ?? "pdf" },
 })
 
 const authorizedIdentity = new Identity.OIDCIdentity(
@@ -83,23 +84,46 @@ describe("handleResumePrint", () => {
         )),
       ))
 
-    it.effect("forwards the config blob and theme to the print service", () => {
-      const calls: Array<[string, "light" | "dark"]> = []
+    it.effect("forwards the config blob, theme, and output format to the print service", () => {
+      const calls: Array<[string, "light" | "dark", "pdf" | "docx"]> = []
       return Effect.gen(function*() {
         const result = yield* handleResumePrint(
           printArgs({ config: "config-blob", theme: "dark" }),
         )
         expect(result).toBeInstanceOf(Uint8Array)
-        expect(calls).toEqual([["config-blob", "dark"]])
+        expect(calls).toEqual([["config-blob", "dark", "pdf"]])
       }).pipe(
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
           HandlerTestLayer,
           withResumePrinting({
-            printResume: (config, theme) =>
+            printResume: (config, theme, format) =>
               Effect.as(
-                Effect.sync(() => calls.push([config, theme])),
+                Effect.sync(() => calls.push([config, theme, format])),
                 new Uint8Array([0x25]),
+              ),
+          }),
+        )),
+      )
+    })
+
+    it.effect("returns DOCX bytes when outputFormat=docx", () => {
+      const calls: Array<"pdf" | "docx"> = []
+      return Effect.gen(function*() {
+        const result = yield* handleResumePrint(printArgs({ outputFormat: "docx" }))
+        expect(result).toBeInstanceOf(Uint8Array)
+        // "PK\x03\x04" zip magic (DOCX container)
+        expect(Array.from(result.slice(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04])
+        expect(calls).toEqual(["docx"])
+      }).pipe(
+        Effect.provide(Layer.mergeAll(
+          withIdentity(authorizedIdentity),
+          HandlerTestLayer,
+          withResumePrinting({
+            printResume: (_config, _theme, format) =>
+              Effect.as(
+                Effect.sync(() => calls.push(format)),
+                new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
               ),
           }),
         )),
