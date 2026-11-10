@@ -1,7 +1,7 @@
 import { assert, describe, expect, it } from "@effect/vitest"
 import { Effect, HashSet, Layer } from "effect"
 import { type Homelab } from "homelab-api"
-import { ApiErrors, Identity, Middleware, Services } from "homelab-services"
+import { ApiErrors, Identity, Middleware, Schemas, Services, Utils } from "homelab-services"
 import { Layers } from "homelab-services-node"
 import { ResumeContent } from "shared"
 import { handleResumeTailor } from "../../../src/handlers/resume/tailor.js"
@@ -46,12 +46,23 @@ const sampleTailorResponse: Services.TailorService.TailorResult = {
     promptVersion: "v1",
     schemaVersion: "v1",
   },
+  changes: [
+    {
+      patch: {
+        op: "replace" as const,
+        path: "/blurb",
+        value: "Tailored blurb",
+      },
+      previous: "Original blurb",
+    },
+  ],
 }
 
 const tailorArgs = (overrides?: {
   listing?: string
   content?: ResumeContent.ContentState
   baseVersion?: string
+  policy?: Schemas.ResumeTailor.TailorValidationPolicy
 }): Homelab.ResumeEndpoints.Tailor.ResumeTailorHandlerArgs => ({
   request: {} as any,
   endpoint: {} as any,
@@ -61,6 +72,12 @@ const tailorArgs = (overrides?: {
     listing: overrides?.listing ?? "Senior engineer with TypeScript experience wanted.",
     content: overrides?.content ?? sampleTailorContent,
     baseVersion: overrides?.baseVersion ?? ResumeContent.CONTENT_DEFAULTS_VERSION,
+    policy: overrides?.policy ?? {
+      enabled: false,
+      requireTagsGloballyAvailable: true,
+      rejectFabricatedMetrics: true,
+      groundTipsInListing: true,
+    },
   },
 })
 
@@ -143,26 +160,36 @@ describe("handleResumeTailor", () => {
         )),
       ))
 
-    it.effect("forwards subject, listing, content, and baseVersion to the tailor service", () => {
-      const calls: Array<[string, string, ResumeContent.ContentState, string]> = []
+    it.effect("forwards subject, listing, content, baseVersion, and policy to the tailor service", () => {
+      const calls: Array<
+        [string, string, ResumeContent.ContentState, string, Schemas.ResumeTailor.TailorValidationPolicy]
+      > = []
       const listing = "Need a DevOps architect fluent in Nix."
+      const policy: Schemas.ResumeTailor.TailorValidationPolicy = {
+        enabled: true,
+        requireTagsGloballyAvailable: true,
+        rejectFabricatedMetrics: true,
+        groundTipsInListing: true,
+      }
       return Effect.gen(function*() {
-        const result = yield* handleResumeTailor(tailorArgs({ listing }))
+        const args = tailorArgs({ listing, policy })
+        const result = yield* handleResumeTailor(args)
         expect(result).toEqual(sampleTailorResponse)
         expect(calls).toEqual([[
           "user@example.com",
           listing,
           sampleTailorContent,
           ResumeContent.CONTENT_DEFAULTS_VERSION,
+          policy,
         ]])
       }).pipe(
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
           HandlerTestLayer,
           withTailor({
-            tailorResume: (subject, forwardedListing, content, baseVersion) =>
+            tailorResume: (subject, forwardedListing, content, baseVersion, forwardPolicy) =>
               Effect.as(
-                Effect.sync(() => calls.push([subject, forwardedListing, content, baseVersion])),
+                Effect.sync(() => calls.push([subject, forwardedListing, content, baseVersion, forwardPolicy!])),
                 sampleTailorResponse,
               ),
           }),
@@ -228,7 +255,7 @@ describe("handleResumeTailor", () => {
         )),
       ))
 
-    it.effect("maps TailorError to InternalServerError with cause chain in message", () => {
+    it.effect("maps TailorError to InternalServerError with raw error in error field", () => {
       const nestedError = new Error("provider connection failed")
       return Effect.gen(function*() {
         const result = yield* Effect.flip(handleResumeTailor(tailorArgs()))
@@ -236,10 +263,10 @@ describe("handleResumeTailor", () => {
           result instanceof ApiErrors.InternalServerError,
           `Expected InternalServerError, got ${result._tag ?? result}`,
         )
-        // Message should contain the chain rendered by describeErrorChain
-        expect(result.message).toContain("Stage 2 failed")
-        expect(result.message).toContain("OpenRouterError")
-        expect(result.message).toContain("provider connection failed")
+        // Message is now short context; the error field carries the nested error JSON
+        // (services store `Utils.errorToJson(raw)` — Schema.Defect encode; handler passes through)
+        expect(result.message).toContain("Stage 2")
+        expect(result.error).toEqual({ name: "Error", message: "provider connection failed" })
       }).pipe(
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
@@ -248,8 +275,8 @@ describe("handleResumeTailor", () => {
             tailorResume: () =>
               Effect.fail(
                 new Services.TailorService.TailorError({
-                  message: "Stage 2 failed: OpenRouterError: provider connection failed",
-                  error: nestedError,
+                  message: "Stage 2 (tailor) failed",
+                  error: Utils.errorToJson(nestedError),
                 }),
               ),
           }),

@@ -8,6 +8,46 @@
 
 import { Schema } from "effect"
 import { ResumeContent } from "shared"
+import { OptionalUnknown, OptionalWithDefault } from "./optionals.js"
+
+/* ---- Validation Policy (T13) --------------------------------------------------------------- */
+
+/**
+ * Validation policy for the tailor pipeline (doc 07 §B.1). All fields defaulted → the schema
+ * alone defines the permissive default policy (enabled=false skips semantic checks entirely).
+ * Extensible: new rules = new defaulted fields (old clients keep decoding; T19 adds
+ * allowedEditPaths).
+ *
+ * - enabled: master switch — false (default) → skip fabrication/evidence/tag checks
+ * - requireTagsGloballyAvailable: tag vocabulary rule (enabled=true only)
+ * - rejectFabricatedMetrics: fabrication guard (enabled=true only)
+ * - groundTipsInListing: evidence substring check (enabled=true only)
+ */
+export const TailorValidationPolicy = Schema.Struct({
+  enabled: OptionalWithDefault(Schema.Boolean, () => false),
+  requireTagsGloballyAvailable: OptionalWithDefault(Schema.Boolean, () => true),
+  rejectFabricatedMetrics: OptionalWithDefault(Schema.Boolean, () => true),
+  groundTipsInListing: OptionalWithDefault(Schema.Boolean, () => true),
+})
+
+export type TailorValidationPolicy = Schema.Schema.Type<typeof TailorValidationPolicy>
+
+/** Default validation policy (permissive: enabled=false). */
+export const DEFAULT_TAILOR_VALIDATION_POLICY: TailorValidationPolicy = Schema.decodeUnknownSync(
+  TailorValidationPolicy,
+)({})
+
+/**
+ * TailorChange: a single content mutation enriched with the previous value at the path (for
+ * the Changes tab UI). JsonPatch-native vocabulary (C3/M12). previous=null for add ops or
+ * when the path is unresolvable in the request content.
+ */
+export const TailorChange = Schema.Struct({
+  patch: ResumeContent.JsonPatchOperationSchema,
+  previous: OptionalUnknown,
+})
+
+export type TailorChange = Schema.Schema.Type<typeof TailorChange>
 
 /* ---- Request ------------------------------------------------------------------------------- */
 
@@ -18,11 +58,13 @@ import { ResumeContent } from "shared"
  *   middle-truncation ~20k chars is the TailorService's job)
  * - content: user's current resume content as a base64 JSON Patch vs defaults
  * - baseVersion: CONTENT_DEFAULTS_VERSION from shared (server rejects mismatches with 4xx)
+ * - policy: optional validation policy (defaults to permissive: enabled=false)
  */
 export const ResumeTailorRequest = Schema.Struct({
   listing: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200_000)),
   content: ResumeContent.ContentPatchBase64,
   baseVersion: Schema.String,
+  policy: Schema.optionalKey(TailorValidationPolicy),
 })
 
 export type ResumeTailorRequest = Schema.Schema.Type<typeof ResumeTailorRequest>
@@ -131,6 +173,7 @@ export type TailorMeta = Schema.Schema.Type<typeof TailorMeta>
  * - baseVersion: CONTENT_DEFAULTS_VERSION (matches request)
  * - fit: fit report (verdict, summary, tips, keyword coverage)
  * - meta: per-stage metadata (tokens, latency, models, degraded flag, hashes, versions)
+ * - changes: structured list of JsonPatch mutations (single source of truth for Changes tab)
  */
 export const ResumeTailorResponse = Schema.Struct({
   jobTitle: Schema.String,
@@ -139,6 +182,7 @@ export const ResumeTailorResponse = Schema.Struct({
   baseVersion: Schema.String,
   fit: FitReport,
   meta: TailorMeta,
+  changes: Schema.Array(TailorChange),
 })
 
 export type ResumeTailorResponse = Schema.Schema.Type<typeof ResumeTailorResponse>

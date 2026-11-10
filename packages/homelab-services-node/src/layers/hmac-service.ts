@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Option, String } from "effect"
+import { Effect, FileSystem, Layer, Option, Redacted, String } from "effect"
 import { Config, Services } from "homelab-services"
 import * as Crypto from "node:crypto"
 
@@ -10,6 +10,7 @@ export const HMACServiceLive = Layer.effect(
     const secret = yield* secretFilePath.pipe(
       Option.map(fs.readFileString),
       Option.map(Effect.map(String.trim)),
+      Option.map(Effect.map(Redacted.make)),
       Effect.transposeOption,
     )
 
@@ -18,13 +19,13 @@ export const HMACServiceLive = Layer.effect(
 )
 
 class HMACServiceImpl implements Services.HMACService.HMACServiceDef {
-  constructor(private readonly secret: Option.Option<string>) {}
+  constructor(private readonly secret: Option.Option<Redacted.Redacted<string>>) {}
 
   hmacDigest(data: string) {
     return Effect.gen({ self: this }, function*() {
       const secret = yield* this.secret.pipe(
         Option.match({
-          onSome: Effect.succeed,
+          onSome: (redacted) => Effect.succeed(Redacted.value(redacted)),
           onNone: () => Effect.fail(new Services.HMACService.HMACDigestError({ error: "Missing HMAC Secret" })),
         }),
       )

@@ -1,32 +1,22 @@
-import { Clock, Duration, Effect, Layer } from "effect"
-import { Config, Services } from "homelab-services"
-import { createHash } from "node:crypto"
-import { ResumeContent } from "shared"
+import { Clock, Duration, Effect, Layer, Schema } from "effect"
+import { Config, Schemas, Services, Utils } from "homelab-services"
 import type { ResumeContent as ResumeContentType } from "shared"
-import { runCleanupStage } from "./tailor/cleanup.js"
-import { describeErrorChain } from "./tailor/errors.js"
-import { sanitize, truncate } from "./tailor/hygiene.js"
-import { buildTailorMessages, buildTailorResponseFormat } from "./tailor/prompts.js"
-import {
-  checkEvidence,
-  checkFabrication,
-  checkTagInvariance,
-  computeKeywordCoverage,
-  mergeEdits,
-  resolveIds,
-} from "./tailor/validation.js"
-import { promptVersion, schemaVersion, type TailorEdits } from "./tailor/wire-schema.js"
+import { TailorEdits as TailorEditsWire } from "../schemas/Tailoring.js"
 
 /**
  * Real TailorService implementation composing the two-stage AI pipeline.
  *
- * Pipeline (doc 02 §B):
- * 1. hygiene → truncate
- * 2. quota.tryConsume(subject)
- * 3. stage 1 (cleanup)
- * 4. stage 2 (tailor)
- * 5. validation pipeline (decode → ID resolution → tag guard → fabrication → evidence → merge → coverage → delta-assert)
- * 6. Return TailorResult
+ * Pipeline (doc 07 §B):
+ * 1. hygiene → truncate (PromptSanitizationService)
+ * 2. quota.tryConsume(subject) (TailorQuotaService)
+ * 3. stage 1 (cleanup) (ResumeListingExtractionService)
+ * 4. stage 2 (tailor) (OpenRouterClientService + ResumePromptConfigService)
+ * 5. validation pipeline (ResumeTailorValidationService)
+ * 6. merge + delta guard (ResumeContentMergeService)
+ * 7. keyword coverage (ResumeTailorValidationService)
+ * 8. Return TailorResult
+ *
+ * The orchestrator is a pure consumer of the five service tags — no imports from tailor/*.
  */
 
 export const TailorServiceLive = Layer.effect(
@@ -35,8 +25,24 @@ export const TailorServiceLive = Layer.effect(
     const env = yield* Config.Env.Env
     const openRouterClient = yield* Services.OpenRouterClientService.OpenRouterClientService
     const quotaService = yield* Services.TailorQuotaService.TailorQuotaService
+    const sanitizationService = yield* Services.PromptSanitizationService.PromptSanitizationService
+    const extractionService = yield* Services.ResumeListingExtractionService.ResumeListingExtractionService
+    const promptConfigService = yield* Services.ResumePromptConfigService.ResumePromptConfigService
+    const validationService = yield* Services.ResumeTailorValidationService.ResumeTailorValidationService
+    const mergeService = yield* Services.ResumeContentMergeService.ResumeContentMergeService
+    const hashingService = yield* Services.HashingServiceSha256.HashingServiceSha256
 
-    return new TailorServiceImpl(env, openRouterClient, quotaService)
+    return new TailorServiceImpl(
+      env,
+      openRouterClient,
+      quotaService,
+      sanitizationService,
+      extractionService,
+      promptConfigService,
+      validationService,
+      mergeService,
+      hashingService,
+    )
   }),
 )
 
@@ -45,6 +51,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
     private readonly env: typeof Config.Env.Env.Service,
     private readonly openRouterClient: Services.OpenRouterClientService.OpenRouterClientServiceDef,
     private readonly quotaService: Services.TailorQuotaService.TailorQuotaServiceDef,
+    private readonly sanitizationService: Services.PromptSanitizationService.PromptSanitizationServiceDef,
+    private readonly extractionService: Services.ResumeListingExtractionService.ResumeListingExtractionServiceDef,
+    private readonly promptConfigService: Services.ResumePromptConfigService.ResumePromptConfigServiceDef,
+    private readonly validationService: Services.ResumeTailorValidationService.ResumeTailorValidationServiceDef,
+    private readonly mergeService: Services.ResumeContentMergeService.ResumeContentMergeServiceDef,
+    private readonly hashingService: Services.HashingServiceSha256.HashingServiceSha256Def,
   ) {}
 
   tailorResume(
@@ -52,28 +64,27 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
     listing: string,
     content: ResumeContentType.ContentState,
     baseVersion: string,
+    policy?: Schemas.ResumeTailor.TailorValidationPolicy,
   ): Effect.Effect<
     Services.TailorService.TailorResult,
     Services.TailorService.TailorError | Services.TailorService.TailorQuotaExceeded
   > {
     return Effect.gen({ self: this }, function*() {
       // Compute hashes for meta
-      const listingHash = createHash("sha256").update(sanitize(listing)).digest("hex")
-      const contentHash = createHash("sha256")
-        .update(JSON.stringify(content))
-        .digest("hex")
+      const sanitized = this.sanitizationService.sanitize(listing)
+      const listingHash = yield* this.hashingService.digestHex(sanitized)
+      const contentHash = yield* this.hashingService.digestHex(JSON.stringify(content))
 
       yield* Effect.logDebug("[tailor] pipeline starting", {
         listingLength: listing.length,
         contentHashPrefix: contentHash.slice(0, 12),
       })
 
-      // 1. Hygiene + truncate
-      const sanitized = sanitize(listing)
-      const { result: hygienedListing, truncated } = truncate(sanitized)
+      // 1. Hygiene + truncate (via PromptSanitizationService)
+      const { sanitized: hygienedListing, truncated } = this.sanitizationService.hygienize(listing)
       if (truncated) {
         yield* Effect.logInfo("[tailor] listing truncated from middle", {
-          originalLength: sanitized.length,
+          originalLength: listing.length,
           truncatedLength: hygienedListing.length,
         })
       }
@@ -81,20 +92,18 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       // 2. Quota check
       yield* this.quotaService.tryConsume(subject)
 
-      // 3. Stage 1: Cleanup
-      const stage1Result = yield* runCleanupStage(
-        this.openRouterClient,
-        hygienedListing,
-        this.env.openRouterCleanupModel,
-      ).pipe(
+      // 3. Stage 1: Cleanup (via ResumeListingExtractionService)
+      const stage1Result = yield* this.extractionService.extract({
+        listing: hygienedListing,
+      }).pipe(
         Effect.catch((err) =>
           Effect.flatMap(
-            Effect.logError(`Stage 1 (cleanup) failed: ${describeErrorChain(err)}`),
+            Effect.logError("Stage 1 (cleanup) failed"),
             () =>
               Effect.fail(
                 new Services.TailorService.TailorError({
-                  message: `Stage 1 (cleanup) failed: ${describeErrorChain(err)}`,
-                  error: err,
+                  message: "Stage 1 (cleanup) failed",
+                  error: Utils.errorToJson(err),
                 }),
               ),
           )
@@ -102,19 +111,22 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       )
 
       yield* Effect.logInfo("Stage 1 (cleanup) succeeded", {
-        model: stage1Result.meta.model,
-        tokens: stage1Result.meta.tokens,
-        latencyMs: stage1Result.meta.latencyMs,
+        model: stage1Result.stage.model,
+        tokens: {
+          input: stage1Result.stage.promptTokens,
+          output: stage1Result.stage.completionTokens,
+        },
+        latencyMs: stage1Result.stage.latencyMs,
       })
 
-      const cleanedListing = stage1Result.cleanup.cleanedListing
-      const jobTitle = stage1Result.cleanup.jobTitle
-      const company = stage1Result.cleanup.company
+      const cleanedListing = stage1Result.cleanedListing
+      const jobTitle = stage1Result.jobTitle
+      const company = stage1Result.company
 
-      // 4. Stage 2: Tailor
+      // 4. Stage 2: Tailor (via ResumePromptConfigService + OpenRouterClientService)
       const stage2StartTime = yield* Clock.currentTimeMillis
-      const tailorMessages = buildTailorMessages(cleanedListing, content)
-      const tailorResponseFormat = buildTailorResponseFormat()
+      const tailorMessages = this.promptConfigService.buildTailorMessages({ cleanedListing, content })
+      const tailorResponseFormat = this.promptConfigService.buildTailorResponseFormat()
 
       const stage2Result = yield* this.openRouterClient
         .chat({
@@ -126,15 +138,16 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         })
         .pipe(
           Effect.flatMap((response) => {
-            // Parse JSON
-            return Effect.try({
-              try: () => JSON.parse(response.content) as TailorEdits,
-              catch: (error) =>
+            // Parse JSON via schema
+            return Schema.decodeUnknownEffect(
+              Schema.fromJsonString(TailorEditsWire),
+            )(response.content).pipe(
+              Effect.mapError((error) =>
                 new Services.TailorService.TailorError({
-                  message: `Stage 2 (tailor) output was not valid JSON: ${describeErrorChain(error)}`,
-                  error,
-                }),
-            }).pipe(
+                  message: "Stage 2 (tailor) output was not valid JSON",
+                  error: Utils.errorToJson(error),
+                })
+              ),
               Effect.flatMap((edits) =>
                 Clock.currentTimeMillis.pipe(
                   Effect.map((endTime) => ({
@@ -151,12 +164,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
           }),
           Effect.catch((err) =>
             Effect.flatMap(
-              Effect.logError(`Stage 2 (tailor) failed: ${describeErrorChain(err)}`),
+              Effect.logError("Stage 2 (tailor) failed"),
               () =>
                 Effect.fail(
                   new Services.TailorService.TailorError({
-                    message: `Stage 2 (tailor) failed: ${describeErrorChain(err)}`,
-                    error: err,
+                    message: "Stage 2 (tailor) failed",
+                    error: Utils.errorToJson(err),
                   }),
                 ),
             )
@@ -169,61 +182,79 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         latencyMs: stage2Result.latencyMs,
       })
 
-      // 5. Validation pipeline
-      let edits = stage2Result.edits
+      // 5. Validation pipeline (via ResumeTailorValidationService)
+      // Use the policy passed in, or fall back to the permissive default (enabled=false)
+      const effectivePolicy = policy ?? Schemas.ResumeTailor.DEFAULT_TAILOR_VALIDATION_POLICY
 
-      // 5a. ID resolution
-      const idResolution = resolveIds(edits, content)
-      edits = idResolution.edits
-      if (idResolution.dropped.length > 0) {
-        yield* Effect.logInfo("[tailor] dropped edits with unknown IDs", {
-          dropped: idResolution.dropped,
+      const validation = yield* this.validationService.validateEdits({
+        content,
+        edits: stage2Result.edits,
+        cleanedListing,
+        policy: effectivePolicy,
+      }).pipe(
+        Effect.catch((err) =>
+          Effect.flatMap(
+            Effect.logError("Validation failed"),
+            () =>
+              Effect.fail(
+                new Services.TailorService.TailorError({
+                  message: "Validation failed",
+                  error: Utils.errorToJson(err),
+                }),
+              ),
+          )
+        ),
+      )
+
+      const edits = validation.edits
+
+      if (validation.dropped.length > 0) {
+        yield* Effect.logInfo("[tailor] dropped edits during validation", {
+          dropped: validation.dropped,
         })
       }
 
-      // 5b. Tag invariance
-      const tagCheck = checkTagInvariance(edits, content)
-      edits = tagCheck.edits
-      if (tagCheck.rejected.length > 0) {
-        yield* Effect.logWarning("[tailor] rejected tag groups (length/membership violation)", {
-          rejected: tagCheck.rejected,
-        })
-      }
+      // 5e. Merge (via ResumeContentMergeService)
+      const mergeResult = yield* this.mergeService.merge({
+        content,
+        edits,
+        policy: effectivePolicy,
+      }).pipe(
+        Effect.catch((err) =>
+          Effect.flatMap(
+            Effect.logError("Merge failed"),
+            () =>
+              Effect.fail(
+                new Services.TailorService.TailorError({
+                  message: "Merge failed",
+                  error: Utils.errorToJson(err),
+                }),
+              ),
+          )
+        ),
+      )
 
-      // 5c. Fabrication guard
-      const fabricationCheck = checkFabrication(edits, content, cleanedListing)
-      edits = fabricationCheck.edits
-      if (fabricationCheck.dropped.length > 0) {
-        yield* Effect.logWarning("[tailor] dropped edits with fabricated content", {
-          dropped: fabricationCheck.dropped,
-        })
-      }
+      const mergedContent = mergeResult.merged
+      const changes = mergeResult.changes
 
-      // 5d. Evidence guard
-      edits = checkEvidence(edits, cleanedListing)
-
-      // 5e. Merge
-      const mergedContent = mergeEdits(content, edits)
-
-      // 5f. Keyword coverage (server-side)
-      const coverage = computeKeywordCoverage(edits.fit.keywordCoverage.required, mergedContent)
-
-      // 5g. Merge-delta assertion (replace-only) — FAIL on non-replace ops
-      const patch = ResumeContent.ContentDiffer.diff(content, mergedContent)
-      const nonReplaceOps = patch.filter((op) => op.op !== "replace")
-      if (nonReplaceOps.length > 0) {
-        yield* Effect.logWarning("[tailor] merge delta contains non-replace ops, failing", {
-          ops: nonReplaceOps.map((op) => op.op),
-        })
-        return yield* Effect.fail(
-          new Services.TailorService.TailorError({
-            message: `Merge-delta guard: model produced non-replace JSON-Patch ops [${
-              nonReplaceOps.map((op) => op.op).join(", ")
-            }] violating the replace-only contract`,
-            error: null,
-          }),
-        )
-      }
+      // 5f. Keyword coverage (via ResumeTailorValidationService)
+      const coverage = yield* this.validationService.computeKeywordCoverage({
+        merged: mergedContent,
+        required: edits.fit.keywordCoverage.required,
+      }).pipe(
+        Effect.catch((err) =>
+          Effect.flatMap(
+            Effect.logError("Keyword coverage computation failed"),
+            () =>
+              Effect.fail(
+                new Services.TailorService.TailorError({
+                  message: "Keyword coverage computation failed",
+                  error: Utils.errorToJson(err),
+                }),
+              ),
+          )
+        ),
+      )
 
       // 6. Build final result
       const fitReport = {
@@ -233,6 +264,15 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
           matched: coverage.matched,
           missing: coverage.missing,
         },
+      }
+
+      const stage1Meta = {
+        model: stage1Result.stage.model,
+        tokens: {
+          input: stage1Result.stage.promptTokens,
+          output: stage1Result.stage.completionTokens,
+        },
+        latencyMs: stage1Result.stage.latencyMs,
       }
 
       const stage2Meta = {
@@ -248,21 +288,22 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         baseVersion,
         fit: fitReport,
         meta: {
-          stage1: stage1Result.meta,
+          stage1: stage1Meta,
           stage2: stage2Meta,
           degraded: false,
           cacheHit: false,
           contentHash,
           listingHash,
-          promptVersion,
-          schemaVersion,
+          promptVersion: this.promptConfigService.version,
+          schemaVersion: this.promptConfigService.schemaVersion,
         },
+        changes,
       }
     }).pipe(
       Effect.annotateLogs({
         subject,
-        promptVersion,
-        schemaVersion,
+        promptVersion: this.promptConfigService.version,
+        schemaVersion: this.promptConfigService.schemaVersion,
       }),
       Effect.catch((error) => {
         // Pass through typed errors unchanged
@@ -274,12 +315,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
         }
         // Wrap unexpected typed errors
         return Effect.flatMap(
-          Effect.logError(`Tailor pipeline failed: ${describeErrorChain(error)}`),
+          Effect.logError("Tailor pipeline failed"),
           () =>
             Effect.fail(
               new Services.TailorService.TailorError({
-                message: `Tailor pipeline failed: ${describeErrorChain(error)}`,
-                error,
+                message: "Tailor pipeline failed",
+                error: Utils.errorToJson(error),
               }),
             ),
         )
@@ -287,12 +328,12 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
       Effect.catchDefect((defect) => {
         // Catch defects (uncaught exceptions) and wrap them
         return Effect.flatMap(
-          Effect.logError(`Tailor pipeline failed: ${describeErrorChain(defect)}`),
+          Effect.logError("Tailor pipeline failed"),
           () =>
             Effect.fail(
               new Services.TailorService.TailorError({
-                message: `Tailor pipeline failed: ${describeErrorChain(defect)}`,
-                error: defect,
+                message: "Tailor pipeline failed",
+                error: Utils.errorToJson(defect),
               }),
             ),
         )

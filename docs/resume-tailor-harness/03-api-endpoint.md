@@ -1,10 +1,21 @@
 # 03 — API Endpoint: `POST /resume/tailor`
 
+> **V2 override (owner, 2026-11-09 — plan: [`07-v2-plan.md`](./07-v2-plan.md) §D, task T15):**
+> the wire contract grows two fields — request gains optional **`policy`**
+> (`Schemas.ResumeTailor.TailorValidationPolicy`, defaulted to the permissive policy: validation
+> disabled), response gains **`changes`** (structured merge-delta list the frontend Changes tab
+> renders). `TailorServiceDef.tailorResume` gains the `policy` argument. **Error shape (T12/M1):**
+> `describeErrorChain` is retired — the 500 mapping becomes `InternalServerError({ message:
+> <short stage context>, error: <raw nested error JSON> })` using the pre-existing
+> `error: OptionalUnknown` field (no http-errors schema change). Endpoint def/authz chain below
+> are unchanged (schema-driven).
+
 > **Override note (2026-11-08):** pipeline failures are 500s with the nested cause chain
 > rendered into the error message (doc 02 banner, `cdc7b6db8`) — the live service no longer
 > produces degraded results, so "degraded is a 200" text below is historical. The
 > degraded-passthrough handler test remains as a stub-level check that the handler passes
-> service successes through unmodified.
+> service successes through unmodified. _(v2 supersedes the chain-rendering part: raw nested
+> error JSON in the `error` field instead of a formatted message — T12.)_
 
 ## Purpose & Scope
 

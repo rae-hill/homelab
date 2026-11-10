@@ -10,19 +10,27 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 
 ## Status
 
-| Task | Doc | Scope one-liner                                                                            | Status                                                                                                                      | Commit         |
-| ---- | --- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)        | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                              | `62d248e97683` |
-| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services            | **done** (JSON-Schema emission snapshot deferred to T5)                                                                     | `0dab24d048fa` |
-| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests        | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                 | `afd402ddc11c` |
-| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                  | `db5134460c1d` |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                        | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                 | `db5134460c1d` |
-| T6   | 02  | Validation pipeline + merge + quota + evals                                                | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                  | `db5134460c1d` |
-| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice       | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                       | `5e45edd1782a` |
-| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                     | **done** (manual browser check still pending — no headless UI test in v1)                                                   | `1f1b8e76b862` |
-| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                        | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`) | `e30f55bb2`    |
-| T10  | 03  | e2e tests (vitest; live-AI gated)                                                          | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                             | `7900cdab4a17` |
-| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                | deferred                                                                                                                    | —              |
+| Task | Doc | Scope one-liner                                                                                                                                   | Status                                                                                                                                     | Commit         |
+| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)                                                               | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                                             | `62d248e97683` |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services                                                                   | **done** (JSON-Schema emission snapshot deferred to T5)                                                                                    | `0dab24d048fa` |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests                                                               | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                                | `afd402ddc11c` |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton                                                        | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                                 | `db5134460c1d` |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                                                                               | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                                | `db5134460c1d` |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                                                                       | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                                 | `db5134460c1d` |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice                                                              | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                                      | `5e45edd1782a` |
+| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                                                                            | **done** (manual browser check still pending — no headless UI test in v1)                                                                  | `1f1b8e76b862` |
+| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                                                                               | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`)                | `e30f55bb2`    |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                                                                                 | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                                            | `7900cdab4a17` |
+| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                                                                       | deferred                                                                                                                                   | —              |
+| T12  | 07  | v2: errors.ts retirement → raw nested error JSON (logs + 500 `error` field) (M1)                                                                  | **done** (Schema.Defect serializer per owner directive; old-format tests skipped TODO(v2))                                                 | `fc3364dac`    |
+| T13  | 07  | v2: 5 service extractions — validation(policy)/listing-extraction/prompt-config(version)/sanitization(arg consts)/merge-delta (E1–E4, M9, M12/C3) | **done** (interrupted-agent recovery + coordinator fixes: extraction env-model bug, test layer-capture pattern, policy/rationale fixtures) | `2714b1a77`    |
+| T14  | 07  | v2: `Schemas.Tailoring` move + `Schema.fromJsonString` parsing + `HashingServiceSha256` (M2–M4)                                                   | **done** (native effect/crypto Digest; hash values unchanged — equivalence tests)                                                          | `ebf9b9037`    |
+| T15  | 07  | v2: wire — request `policy` + response `changes` (JsonPatch-native) (M7, C2)                                                                      | **done** (policy = `Schema.optionalKey` BOTH sides — typed clients may omit; + shell-leak & self-import-cycle fixes)                       | `6d9def5f1`    |
+| T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | **done** (addedBullets experience-only — projects have no bulletPoints; strict policy rejects adds)                                        | `0c603a34e`    |
+| T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | **done** (no auto-apply/snapshots; generatePresetName removed; legacy entries decode changes:null)                                         | `3987b85f6`    |
+| T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | **done** (fiber.cache.span extraction; grafana customQuery eval-verified; 222 trace_id lines + 0 sk-or- in the e2e log dump)               | `052cda611`    |
+| T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | **deferred** (owner 2026-11-09: field-verify v2 first; then §H eval gate + explicit go)                                                    | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -104,6 +112,58 @@ if shell text changed; `git add` new `.nix` files BEFORE any `nix eval`/`nix bui
   (TimeoutError → "Unreachable"), 10s boot-fetch timeout, probe `--max-time 10` + progress
   echoes. Rule: outbound calls to tailnet hosts ALWAYS carry `Effect.timeout`
   (precedent: `shared/src/oidc/reachability.ts`).
+- **v2 exploration facts (2026-11-09, all verified against source):** `promptVersion` lives in
+  `wire-schema.ts` (NOT prompts.ts). `ApiErrors.InternalServerError` already carries
+  `error: OptionalUnknown` — raw nested error JSON needs no schema change. `BulletPoint` is an
+  object `{id, text, visible}`; v1 "hide" = `visible:false` = a REPLACE op (why the replace-only
+  guard passed); added bullets (T16) produce ADD ops → guard must relax (T13). shared's
+  `resume-content/patch.ts` already hand-writes `JsonPatchOperationSchema`/`ContentPatchOps`
+  (effect's `JsonPatch` = types + get/apply only). `homelab-services-node` index has NO `Schemas`
+  namespace yet (Config/Layers/Shell only).
+- **Effect 4.1.2 API facts (vendored repos/effect):** `effect/crypto` `Digest.digestHex(Digest.sha256,
+  bytes)` + `Digest.layerWebCrypto` (bundle-hazard watch — the undici lesson); `Schema.fromJsonString(
+  schema)` is the JSON-string→typed helper (there is NO `Schema.parseJson` in v4); `Equal.equals`
+  does DEEP structural equality on plain objects; `Redacted.toString/toJSON` → `<redacted[:label]>`
+  (no `Secret` module in this version); `@effect/opentelemetry` spans expose a public `traceId`
+  (OtelTracer.ts:417/458) — the hook for trace-id-in-logs (T18).
+- **Grafana tracesToLogsV2 (nix-config/modules/features/grafana/service.nix:93–99) has NO `tags`
+  mapping** → Grafana derives a `service_name`-style matcher that can never match Alloy's journald
+  labels (`unit`, `hostname`, `syslevel`, `container`, `transport` — services/alloy.nix:24–67); the
+  homelab-api unit label is `homelab-api.service`. Fix = `customQuery` +
+  `{unit="homelab-api.service"} |= "$__traceID"` AND trace_id in the JSON log lines (today's
+  jsonConsoleLogger emits no trace context).
+- **Fresh worktrees lack the gitignored `packages/*/private/` test fixtures** — `yarn test`
+  cascade-fails (627 errors: `private/hmac-secret` ENOENT). Fix: run **`yarn seed:test-secrets`**
+  FIRST (root package.json entry consolidating `scripts/stage-test-secrets.mjs` +
+  `scripts/stage-e2e-secrets.mjs`; idempotent, never overwrites). CI runs the unit seeder itself
+  (ci.yml:58); `e2e.sh` runs the e2e seeder. Owner directive: private test values are ALWAYS
+  seeded by reusable scripts, never hand-placed.
+- **`Schema.Defect()` (Effect 4.1.2) is the built-in unknown⇄Json codec for failure values**
+  (`SchemaTransformation.defectFromJson`): encode = `Error` → recursive `{name, message, cause?}`
+  (cycles → `"[Circular]"`; stack only with `{includeStack:true}`; non-Errors via the
+  Inspectable-aware JSON formatter); decode = JSON with string `message` rebuilds as `Error`.
+  `Data.TaggedError` sets `prototype.name = tag` (internal/core.ts:711) so tags survive encoding,
+  but own-fields beyond name/message/cause are DROPPED. Recursive schemas elsewhere:
+  `Schema.suspend(() => ...)`. There is NO `Cause.toJSON` in v4.
+- **NEVER import the package's own barrel from inside the package** (e.g.
+  `import { Schemas } from "homelab-services-node"` inside `homelab-services-node/src/layers/*`):
+  runtime TDZ landmine (module-level `.pipe(...)` on a mid-cycle `undefined` Live crashes suites
+  at COLLECTION time) + type degradation (it surfaced as a phantom `OpenRouterClientService` leak
+  in main.ts). Use relative imports (`../schemas/Tailoring.js`). **`yarn circular` does NOT catch
+  package self-imports.**
+- **Flat `Layer.provide` chains do NOT satisfy sibling providers' own requirements:**
+  `A.pipe(Layer.provide(B), Layer.provide(C))` leaves C's requirements in the aggregate's RIn even
+  though B provides them — verified with a type probe (`Layer<TailorService, never, Env |
+  OpenRouterClientService | FileSystem | HttpClient>`). Nest instead:
+  `Layer.provide(C.pipe(Layer.provide(B)))` (shell/tailor.ts now does this for the extraction
+  stage; Effect memoizes the repeated layer identity so it builds once).
+- **Subagents must NEVER run `git stash`** (owner caught one attempting it — it can scramble the
+  coordinator's uncommitted tree). House rule added to next-agent-prompt: no stash/checkout/
+  restore/reset; STOP and report instead. Recovery from a cancelled agent: audit `git status` +
+  targeted greps, keep coherent partial work, fix forward (worked twice this session).
+- **Schema-validated LLM-output stubs catch stage-dispatch bugs:** the T15 strict-policy stub
+  returned stage-2-shaped JSON for ALL calls; `Schema.fromJsonString(CleanupResponse)` (T14)
+  rejected it at stage 1 — the cast it replaced would have silently passed garbage.
 
 ## Open items (prioritized — the work queue for the next session)
 
@@ -115,15 +175,20 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 (`e7137e69d`), CI-hang bounds landed (`b372d0713`), kanidm groups split by owner
 (`9727a4ceb1ff`).
 
-1. **Owner's tailoring-quality suggestions — TOP PRIORITY, ELICIT FIRST:** the first live run
-   succeeded but the output was sparse ("it didn't have much"); the owner has concrete
-   improvement suggestions that are NOT yet written down — start the next session by asking for
-   them. Candidate levers: stage-2 prompt guidance, cleanup-stage extractive strictness,
-   `maxTokens`, main-model choice (`OPENROUTER_MODEL` is env-overridable without a rebuild).
-   Review against doc 02 §I evals (injection + poor-fit are regression-critical); bump
-   `promptVersion` (layers/tailor/prompts.ts) whenever prompts change. Owner authorized small
-   live spend: `RUN_TAILOR_LIVE=1 e2e src/resume` needs the real key dropped into the gitignored
-   `packages/homelab-server/private/openrouter-api-key` (currently the dummy), or test via UI.
+1. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
+   full e2e green (15 files, 112✓+1 skip, exit 0). Remaining: T19 — GATED (needs explicit owner
+   go; its §H eval gate must first build the doc 02 §I fixtures, which don't exist on disk) + the
+   owner deploy-time checklist (Tempo link click, augustus redaction grep, browser pass over the
+   new review UI, CI push).** The owner's tailoring-quality suggestions were ELICITED
+   (2026-11-09) and grew into the full v2 directive set (M1–M12 + clarifications C1–C3) — plan of
+   record: `docs/resume-tailor-harness/07-v2-plan.md`. Waves: **V2-A** T12→T13→T14 (serial) →
+   **V2-B** T15→T16→T19 (T19 GATED: §H evals + owner go) ∥ T18 → **V2-C** T17; **full `e2e` suite
+   LAST** (owner directive). Quality levers the owner endorsed: permissive rewrite + added bullets
+   with a language/framework/runtime fabrication bound (T16), policy-driven validation defaulting
+   OFF (T13/T15), Changes-tab review before apply (T17). Small live spend remains owner-authorized
+   (`RUN_TAILOR_LIVE=1 e2e src/resume` + the real key in gitignored
+   `packages/homelab-server/private/openrouter-api-key`); bump `promptVersion` on any prompt change
+   (v2: it becomes the prompt-config service's `version` property).
 2. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
    fetch, probe `--max-time 10` + progress echoes). Next push should show the E2E job pass — or
    fail loudly with the log dump instead of stalling silently after "starting bundled server".
@@ -340,3 +405,128 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
   is historical; frontend degraded paths unreachable-but-kept), doc 02 merge-delta guard text
   corrected to failure semantics, README + next-agent-prompt state brought current, backlog
   trimmed (kanidm dedicated groups were done by the owner in `9727a4ceb1ff`).
+
+### 2026-11-09 — v2 planning session (owner directives → doc 07)
+
+- Owner handed off the v2 work order (15 items: 4 service extractions E1–E4, misc M1–M11) in a
+  PARALLEL WORKTREE (`nimble-otter` — the owner now runs multiple agents in separate worktrees;
+  next-agent-prompt's "work in the primary worktree" line updated accordingly). This resolves the
+  old open item 1: the quality suggestions ARE the v2 directives (permissive validation + prompt
+  liberty + visible-changes review flow).
+- Clarifications captured: **C1** confirm-modal ONLY on "Apply changes to resume" in the new
+  Changes tab ⇒ submit stops auto-applying/snapshotting (D1/D4 overridden → D13). **C2** the
+  change list is SERVER-provided (`response.changes`). Follow-up owner message delegated the
+  merge-delta design (**M12**) ⇒ **C3**: dedicated `ResumeContentMergeService` (validation =
+  SEMANTIC policy; merge = MECHANICAL + STRUCTURAL policy over the Effect JsonPatch delta);
+  `changes` are JsonPatch-native (reuse shared's `JsonPatchOperationSchema` + `previous`
+  enrichment); the owner's "Effect JsonPatches for everything" is planned as GATED **T19**
+  (feasibility verified: flattened strict-mode op schema — no unions; path-annotated prompt v3;
+  path-allowlist policy `allowedEditPaths`; gate = offline evals + injection pass + owner review).
+- Four explore subagents (qwen3.8-flash) mapped: tailor backend surface (all 6 modules + pipeline
+  internals + test inventory), observability (logger/otel redaction, Grafana/Alloy/Loki chain,
+  no trace-id in log lines), frontend (hooks snapshot sites L130–142/L202–214, entry shape, modal
+  structure), Effect 4.1.2 APIs (Redacted/Digest/fromJsonString/Equal — see Gotchas). Findings
+  written into doc 07 §Verified current state.
+- Docs updated: **07-v2-plan.md NEW (authoritative for T12–T19)**; override banners on docs
+  01–05; README (status, vision note, D1/D4 overrides, new D10–D15, wire-v2 note, doc map, v2
+  task graph, OQ6–10); next-agent-prompt.md re-pointed at doc 07.
+- **Next:** execute doc 07 waves — V2-A (T12→T13→T14), V2-B (T15→T16→T19-gated) ∥ T18, V2-C
+  (T17); per-task gate + commit `--no-verify`; FULL e2e last; keep this file current.
+
+### 2026-11-09 (second) — v2 implementation begins: T12 landed + worktree-seeding gotcha
+
+- **T12 done** (`fc3364dac`, cancelled-agent recovery + coordinator rework): the owner cancelled
+  the first subagent mid-run with a design directive — error serialization must go through Effect
+  Schema decode/encode ("validating the object… serialization that's built into effect"), not a
+  hand-rolled mapper. Audit of the partial tree showed the agent's call-site work was complete and
+  coherent (all 12 `describeErrorChain` sites converted to short-context `message` +
+  `error: Utils.errorToJson(raw)`; errors.test.ts skipped; handler passing `error: err.error`), so
+  it was KEPT; only the serializer internals were replaced with the native **`Schema.Defect()`**
+  codec (`Utils.errorToJson` = `Schema.encodeSync`, `parseErrorJson` = `Schema.decodeUnknownSync` —
+  behavior + trade-offs in Gotchas). 6 co-located tests added
+  (`homelab-services/src/utils/error-json.test.ts`); handler test upgraded from TODO to a real
+  structured-passthrough assertion; `errors.ts` deleted. Gate green: typecheck ✓, tests ✓
+  (services-node 720+1todo, homelab-server 64, homelab-services 15), lint 0 errors.
+- **Seeding discovery (owner directive "re-usable scripts to seed the private testing values"):**
+  the first gate run failed with 627 cascading errors — fresh worktrees lack the gitignored
+  `packages/*/private/` fixtures. The reusable seeders ALREADY existed
+  (`scripts/stage-test-secrets.mjs` — unit tests, used by CI; `scripts/stage-e2e-secrets.mjs` —
+  e2e, used by e2e.sh); what was missing is a discoverable entry point + workflow wiring. Added
+  root **`yarn seed:test-secrets`** (runs both, idempotent) and documented it in doc 07 §Execution
+  protocol + next-agent-prompt house rules. Ran it: both packages seeded, gate green.
+- **Next:** T13 (five service extractions — the big one) via subagent dispatch.
+
+### 2026-11-09 (third) — V2-A complete + T15: service extractions, schemas/hashing, wire v2
+
+- **T13 done** (`2714b1a77`, qwen3.7-plus subagent — CANCELLED near the end but left coherent
+  work; coordinator audit-and-completed): five services extracted per doc 07 §B — validation
+  (semantic policy: fabrication/evidence/tag-vocabulary checks gated by `TailorValidationPolicy`,
+  default enabled=false), merge (mechanical + structural JsonPatch-delta guard: default allows
+  replace+add, rejects remove; enabled=true → v1 replace-only; returns {merged, delta, changes}
+  with previous-value enrichment), listing-extraction, prompt-config (public `version`/
+  `schemaVersion` properties — constants moved out of wire-schema; factory = version-keyed impls),
+  sanitization (truncation constants as method args). `TailorEdits` structural interface lives in
+  the homelab-services def (dependency direction); impl assignment is the conformance gate. Old
+  tailor/{validation,cleanup,prompts,hygiene}.ts deleted. Coordinator fixes: extraction impl had
+  hardcoded model slug (→ Config.Env), test layer-capture pattern (service closures capture their
+  client at LAYER BUILD — providing a different layer to a METHOD call is a no-op), policy
+  fixtures needed full Type-side values, tag-vocabulary fixture used a tag that WAS in the
+  vocabulary. Gate green (729 tests).
+- **T14 done** (`ebf9b9037`, qwen3.7-plus subagent, clean completion): wire-schema →
+  `src/schemas/Tailoring.ts` + `Schemas` namespace on the node package index; stage-1/stage-2
+  parsing via `Schema.fromJsonString` + `decodeUnknownEffect` (messages unchanged);
+  `HashingServiceSha256` (def + node impl on native `effect/crypto` `Digest.digestHex(Digest.
+  sha256, …)` + `layerWebCrypto`, self-contained Live; own TaggedError) replaces createHash —
+  hash VALUES unchanged (known-vector + createHash-reference equivalence tests). NOTE: this agent
+  introduced the package self-import cycle (see Gotchas) — surfaced in T15.
+- **T15 done** (`6d9def5f1`, subagent CANCELLED by owner mid-run — it attempted `git stash`, now
+  a hard house rule; coordinator completed): request `policy` — coordinator switched
+  OptionalWithDefault → **`Schema.optionalKey`** after the agent's version forced every typed
+  client to pass a policy (it had hardcoded one into packages/resume — reverted; T17 owns the
+  frontend). Response `changes` (required, JsonPatch-native). Handler forwards `payload.policy`;
+  orchestrator threads it to validation+merge and returns `mergeResult.changes`. TWO structural
+  fixes en route (both now Gotchas): the self-import cycle (runtime suite-collection crash +
+  phantom type leak) → relative imports; and the flat `Layer.provide` chain leaking
+  `OpenRouterClientService` into the Shell.Tailor Aggregate RIn (main.ts `Layer.launch` red) →
+  nested extraction deps, verified with a temporary type probe. Debug path worth repeating:
+  bisect by restoring `git show <commit>:<path>` over single files (copies in /tmp first), probe
+  layer RIn via `const p: Layer.Layer<unknown, never, never> = Aggregate`. Schema tests now cover
+  wire-side policy defaulting (decodeUnknown from raw JSON — the server edge) + roundtrips;
+  strict-policy pipeline eval proves fabrication-drop end-to-end (real INITIAL_CONTENT_STATE ids
+  `nutrien`/`nutrien__b0` — bullet ids are `${entryId}__b${i}`).
+- Gates after each task: typecheck ✓ / tests ✓ (730 + 1 todo) / lint 0 errors / circular ✓.
+- **Next:** T16 (prompt v2 permissiveness + addedBullets + version bumps + evals), then T17
+  (frontend), T18 (observability), T19 gated (owner go needed), FULL e2e last.
+
+### 2026-11-09 (fourth) — T16–T18 landed + FULL e2e green: ungated v2 work COMPLETE
+
+- **T16 done** (`0c603a34e`, qwen3.7-plus subagent, clean completion): prompt v2 creative liberty —
+  rewrite bullets/descriptions toward the listing + `addedBullets` for requirement-matching
+  additions; HARD BOUND per owner M10: never claim a language/framework/runtime absent from the
+  candidate content, no invented metrics/employers/titles/dates. Schema + def interface in sync
+  (conformance gate), merge appends addedBullets with `${entryId}__b${baseLength+idx}` ids
+  (EXPERIENCE ONLY — projects have no bulletPoints; justified deviation), validation's fabrication
+  scan covers added text, strict policy (enabled=true) rejects `add` ops, versions bumped
+  `v2-2026-11`/`v2`, JSON-Schema emission snapshot updated. NOTE: doc 02 §I's offline eval fixtures
+  were never implemented on disk — that work folds into the T19 gate.
+- **T18 done** (`052cda611`, subagent + coordinator review): Grafana `tracesToLogsV2` → customQuery
+  `{unit="homelab-api.service"} |= "$__traceID"` (nix-eval verified against augustus); JSON log
+  lines gain `trace_id`/`span_id` from `fiber.cache.span` (core `Tracer.Span` exposes both —
+  vendored Tracer.ts:394-398); manual key-pattern redaction REMOVED (logger.ts pattern +
+  RedactingSpanProcessor → plain BatchSpanProcessor); hmac secret + JWK decryption secret +
+  decrypted private JWK wrapped in `Redacted`, unwrapped only at crypto boundaries. Offline
+  acceptance from the e2e log dump: **222 `"trace_id"` lines, 0 `sk-or-`**.
+- **T17 done** (`3987b85f6`, subagent + coordinator review): review-then-apply — no auto-apply, no
+  "Pre-tailor:" snapshots (`generatePresetName` deleted; `resolveCollision`/suffix API kept for
+  manual presets); details modal = Tabs **Summary | Changes** (op badge + path + previous→value;
+  legacy entries → "No changes recorded"); "Apply changes to resume" in the Changes tab; overwrite
+  confirm dialog only when `Equal.equals(content, INITIAL_CONTENT_STATE)` is FALSE; entry `changes`
+  nullable/absent-tolerant (envelope stays v1); policy switches UI → `payload.policy`. Resume
+  production build ✓.
+- **FULL e2e suite GREEN (owner directive: saved for last):** 15 files, 112 passed + 1 skipped
+  (live-AI gated), exit 0. The rolldown bundle handles `effect/crypto` fine (no undici repeat);
+  the bundled server boots + health-passes with all v2 layers.
+- **Remaining:** T19 (GATED — owner go + §H eval gate, which includes building the missing eval
+  fixtures); owner deploy-time checklist: redeploy augustus (nix grafana change + server), live
+  Tempo "View logs for this span" click, `journalctl -u homelab-api | grep -c 'sk-or-'` → 0,
+  browser pass over the new review UI, CI push should be green-or-loud.

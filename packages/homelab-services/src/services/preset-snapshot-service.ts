@@ -6,18 +6,6 @@ export const PresetSnapshotServiceId = "homelab-api/services/tailor/PresetSnapsh
 /* ---- Pure helpers --------------------------------------------------------------------------- */
 
 /**
- * Generate a preset name for a tailor response.
- * Format: "Pre-tailor: <jobTitle|Untitled> — <YYYY-MM-DD HH-mm>"
- * Time uses HH-mm (dash-separated) to avoid filesystem-unfriendly colons in exports.
- */
-export const generatePresetName = (jobTitle: string | null, now: Date): string => {
-  const title = jobTitle?.trim() || "Untitled"
-  const date = now.toISOString().slice(0, 10) // YYYY-MM-DD
-  const time = now.toISOString().slice(11, 16).replace(":", "-") // HH-mm
-  return `Pre-tailor: ${title} — ${date} ${time}`
-}
-
-/**
  * Resolve a naming collision by appending " (1)", " (2)", ... until a unique name is found.
  * Pure; does not mutate the input set.
  */

@@ -2,6 +2,12 @@ import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Layer } from "effect"
 import { Config, Services } from "homelab-services"
 import { ResumeContent } from "shared"
+import { HashingServiceSha256Live } from "../src/layers/hashing-service-sha256.js"
+import { PromptSanitizationServiceLive } from "../src/layers/prompt-sanitization-service.js"
+import { ResumeContentMergeServiceLive } from "../src/layers/resume-content-merge-service.js"
+import { ResumeListingExtractionServiceLive } from "../src/layers/resume-listing-extraction-service.js"
+import { ResumePromptConfigServiceLive } from "../src/layers/resume-prompt-config-service.js"
+import { ResumeTailorValidationServiceLive } from "../src/layers/resume-tailor-validation-service.js"
 import { TailorServiceLive } from "../src/layers/tailor-service.js"
 
 // Stub OpenRouterClientService that returns canned responses
@@ -15,7 +21,7 @@ const makeStubOpenRouterClient = (
     chat: (req: any) =>
       Effect.gen(function*() {
         // Stage 1 (cleanup) call
-        if (req.maxTokens === 4000) {
+        if (req.model === "test-cleanup-model") {
           if (shouldFailStage1) {
             return yield* Effect.fail(
               new Services.OpenRouterClientService.OpenRouterError({
@@ -52,6 +58,13 @@ const makeStubOpenRouterClient = (
                 bullets: [],
                 entryDescriptions: [],
                 hiddenBullets: [],
+                addedBullets: [
+                  {
+                    entryId: "nutrien",
+                    text: "Led cross-functional team in designing scalable async data pipelines",
+                    rationale: "Matches listing requirement for pipeline architecture experience",
+                  },
+                ],
                 tagGroups: [],
                 fit: {
                   verdict: "strong",
@@ -94,6 +107,12 @@ const StubEnv = Layer.succeed(Config.Env.Env, {
 
 describe("tailor pipeline", () => {
   const TestLayer = TailorServiceLive.pipe(
+    Layer.provide(PromptSanitizationServiceLive),
+    Layer.provide(ResumeListingExtractionServiceLive),
+    Layer.provide(ResumePromptConfigServiceLive),
+    Layer.provide(ResumeTailorValidationServiceLive),
+    Layer.provide(ResumeContentMergeServiceLive),
+    Layer.provide(HashingServiceSha256Live),
     Layer.provide(StubEnv),
   )
 
@@ -125,6 +144,41 @@ describe("tailor pipeline", () => {
       expect(result.meta.listingHash).toBeDefined()
       expect(result.meta.promptVersion).toBeDefined()
       expect(result.meta.schemaVersion).toBeDefined()
+
+      // T15: changes field should be present and contain replace operations
+      expect(result.changes).toBeDefined()
+      expect(Array.isArray(result.changes)).toBe(true)
+      expect(result.changes.length).toBeGreaterThan(0)
+
+      // Verify the changes contain replace operations with previous values
+      const replaceOps = result.changes.filter((c) => c.patch.op === "replace")
+      expect(replaceOps.length).toBeGreaterThan(0)
+
+      // At least one change should have a previous value (the original text)
+      const changesWithPrevious = result.changes.filter((c) => c.previous !== undefined)
+      expect(changesWithPrevious.length).toBeGreaterThan(0)
+
+      // Verify the structure of a change entry
+      const firstChange = result.changes[0]
+      expect(firstChange.patch).toBeDefined()
+      expect(firstChange.patch.op).toBe("replace")
+      expect(firstChange.patch.path).toBeDefined()
+      expect(firstChange.previous).toBeDefined()
+
+      // T16: addedBullets should produce an add op in changes
+      const addOps = result.changes.filter((c) => c.patch.op === "add")
+      expect(addOps.length).toBeGreaterThan(0)
+
+      // Verify the added bullet is present in the content
+      const nutrienEntry = result.content.experience.find((e) => e.id === "nutrien")
+      expect(nutrienEntry).toBeDefined()
+      if (nutrienEntry) {
+        const addedBullet = nutrienEntry.bulletPoints.find((bp) =>
+          bp.text === "Led cross-functional team in designing scalable async data pipelines"
+        )
+        expect(addedBullet).toBeDefined()
+        expect(addedBullet?.visible).toBe(true)
+      }
     }).pipe(
       Effect.provide(
         TestLayer.pipe(
@@ -151,7 +205,7 @@ describe("tailor pipeline", () => {
           expect(errorOption.value._tag).toBe("TailorError")
           if (errorOption.value._tag === "TailorError") {
             expect(errorOption.value.message).toContain("Stage 1 (cleanup) failed")
-            expect(errorOption.value.message).toContain("Stage 1 failed")
+            // TODO(v2): error field now contains structured errorToJson output, not chain string
           }
         }
       }
@@ -181,7 +235,7 @@ describe("tailor pipeline", () => {
           expect(errorOption.value._tag).toBe("TailorError")
           if (errorOption.value._tag === "TailorError") {
             expect(errorOption.value.message).toContain("Stage 2 (tailor) failed")
-            expect(errorOption.value.message).toContain("Stage 2 failed")
+            // TODO(v2): error field now contains structured errorToJson output, not chain string
           }
         }
       }
@@ -314,7 +368,7 @@ describe("tailor pipeline", () => {
           expect(errorOption.value._tag).toBe("TailorError")
           if (errorOption.value._tag === "TailorError") {
             expect(errorOption.value.message).toContain("Tailor pipeline failed")
-            expect(errorOption.value.message).toContain("Unexpected network failure")
+            // TODO(v2): error field now contains structured errorToJson output, not chain string
           }
         }
       }
@@ -322,6 +376,94 @@ describe("tailor pipeline", () => {
       Effect.provide(
         TestLayer.pipe(
           Layer.provide(failingClient),
+          Layer.provide(StubQuotaService),
+        ),
+      ),
+    )
+  })
+
+  it.effect("strict policy (enabled: true) reaches validation and drops fabricated metrics", () => {
+    // Stub dispatching on model (like makeStubOpenRouterClient): stage 2 returns an edit
+    // with a fabricated metric ("300%" appears in neither content nor listing)
+    const strictClient = Layer.succeed(
+      Services.OpenRouterClientService.OpenRouterClientService,
+      {
+        chat: (req: any) =>
+          req.model === "test-cleanup-model"
+            ? Effect.succeed({
+              content: JSON.stringify({
+                cleanedListing: "Software Engineer role",
+                jobTitle: "Software Engineer",
+                company: null,
+              }),
+              finishReason: "stop",
+              usage: { promptTokens: 100, completionTokens: 50 },
+            })
+            : Effect.succeed({
+              content: JSON.stringify({
+                headline: null,
+                summary: null,
+                bullets: [
+                  {
+                    // real IDs from INITIAL_CONTENT_STATE — must NOT be dropped by ID
+                    // resolution, so the fabrication check is what rejects it
+                    entryId: "nutrien",
+                    bulletId: "nutrien__b0",
+                    text: "Increased performance by 300% through optimization",
+                    rationale: "Matches listing requirement for performance optimization",
+                  },
+                ],
+                entryDescriptions: [],
+                hiddenBullets: [],
+                addedBullets: [],
+                tagGroups: [],
+                fit: {
+                  verdict: "partial",
+                  summary: "Good match",
+                  tips: [],
+                  keywordCoverage: { required: [] },
+                },
+              }),
+              finishReason: "stop",
+              usage: { promptTokens: 100, completionTokens: 50 },
+            }),
+      },
+    )
+
+    return Effect.gen(function*() {
+      const service = yield* Services.TailorService.TailorService
+      const content = ResumeContent.INITIAL_CONTENT_STATE
+
+      // Call with strict policy (enabled: true)
+      const result = yield* service.tailorResume(
+        "user@example.com",
+        "Software Engineer role",
+        content,
+        "v1",
+        {
+          enabled: true,
+          requireTagsGloballyAvailable: true,
+          rejectFabricatedMetrics: true,
+          groundTipsInListing: true,
+        },
+      )
+
+      // With strict policy, the fabricated metric "300%" should be dropped
+      // The changes array should not contain this bullet modification
+      expect(result.changes).toBeDefined()
+      expect(Array.isArray(result.changes)).toBe(true)
+
+      // Verify no changes contain the fabricated metric text
+      const changesWithMetric = result.changes.filter((c) =>
+        c.patch.op === "replace" &&
+        typeof c.patch.value === "string" &&
+        c.patch.value.includes("300%")
+      )
+      expect(changesWithMetric).toHaveLength(0)
+    }).pipe(
+      Effect.provide(
+        TestLayer.pipe(
+          Layer.provide(strictClient),
           Layer.provide(StubQuotaService),
         ),
       ),

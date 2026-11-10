@@ -1,5 +1,17 @@
 # 04 — Frontend UI & State
 
+> **V2 OVERRIDE (owner, 2026-11-09 — plan: [`07-v2-plan.md`](./07-v2-plan.md) §F, task T17):**
+> **D1's auto-apply + "Pre-tailor:" preset snapshot are RETIRED** (and with them D4's "no review
+> step"). New flow: submit → entry stored (now including the server-provided `changes` list) →
+> details modal opens with **tabs "Summary" | "Changes"** → apply is EXPLICIT via **"Apply changes
+> to resume"** in the Changes tab. That click — and only that click — pops the overwrite
+> confirmation (_"Your existing configuration will be overwritten"_) **when current content
+> differs from `INITIAL_CONTENT_STATE`** (compared with Effect `Equal.equals`, deep structural).
+> The tailoring tab gains a collapsible **validation-policy** section passed through
+> `requestTailor`. `generatePresetName` and both pre-save call sites are removed; manual preset
+> behavior is untouched. Sections §D (auto-apply) and §E's footer/recall description below are
+> historical.
+
 Status: **planning** (2026-11). Covers T7 and T8. Authoritative on D1, D4, D6: see [`README.md`](./README.md).
 
 > **Override note (2026-11-08):** the server no longer returns degraded results — failures

@@ -1,5 +1,11 @@
 # 01 — Shared State & Contracts
 
+> **V2 override (owner, 2026-11-09 — plan: [`07-v2-plan.md`](./07-v2-plan.md) §D, task T15):** the
+> §E wire shapes grow two fields: `ResumeTailorRequest.policy` (optional,
+> `TailorValidationPolicy`, permissive default) and `ResumeTailorResponse.changes`
+> (`Array(TailorChange)` — the server-computed merge delta). `ContentPatchBase64`, frozen
+> defaults, and versioning policy are unchanged.
+
 Status: **planning** (2026-11). This document covers tasks T1 and T2 from the README's task graph: extract content schemas and defaults into `packages/shared`, extend `ContentState` with the hard-coded blurb and about-me text, build the base64 JSON Patch codec, and define the wire contract shapes. Authoritative on decisions D1–D6: see [`README.md`](./README.md).
 
 ---

@@ -1,17 +1,6 @@
 import { Array, Cause, Config, Formatter, Inspectable, Layer, Logger, References } from "effect"
 import { match } from "ts-pattern"
 
-/** Regex matching sensitive key names that should be redacted in logs. */
-const SENSITIVE_KEY_PATTERN = /authorization|api[_-]?key|secret|bearer/i
-
-/** Redact sensitive values in log annotations to prevent credential leakage. */
-const redactSensitiveValue = (key: string, value: unknown): unknown => {
-  if (SENSITIVE_KEY_PATTERN.test(key)) {
-    return "[REDACTED]"
-  }
-  return value
-}
-
 export const structureLogMessage = (u: unknown): unknown => {
   switch (typeof u) {
     case "bigint":
@@ -57,7 +46,7 @@ export const jsonLogger = Logger.make<unknown, unknown>(
 
     const annotations = fiber.getRef(References.CurrentLogAnnotations)
     for (const [k, v] of Object.entries(annotations)) {
-      annotationsObj[k] = structureLogMessage(redactSensitiveValue(k, v))
+      annotationsObj[k] = structureLogMessage(v)
     }
 
     const spans = fiber.getRef(References.CurrentLogSpans)
@@ -67,6 +56,13 @@ export const jsonLogger = Logger.make<unknown, unknown>(
 
     const loggedMessage = getLoggableMessage(message)
 
+    // Extract trace_id and span_id from the current OTel span if available
+    // fiber.cache.span is AnySpan (Span | ExternalSpan), both expose traceId/spanId
+    const currentSpan = fiber.cache.span
+    const traceContext = currentSpan
+      ? { trace_id: currentSpan.traceId, span_id: currentSpan.spanId }
+      : {}
+
     return {
       logLevel,
       timestamp: date.toISOString(),
@@ -74,6 +70,7 @@ export const jsonLogger = Logger.make<unknown, unknown>(
       annotations: annotationsObj,
       spans: spansObj,
       fiberId: String(fiber.id),
+      ...traceContext,
       ...loggedMessage,
     }
   },

@@ -1,5 +1,6 @@
 import { Context, Data, Effect, Schema } from "effect"
-import { FitReport, TailorMeta } from "../schemas/resume-tailor.js"
+import { OptionalWithDefault } from "../schemas/optionals.js"
+import { FitReport, TailorChange, TailorMeta } from "../schemas/resume-tailor.js"
 
 export const TailorEntryStoreServiceId = "homelab-api/services/tailor/TailorEntryStoreService"
 
@@ -24,6 +25,11 @@ export const TailorEntrySchema = Schema.Struct({
   baseVersion: Schema.String,
   meta: Schema.NullOr(TailorMeta),
   error: Schema.NullOr(Schema.String),
+  /**
+   * Structured list of JsonPatch mutations (server-derived from merge delta).
+   * Nullable + absent-tolerant so pre-v2 localStorage entries decode as `changes: null`.
+   */
+  changes: OptionalWithDefault(Schema.NullOr(Schema.Array(TailorChange)), () => null),
 })
 
 export type TailorEntry = Schema.Schema.Type<typeof TailorEntrySchema>

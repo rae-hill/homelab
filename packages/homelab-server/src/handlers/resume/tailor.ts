@@ -31,6 +31,7 @@ export const handleResumeTailor = Effect.fn("handleResumeTailor")(
       listing,
       content,
       baseVersion,
+      args.payload.policy,
     )
   },
   Effect.tapError(Effect.logError),
@@ -45,6 +46,7 @@ export const handleResumeTailor = Effect.fn("handleResumeTailor")(
       Match.tag("TailorError", (err) =>
         new ApiErrors.InternalServerError({
           message: err.message,
+          error: err.error,
         })),
       Match.orElse((_) => _),
     ),

@@ -179,6 +179,12 @@ should need **zero** unit changes — confirm at deploy time (Test Plan step 6).
 
 ### 9. Log-redaction ops acceptance check (initial plan §10)
 
+> **V2 note (2026-11-09, [`07-v2-plan.md`](./07-v2-plan.md) §G/T18):** the IMPLEMENTATION of
+> redaction changes — manual key-pattern redaction (`SENSITIVE_KEY_PATTERN` in logger.ts,
+> `RedactingSpanProcessor` in otel.ts) is removed in favor of `Redacted`-at-the-source for every
+> sensitive value (`Redacted.toString/toJSON` auto-redacts). This acceptance grep REMAINS the
+> deploy-time check and must still return 0.
+
 Code-side redaction (`Authorization` header + provider dumps out of logs/OTel — augustus runs Tempo,
 so `OTEL_GRPC_ENDPOINT_URL` is rendered, template lines 217–222) is doc 02's job; the **operational
 gate** lives here — Test Plan step 7.

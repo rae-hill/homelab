@@ -74,6 +74,12 @@ describe("POST /resume/tailor", () => {
               listing: fixtureListing,
               content: fixtureContent,
               baseVersion: ResumeContent.CONTENT_DEFAULTS_VERSION,
+              policy: {
+                enabled: false,
+                requireTagsGloballyAvailable: true,
+                rejectFabricatedMetrics: true,
+                groundTipsInListing: true,
+              },
             },
             headers: {
               dpop: dpopProof,
@@ -96,6 +102,12 @@ describe("POST /resume/tailor", () => {
               listing: fixtureListing,
               content: fixtureContent,
               baseVersion: ResumeContent.CONTENT_DEFAULTS_VERSION,
+              policy: {
+                enabled: false,
+                requireTagsGloballyAvailable: true,
+                rejectFabricatedMetrics: true,
+                groundTipsInListing: true,
+              },
             },
             headers: {},
           }),
@@ -124,6 +136,12 @@ describe("POST /resume/tailor", () => {
               listing: fixtureListing,
               content: fixtureContent,
               baseVersion: "v0-bogus",
+              policy: {
+                enabled: false,
+                requireTagsGloballyAvailable: true,
+                rejectFabricatedMetrics: true,
+                groundTipsInListing: true,
+              },
             },
             headers: {
               dpop: dpopProof,
@@ -181,6 +199,12 @@ describe("POST /resume/tailor", () => {
               listing: fixtureListing,
               content: fixtureContent,
               baseVersion: ResumeContent.CONTENT_DEFAULTS_VERSION,
+              policy: {
+                enabled: false,
+                requireTagsGloballyAvailable: true,
+                rejectFabricatedMetrics: true,
+                groundTipsInListing: true,
+              },
             },
             headers: {
               dpop: dpopProof,
@@ -195,6 +219,7 @@ describe("POST /resume/tailor", () => {
           expect(result.content.skills.length).toBeGreaterThan(0)
           expect(result.fit).toBeDefined()
           expect(result.meta).toBeDefined()
+          expect(Array.isArray(result.changes)).toBe(true)
         }).pipe(Effect.provide(E2ETestLayer)),
       180_000, // 2x60s stage budgets + margin
     )

@@ -1,7 +1,7 @@
 export {
+  useApplyEntry,
   useCloseDetail,
   useOpenDetail,
-  useRecallEntry,
   useRemoveEntry,
   useSubmitTailor,
   useTailorDetail,

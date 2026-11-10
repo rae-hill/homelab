@@ -1,13 +1,15 @@
 import { Schema } from "effect"
 
 /**
- * Wire schemas for the two-stage AI pipeline.
+ * Model-facing wire schemas for the two-stage AI pipeline.
  *
  * Stage 1 (cleanup): extractive-only deletion + title/company extraction
  * Stage 2 (tailor): constrained ID-addressed edits + fit report
  *
  * Strict-mode rules: every object fully required, additionalProperties:false,
  * NullOr not optional, no refinements/transforms/pattern/length constraints.
+ *
+ * Now exposed as Schemas.Tailoring.* from homelab-services-node.
  */
 
 // ─── Stage 1: Cleanup ─────────────────────────────────────────────────────────
@@ -37,6 +39,12 @@ const TailorEntryDescription = Schema.Struct({
 const TailorHiddenBullet = Schema.Struct({
   entryId: Schema.String,
   bulletId: Schema.String,
+  rationale: Schema.String,
+})
+
+const TailorAddedBullet = Schema.Struct({
+  entryId: Schema.String,
+  text: Schema.String,
   rationale: Schema.String,
 })
 
@@ -78,13 +86,9 @@ export const TailorEdits = Schema.Struct({
   bullets: Schema.Array(TailorBullet),
   entryDescriptions: Schema.Array(TailorEntryDescription),
   hiddenBullets: Schema.Array(TailorHiddenBullet),
+  addedBullets: Schema.Array(TailorAddedBullet),
   tagGroups: Schema.Array(TailorTagGroup),
   fit: FitReport,
 })
 
 export type TailorEdits = Schema.Schema.Type<typeof TailorEdits>
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-export const promptVersion = "v1-2026-11"
-export const schemaVersion = "v1"

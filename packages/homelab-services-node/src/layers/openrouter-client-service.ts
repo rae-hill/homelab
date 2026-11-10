@@ -1,7 +1,6 @@
 import { Duration, Effect, FileSystem, Layer, Option, Redacted, Schema } from "effect"
 import { HttpClient, type HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
-import { Config, Services } from "homelab-services"
-import { describeErrorChain } from "./tailor/errors.js"
+import { Config, Services, Utils } from "homelab-services"
 
 // OpenRouter response schema (minimal, just what we need)
 const OpenRouterResponseSchema = Schema.Struct({
@@ -29,7 +28,7 @@ const mapError = (error: unknown): Services.OpenRouterClientService.OpenRouterEr
   }
   return new Services.OpenRouterClientService.OpenRouterError({
     message: error instanceof Error ? error.message : String(error),
-    error,
+    error: Utils.errorToJson(error),
   })
 }
 
@@ -159,7 +158,7 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
                   return Effect.fail(
                     new Services.OpenRouterClientService.OpenRouterError({
                       message: `OpenRouter API returned status ${failedResponse.status}: ${excerpt}`,
-                      error: httpErr,
+                      error: Utils.errorToJson(httpErr),
                     }),
                   )
                 },
@@ -191,7 +190,7 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
         return yield* Effect.fail(
           new Services.OpenRouterClientService.OpenRouterError({
             message: `OpenRouter finished with unexpected reason: ${finishReason}`,
-            error: decoded,
+            error: Utils.errorToJson(decoded),
           }),
         )
       }
@@ -201,7 +200,7 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
         return yield* Effect.fail(
           new Services.OpenRouterClientService.OpenRouterError({
             message: "OpenRouter response missing content",
-            error: decoded,
+            error: Utils.errorToJson(decoded),
           }),
         )
       }
@@ -235,14 +234,14 @@ class OpenRouterClientServiceImpl implements Services.OpenRouterClientService.Op
               Effect.fail(
                 new Services.OpenRouterClientService.OpenRouterError({
                   message: `OpenRouter request timed out after ${timeoutSec}s for model ${req.model}`,
-                  error,
+                  error: Utils.errorToJson(error),
                 }),
               ),
           )
         }
-        // Log all other failures with chain description
+        // Log all other failures
         return Effect.flatMap(
-          Effect.logError(`OpenRouter request failed: ${describeErrorChain(error)}`),
+          Effect.logError("OpenRouter request failed"),
           () => Effect.fail(mapError(error)),
         )
       }),

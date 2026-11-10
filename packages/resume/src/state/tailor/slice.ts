@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
+import type { Schemas } from "homelab-services"
 import { castDraft } from "immer"
 
 import type { TailorEntry, TailorState } from "./types"
@@ -40,13 +41,15 @@ export const tailorSlice = createSlice({
         contentPatch: null,
         meta: null,
         error: null,
+        changes: null,
       }
       state.entries.unshift(castDraft(entry))
     },
 
     /**
      * Fill a pending entry with the tailor response. Status becomes "success" or "degraded"
-     * based on meta.degraded. Clears any previous error.
+     * based on meta.degraded. Clears any previous error. Stores the structured changes
+     * list (server-derived from merge delta) for the Changes tab review flow.
      */
     submitSucceeded(
       state,
@@ -59,6 +62,7 @@ export const tailorSlice = createSlice({
           contentPatch: string | null
           baseVersion: string
           meta: TailorEntry["meta"]
+          changes: ReadonlyArray<Schemas.ResumeTailor.TailorChange>
         }
       }>,
     ) {
@@ -72,6 +76,7 @@ export const tailorSlice = createSlice({
         entry.contentPatch = response.contentPatch
         entry.baseVersion = response.baseVersion
         entry.meta = castDraft(response.meta)
+        entry.changes = castDraft(response.changes)
         entry.error = null
       }
     },
