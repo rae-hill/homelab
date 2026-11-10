@@ -1,14 +1,9 @@
-import { IconButton, Spinner } from "@chakra-ui/react"
-import { Effect } from "effect"
-import { useCallback, useState } from "react"
-import { LuDownload } from "react-icons/lu"
+import { Group, IconButton, Menu, Portal, Spinner } from "@chakra-ui/react"
+import { LuChevronDown, LuDownload } from "react-icons/lu"
 
 import { useCanPrintResume } from "../state/homelab"
-import { downloadPdf, requestResumePdf } from "../state/homelab/print"
-import { useConfigIO } from "../state/print-config"
-import { toaster } from "./chakra/toaster"
 import { Tooltip } from "./chakra/tooltip"
-import { useColorMode } from "./ui/color-mode"
+import { ResumeFormatMenuItems, useResumeDownload } from "./resume-download"
 
 export interface DownloadFabProps {
   /** Placement offsets, mirroring the settings FAB (this one stacks above it). */
@@ -17,85 +12,82 @@ export interface DownloadFabProps {
 }
 
 /**
- * Bottom-left floating action button — stacked directly **above** the settings FAB —
- * that renders the current print config to a PDF on the homelab server (headless chrome)
- * and downloads it. Only rendered when the tailscale-only API is reachable AND the
- * signed-in identity carries the `Resume_Print` role. Hidden in print.
+ * Bottom-left floating split button — stacked directly **above** the settings FAB —
+ * that renders the current print config to a document on the homelab server
+ * (headless chrome) and downloads it. The main button renders a PDF (the historical
+ * default); the attached chevron opens a menu offering PDF or DOCX (Word). Only
+ * rendered when the tailscale-only API is reachable AND the signed-in identity
+ * carries the `Resume_Print` role. Hidden in print.
  *
- * Feedback: the button shows a spinner while rendering; success/failure surface as toasts
- * (see `chakra/toaster.tsx`). The `<Toaster />` viewport is mounted once in `__root.tsx`.
+ * Feedback: the buttons show a spinner while rendering; success/failure surface as
+ * toasts (see `chakra/toaster.tsx`). The `<Toaster />` viewport is mounted once in
+ * `__root.tsx`.
  */
 export function DownloadFab({
   bottom = [100, 100, 14],
   left = [10, 10, 140],
 }: DownloadFabProps) {
   const canPrint = useCanPrintResume()
-  const { exportBase64 } = useConfigIO()
-  const { colorMode } = useColorMode()
-  const [busy, setBusy] = useState(false)
-
-  const handleClick = useCallback(() => {
-    if (busy) {
-      return
-    }
-    setBusy(true)
-    const theme = colorMode === "dark" ? "dark" : "light"
-    void Effect.runPromise(
-      requestResumePdf(exportBase64(), theme).pipe(
-        Effect.tap((pdf) =>
-          Effect.sync(() => {
-            downloadPdf(pdf)
-            toaster.create({
-              title: "PDF ready",
-              description: "Your resume PDF has been downloaded.",
-              type: "success",
-            })
-          })
-        ),
-        Effect.catch((err) =>
-          Effect.sync(() =>
-            toaster.create({
-              title: "Couldn't download PDF",
-              description: err.message,
-              type: "error",
-            })
-          )
-        ),
-      ),
-    ).then(() => setBusy(false))
-  }, [busy, colorMode, exportBase64])
+  const { busyFormat, download } = useResumeDownload()
 
   if (!canPrint) {
     return null
   }
 
   const hidePrint = { "@media print": { display: "none" } }
+  const busy = busyFormat !== null
 
   return (
-    <Tooltip
-      showArrow
-      openDelay={200}
-      closeDelay={100}
-      positioning={{ placement: "top" }}
-      content={busy ? "Rendering PDF…" : "Download PDF (headless chrome on the homelab)"}
-      contentProps={{ css: hidePrint }}
-    >
-      <IconButton
+    <Menu.Root positioning={{ placement: "top-start" }}>
+      <Group
+        attached
         css={hidePrint}
         zIndex="docked"
-        aria-label="download pdf"
         position="fixed"
         left={left}
         bottom={bottom}
-        rounded="full"
-        size="xl"
         shadow="lg"
-        colorPalette="purple"
-        aria-disabled={busy}
-        onClick={handleClick}
       >
-        {busy ? <Spinner size="sm" /> : <LuDownload />}
-      </IconButton>
-    </Tooltip>
+        <Tooltip
+          showArrow
+          openDelay={200}
+          closeDelay={100}
+          positioning={{ placement: "top" }}
+          content={busyFormat !== null
+            ? `Rendering ${busyFormat.toUpperCase()}…`
+            : "Download PDF (headless chrome on the homelab)"}
+          contentProps={{ css: hidePrint }}
+        >
+          <IconButton
+            aria-label="download resume pdf"
+            rounded="full"
+            size="xl"
+            colorPalette="purple"
+            aria-disabled={busy}
+            onClick={() => download("pdf")}
+          >
+            {busyFormat === "pdf" ? <Spinner size="sm" /> : <LuDownload />}
+          </IconButton>
+        </Tooltip>
+        <Menu.Trigger asChild>
+          <IconButton
+            aria-label="choose download format"
+            rounded="full"
+            size="lg"
+            colorPalette="purple"
+            aria-disabled={busy}
+          >
+            {busyFormat === "docx" ? <Spinner size="sm" /> : <LuChevronDown />}
+          </IconButton>
+        </Menu.Trigger>
+      </Group>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content css={hidePrint}>
+            <ResumeFormatMenuItems download={download} disabled={busy} />
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
   )
 }

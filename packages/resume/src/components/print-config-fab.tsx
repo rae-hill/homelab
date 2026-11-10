@@ -2,12 +2,15 @@ import {
   Box,
   Button,
   Dialog,
+  Group,
   HStack,
   Icon,
   IconButton,
+  Menu,
   Portal,
   SegmentGroup,
   SimpleGrid,
+  Spinner,
   Stack,
   Switch,
   Tabs,
@@ -36,6 +39,7 @@ import {
   LuAlignVerticalSpaceBetween,
   LuBookmark,
   LuBriefcase,
+  LuChevronDown,
   LuFolderGit2,
   LuShare2,
   LuUserRound,
@@ -46,6 +50,7 @@ import {
 import { MdOutlineVisibility } from "react-icons/md"
 import { useKonamiCode } from "../hooks/useKonamiCode"
 import { useResizableHeight } from "../hooks/useResizableHeight"
+import { useCanPrintResume } from "../state/homelab"
 import {
   useContent,
   useEditingEnabled,
@@ -76,6 +81,7 @@ import type {
 import { Tooltip } from "./chakra/tooltip"
 import { PresetsPanel, SharePanel } from "./config-io"
 import { ContentEditor, ContentSubsectionDivider } from "./content-editor"
+import { ResumeFormatMenuItems, useResumeDownload } from "./resume-download"
 import { ListingDetailModal } from "./tailoring/listing-detail-modal"
 import { TailoringTab } from "./tailoring/tailoring-tab"
 
@@ -625,6 +631,11 @@ export function PrintConfigFab({
   const { editingEnabled, setEditingEnabled } = useEditingEnabled()
   const { content, setAboutMe, setBlurb } = useContent()
   const reset = useResetPrintConfig()
+  // Server-rendered downloads (PDF/DOCX split menus) — gated on the
+  // `Resume_Print` role; without it the footer Print button falls back to
+  // browser printing (owner decision, doc 08 OQ1).
+  const canPrint = useCanPrintResume()
+  const { busyFormat, download } = useResumeDownload()
 
   // Per-section config, keyed for the two SectionControls panels.
   const sections = {
@@ -949,9 +960,43 @@ export function PrintConfigFab({
                   <Button variant="outline" onClick={() => setOpen(false)}>
                     Cancel
                   </Button>
-                  <Button colorPalette="teal" onClick={handlePrint}>
-                    Print
-                  </Button>
+                  {canPrint
+                    ? (
+                      <Menu.Root positioning={{ placement: "top-end" }}>
+                        <Group attached>
+                          <Button
+                            colorPalette="teal"
+                            aria-disabled={busyFormat !== null}
+                            onClick={() => download("pdf")}
+                          >
+                            {busyFormat === "pdf" ? <Spinner size="sm" /> : null}
+                            Print
+                          </Button>
+                          <Menu.Trigger asChild>
+                            <IconButton
+                              aria-label="choose print format"
+                              colorPalette="teal"
+                              variant="solid"
+                              aria-disabled={busyFormat !== null}
+                            >
+                              {busyFormat === "docx" ? <Spinner size="sm" /> : <LuChevronDown />}
+                            </IconButton>
+                          </Menu.Trigger>
+                        </Group>
+                        <Portal>
+                          <Menu.Positioner>
+                            <Menu.Content>
+                              <ResumeFormatMenuItems download={download} disabled={busyFormat !== null} />
+                            </Menu.Content>
+                          </Menu.Positioner>
+                        </Portal>
+                      </Menu.Root>
+                    )
+                    : (
+                      <Button colorPalette="teal" onClick={handlePrint}>
+                        Print
+                      </Button>
+                    )}
                 </HStack>
               </Dialog.Footer>
               <Dialog.CloseTrigger asChild>
