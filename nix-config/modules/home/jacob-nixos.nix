@@ -161,12 +161,22 @@ in
             # incompatible (permission/bash vs permissions/shell).
             package = pkgs-unstable.opencode;
             # Web UI server: the `opencode-web` systemd USER service runs
-            # `opencode serve` on LOOPBACK only — fronted by the NixOS Caddy
-            # mTLS vhost https://opencode.plato-splunk.media (features/opencode;
-            # tailscale0-only :443, never LAN/public). The port comes from
-            # constants.services.opencode.port and is deliberately NOT
-            # opencode's 49374 channel default, so the standalone web server
-            # never fights the shared background service the local TUI spawns.
+            # `opencode serve --service` on LOOPBACK only — fronted by the
+            # NixOS Caddy mTLS vhost https://opencode.plato-splunk.media
+            # (features/opencode; tailscale0-only :443, never LAN/public).
+            # `--service` makes this THE managed background service: it
+            # registers itself in ~/.local/state/opencode/service.json, so a
+            # bare `opencode` on this machine auto-attaches to it (TUI and web
+            # UI share one server + sessions), and `opencode service status` /
+            # `opencode api` work against it. Lifecycle belongs to systemd
+            # (`systemctl --user restart opencode-web`) — NOT `opencode
+            # service start/stop`, which fights Restart=always and the port.
+            # The port comes from constants.services.opencode.port and is
+            # deliberately NOT opencode's 49374 channel default; it is also
+            # mirrored into ~/.config/opencode/service.json (`opencode service
+            # set port 49375` + `set hostname 127.0.0.1`) so any CLI-side
+            # start attempt targets the same address and finds this incumbent
+            # instead of racing it.
             web = {
               enable = true;
               extraArgs = [
@@ -174,15 +184,17 @@ in
                 "127.0.0.1"
                 "--port"
                 (toString opencodeSvc.port)
+                "--service"
               ];
-              # Basic-auth password for the web UI (username is always
-              # "opencode"). A deliberate throwaway: the Caddy mTLS gate means
-              # no request reaches this server without a step-ca client cert.
-              # NOTE: opencode v2 reads OPENCODE_PASSWORD (the home-manager
-              # module docs still say OPENCODE_SERVER_PASSWORD — stale).
-              environmentFile = pkgs.writeText "opencode-web.env" ''
-                OPENCODE_PASSWORD=hackme
-              '';
+              # NOTE: no environmentFile — in `--service` mode the server
+              # IGNORES OPENCODE_PASSWORD. The basic-auth password (username
+              # is always "opencode") is `password` in
+              # ~/.config/opencode/service.json — a deliberate throwaway
+              # behind the Caddy mTLS gate (no request reaches this server
+              # without a step-ca client cert) — set once via `opencode
+              # service set password hackme`, readable via `opencode service
+              # get password`, and carried in the registration file so
+              # discovered CLI clients authenticate automatically.
             };
             settings = {
               # Ordered rules; LAST match wins. See https://opencode.ai/v2/docs/permissions

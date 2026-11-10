@@ -393,11 +393,14 @@ in
         port = 11434;
       };
 
-      # opencode web UI (nixos workstation) — a loopback `opencode serve`
-      # home-manager user service, reverse-proxied by Caddy (mTLS vhost,
-      # tailscale0-only :443). Deliberately NOT opencode's default port 49374:
-      # that's the channel default the shared background service (local TUI)
-      # uses, and the standalone web server must not fight it.
+      # opencode web UI (nixos workstation) — a loopback `opencode serve
+      # --service` home-manager user service, reverse-proxied by Caddy (mTLS
+      # vhost, tailscale0-only :443). `--service` makes it the managed
+      # background service the local TUI auto-attaches to (registration in
+      # ~/.local/state/opencode/service.json). The port is pinned here, in the
+      # unit flags, AND in ~/.config/opencode/service.json (`opencode service
+      # set port/hostname`); deliberately NOT opencode's 49374 channel
+      # default so the catalog port stays the single stable address.
       opencode = {
         subdomain = "opencode";
         domain = mkDomain "opencode";

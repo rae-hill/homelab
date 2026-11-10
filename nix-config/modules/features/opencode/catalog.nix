@@ -2,7 +2,8 @@
 #
 # NEW catalog-native service (not a migration). The opencode web server is a
 # home-manager systemd USER service (`programs.opencode.web` in
-# modules/home/jacob-nixos.nix) running `opencode serve` on LOOPBACK only; this
+# modules/home/jacob-nixos.nix) running `opencode serve --service` on LOOPBACK
+# only (the managed background service the local TUI auto-attaches to); this
 # entry owns the cross-cutting networking contract:
 #
 #   - Caddy vhost https://opencode.plato-splunk.media reverse-proxying into the
