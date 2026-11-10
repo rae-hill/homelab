@@ -30,7 +30,12 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 | T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | **done** (addedBullets experience-only — projects have no bulletPoints; strict policy rejects adds)                                        | `0c603a34e`    |
 | T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | **done** (no auto-apply/snapshots; generatePresetName removed; legacy entries decode changes:null)                                         | `3987b85f6`    |
 | T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | **done** (fiber.cache.span extraction; grafana customQuery eval-verified; 222 trace_id lines + 0 sk-or- in the e2e log dump)               | `052cda611`    |
-| T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | **deferred** (owner 2026-11-09: field-verify v2 first; then §H eval gate + explicit go)                                                    | —              |
+| T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | **deferred** (owner 2026-11-09 + reconfirmed 2026-11-10 "backburner": field-verify v2 first; then §H eval gate + explicit go)              | —              |
+| T20  | 08  | v3: rename `PdfPrintService` → `ResumePrintingService` (+`ResumePrintError`), format-agnostic file/id/span names                                  | **in progress** (rename applied; typecheck+test+lint+`e2e src/resume` green)                                                               | —              |
+| T21  | 08  | v3: `DocumentRenderingServiceDocx` (`formatHtml`) + `@turbodocx/html-to-docx` + `sharp` deps + rolldown externals + bundle spike                  | planned                                                                                                                                    | —              |
+| T22  | 08  | v3: wire `outputFormat=pdf\|docx` (dual magic-byte success schemas) + puppeteer computed-style HTML capture → docx branch                         | planned (ends at **owner DOCX fidelity gate**)                                                                                             | —              |
+| T23  | 08  | v3: frontend — Chakra split menus (settings Print button + Download FAB), format-aware request/download, `window.print` fallback when `!canPrint` | planned (gated on T22 fidelity sign-off)                                                                                                   | —              |
+| T24  | 08  | v3: e2e docx + raw content-type assertions; nix hashes + sharp runtime closure in `$out/lib/bundle/node_modules`; full suite                      | planned                                                                                                                                    | —              |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -175,11 +180,22 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 (`e7137e69d`), CI-hang bounds landed (`b372d0713`), kanidm groups split by owner
 (`9727a4ceb1ff`).
 
-1. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
+1. **v3 work queue = doc 08 (T20–T24): DOCX output for resume printing** (owner, 2026-11-10):
+   `outputFormat=pdf|docx` on `POST /resume/print`; rename `PdfPrintService` →
+   `ResumePrintingService` (+ format param); NEW `DocumentRenderingServiceDocx.formatHtml`
+   wrapping `@turbodocx/html-to-docx`; puppeteer full-HTML capture with in-page computed-style
+   inlining (the library never fetches external CSS and resolves no cascade); dual content-type
+   success schemas (magic-byte-discriminated union — source-cited research in doc 08); Chakra
+   v3 split menus on the Download FAB + the settings-dialog Print button (replacing
+   `window.print()`). Strictly serial: T20→T21→T22→**[GATE: owner DOCX fidelity review]**→T23→T24.
+   Plan of record: `docs/resume-tailor-harness/08-docx-output-plan.md`. **T19 (JsonPatch) is
+   explicitly ON THE BACKBURNER (owner, 2026-11-10)** — still gated, NOT in this queue.
+2. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
    full e2e green (15 files, 112✓+1 skip, exit 0). Remaining: T19 — GATED (needs explicit owner
    go; its §H eval gate must first build the doc 02 §I fixtures, which don't exist on disk) + the
    owner deploy-time checklist (Tempo link click, augustus redaction grep, browser pass over the
-   new review UI, CI push).** The owner's tailoring-quality suggestions were ELICITED
+   new review UI, CI push). (2026-11-10: owner keeps T19 DEFERRED — "on the backburner"; the
+   doc 08 v3 queue takes priority.)** The owner's tailoring-quality suggestions were ELICITED
    (2026-11-09) and grew into the full v2 directive set (M1–M12 + clarifications C1–C3) — plan of
    record: `docs/resume-tailor-harness/07-v2-plan.md`. Waves: **V2-A** T12→T13→T14 (serial) →
    **V2-B** T15→T16→T19 (T19 GATED: §H evals + owner go) ∥ T18 → **V2-C** T17; **full `e2e` suite
@@ -189,22 +205,23 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
    (`RUN_TAILOR_LIVE=1 e2e src/resume` + the real key in gitignored
    `packages/homelab-server/private/openrouter-api-key`); bump `promptVersion` on any prompt change
    (v2: it becomes the prompt-config service's `version` property).
-2. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
+3. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
    fetch, probe `--max-time 10` + progress echoes). Next push should show the E2E job pass — or
    fail loudly with the log dump instead of stalling silently after "starting bundled server".
-3. **Manual browser checklist (partially confirmed by the owner's live run):** still
+4. **Manual browser checklist (partially confirmed by the owner's live run):** still
    unconfirmed — "Pre-tailor: …" preset snapshot toast; details modal
    (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe editable in Heading
    tab and rendering on the resume; print output contains no tailor data.
-4. **Redaction grep unconfirmed** (doc 05 Test Plan): on augustus,
+5. **Redaction grep unconfirmed** (doc 05 Test Plan): on augustus,
    `journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0.
-5. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
+6. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
    point"); doc 06 stretch phase — postgres persistence + category-keyed bases + cache decorator
    (owner wants to do persistence together); "update entry from current content" nicety (README
    OQ4); frozen-base registry mechanics (doc 01 §B — only needed when defaults change);
-   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change). (Kanidm
-   dedicated tailor group — DONE by owner `9727a4ceb1ff`: `homelab.resume.printing` +
-   `homelab.resume.tailoring`.)
+   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change);
+   `POST /resume/print-plain` plain-DOCX templating endpoint (owner idea 2026-11-10 — doc 08
+   §Future work). (Kanidm dedicated tailor group — DONE by owner `9727a4ceb1ff`:
+   `homelab.resume.printing` + `homelab.resume.tailoring`.)
 
 ## Session log
 
@@ -544,3 +561,30 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
   15 files, 112✓ + 1 skip (live-AI gated), exit 0.
 - main is 6 ahead of origin/main (5 openclaw + the merge) — PUSH PENDING owner decision.
 - The `nimble-otter` opencode worktree is fully merged and can be removed.
+
+### 2026-11-10 — v3 planning session (owner directives → doc 08)
+
+- Owner opened the v3 phase: **DOCX output for resume printing** — `outputFormat=pdf|docx` on
+  `POST /resume/print`; motivation: PDF parsers frequently mangle the resume, DOCX should parse
+  better (hypothesis verified at the owner fidelity gate BEFORE frontend polish lands). **T19
+  JsonPatch explicitly put on the backburner.** Plan of record written:
+  `08-docx-output-plan.md` (T20–T24, strictly serial: rename → docx rendering service →
+  wire+capture → [GATE] → frontend split menus → e2e+nix hashes).
+- Research baked into doc 08 (source-cited, so implementers don't redo it):
+  (a) effect 4.1.2 HttpApi resolves response content-type **statically per success-schema
+  member**; an endpoint may declare multiple success schemas at 200 with distinct content-types;
+  union encoding is first-match, so the two Uint8Array members need **magic-byte Type-side
+  filters** (`%PDF` / `PK\x03\x04`) — and the typed client REJECTS undeclared content-types, so
+  both MIME types must be declared (`WithHeaders` override exists but breaks client dispatch →
+  rejected). (b) `@turbodocx/html-to-docx` 1.23.3: default export `HtmlToDocx(html, header?,
+  options?, footer?)` → `Promise<Buffer>`; parses inline `style` attrs, **never fetches external
+  stylesheets, no CSS cascade** → the puppeteer capture must bake `getComputedStyle` whitelisted
+  props into inline styles in-page (under print-media emulation, pruning `display:none` app
+  chrome). Optional `sharp` (SVG→PNG) deliberately NOT added. (c) Chakra v3 split menu =
+  `Menu.Root` > `Group attached` > main Button/IconButton + `Menu.Trigger asChild` chevron >
+  `Portal`>`Menu.Positioner`>`Menu.Content`>`Menu.Item`.
+- Agent decisions flagged for owner in doc 08: C1 (the endpoint is `/resume/print`, not
+  `/resume/tailor`), C2/C3 naming (`ResumePrintingService`/`ResumePrintError`,
+  `DocumentRenderingServiceDocx`/`DocumentRenderingServiceError`/`DocxDocumentOptions`), C4/OQ5
+  (dual content-type union; octet-stream fallback), OQ1 (settings Print button keeps a
+  `window.print()` fallback when `!canPrint`), OQ4 (inline-SVG icon handling pending the gate).
