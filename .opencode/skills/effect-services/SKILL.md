@@ -28,6 +28,7 @@ Upstream monorepos are vendored at `./repos/` as read-only reference material vi
 | `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`)                                                    |
 | `repos/home-manager/`         | https://github.com/nix-community/home-manager.git   | home-manager modules (`release-26.05`, matches the flake input)                                   |
 | `repos/puppeteer/`            | https://github.com/puppeteer/puppeteer.git          | puppeteer-core source (tag `puppeteer-core-v25.16.0`, matches the npm pin)                        |
+| `repos/open-resume/`          | https://github.com/xitanggg/open-resume.git         | OpenResume PDF resume-parser reference (`src/app/lib/parse-resume-from-pdf/`; `main`, squashed)   |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`

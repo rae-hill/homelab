@@ -100,16 +100,17 @@ describe a different version than the one deployed, and sometimes lie outright. 
 docs only for upstreams not vendored here or for tutorial-style material, and corroborate against
 the pinned tag's source before trusting them.
 
-| Question about                                                                      | Resolves to                                                                                 |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| step-ca server behavior (provisioners, ACME challenges, attestation, policy, renew) | `./repos/step-ca/` (smallstep/certificates, tag `v0.29.0` = nixpkgs-26.05)                  |
-| step CLI behavior (flags, issuance/renewal flows, KMS/attestation handling)         | `./repos/step-cli/` (smallstep/cli, tag `v0.30.2` = nixpkgs-26.05)                          |
-| go.step.sm/crypto (KMS drivers, YubiKey PIV, pemutil, x509util)                     | `./repos/crypto/` (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins v0.74.0)     |
-| Kanidm server/CLI behavior                                                          | `./repos/kanidm/`                                                                           |
-| puppeteer / headless chrome printing (`page.pdf`, launch args, `waitForSelector`)   | `./repos/puppeteer/` (tag `puppeteer-core-v25.16.0` = the npm pin in homelab-services-node) |
-| Technitium DNS behavior                                                             | `./repos/technitium-dnsserver/`                                                             |
-| OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)           | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)            |
-| OpenCode behavior (client/server split, `service` mode, registration, HTTP API)     | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                  |
+| Question about                                                                          | Resolves to                                                                                                    |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| step-ca server behavior (provisioners, ACME challenges, attestation, policy, renew)     | `./repos/step-ca/` (smallstep/certificates, tag `v0.29.0` = nixpkgs-26.05)                                     |
+| step CLI behavior (flags, issuance/renewal flows, KMS/attestation handling)             | `./repos/step-cli/` (smallstep/cli, tag `v0.30.2` = nixpkgs-26.05)                                             |
+| go.step.sm/crypto (KMS drivers, YubiKey PIV, pemutil, x509util)                         | `./repos/crypto/` (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins v0.74.0)                        |
+| Kanidm server/CLI behavior                                                              | `./repos/kanidm/`                                                                                              |
+| puppeteer / headless chrome printing (`page.pdf`, launch args, `waitForSelector`)       | `./repos/puppeteer/` (tag `puppeteer-core-v25.16.0` = the npm pin in homelab-services-node)                    |
+| Technitium DNS behavior                                                                 | `./repos/technitium-dnsserver/`                                                                                |
+| OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)               | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)                               |
+| OpenCode behavior (client/server split, `service` mode, registration, HTTP API)         | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                                     |
+| open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, `main` squashed; parser in `src/app/lib/parse-resume-from-pdf/`) |
 
 If a needed upstream is not vendored yet, add it as a subtree (see the `effect-services` skill →
 "Adding a New Vendored Subtree") pinned to the tag nixpkgs builds, rather than relying on web
