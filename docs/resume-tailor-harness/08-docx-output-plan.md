@@ -504,6 +504,12 @@ design-heavy, primary or `qwen3.7-plus`; T24 mechanical. Read-only research → 
   raw content-type e2e assertions relax accordingly). Decision recorded here before T22 lands.
 - **OQ6** DOCX download filename convention: same `resume-rae-hill-<date>-<hex>` stem + `.docx`
   (assumed yes).
+- **OQ7 — theme for DOCX renders (NEW, surfaced by the first fidelity sample):** the dark theme's
+  light-on-dark computed colors inline into the DOCX, where page backgrounds don't exist — text
+  can render near-invisible on Word's white page. Options: (a) honor the requested `theme`
+  (current behavior), (b) frontend sends `theme=light` whenever `outputFormat=docx`, (c) server
+  forces light for docx. Recommendation: **(b)** — one line in the download hook, keeps the wire
+  honest. Owner to confirm at the fidelity gate.
 - **Disposition (owner 2026-11-10):** OQ1 + OQ4 resolved as above; OQ2/OQ3/OQ6 accepted (no
   objection — "ready for implementation"); OQ5 remains an emergency fallback only.
 
