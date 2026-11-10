@@ -1,15 +1,15 @@
 import { Context, Data, Effect } from "effect"
 import type { PrintTheme } from "../schemas/resume.js"
 
-export const PdfPrintServiceId = "homelab-api/services/printing/PdfPrintService"
+export const ResumePrintingServiceId = "homelab-api/services/printing/ResumePrintingService"
 
 /** Raised when headless chrome cannot render the resume PDF (launch, navigation, print). */
-export class PdfPrintError extends Data.TaggedError("PdfPrintError")<{
+export class ResumePrintError extends Data.TaggedError("ResumePrintError")<{
   readonly message: string
   readonly error: unknown
 }> {}
 
-export interface PdfPrintServiceDef {
+export interface ResumePrintingServiceDef {
   /**
    * Render the resume site to a PDF with headless chrome.
    *
@@ -26,16 +26,18 @@ export interface PdfPrintServiceDef {
   readonly printResume: (
     configBase64: string,
     theme: PrintTheme,
-  ) => Effect.Effect<Uint8Array, PdfPrintError>
+  ) => Effect.Effect<Uint8Array, ResumePrintError>
 }
 
-export class PdfPrintService extends Context.Service<PdfPrintService, PdfPrintServiceDef>()(PdfPrintServiceId) {
+export class ResumePrintingService
+  extends Context.Service<ResumePrintingService, ResumePrintingServiceDef>()(ResumePrintingServiceId)
+{
 }
 
-/** {@inheritDoc PdfPrintServiceDef.printResume} */
-export const printResume = Effect.fn("PdfPrintService.printResume")(function*(
-  ...params: Parameters<PdfPrintServiceDef["printResume"]>
-): Effect.fn.Return<Uint8Array, PdfPrintError, PdfPrintService> {
-  const svc = yield* PdfPrintService
+/** {@inheritDoc ResumePrintingServiceDef.printResume} */
+export const printResume = Effect.fn("ResumePrintingService.printResume")(function*(
+  ...params: Parameters<ResumePrintingServiceDef["printResume"]>
+): Effect.fn.Return<Uint8Array, ResumePrintError, ResumePrintingService> {
+  const svc = yield* ResumePrintingService
   return yield* svc.printResume(...params)
 })

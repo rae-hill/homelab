@@ -13,13 +13,13 @@ export const handleResumePrint = Effect.fn("handleResumePrint")(
     const identity = yield* Middleware.CurrentIdentity
     yield* Services.AuthorizationService.canCreate(identity, "Resume_Print", args)
 
-    return yield* Services.PdfPrintService.printResume(args.payload.config, args.query.theme)
+    return yield* Services.ResumePrintingService.printResume(args.payload.config, args.query.theme)
   },
   Effect.tapError(Effect.logError),
   Effect.mapError(
     flow(
       Match.value,
-      Match.tag("PdfPrintError", (err) =>
+      Match.tag("ResumePrintError", (err) =>
         new ApiErrors.InternalServerError({
           message: err.message,
         })),

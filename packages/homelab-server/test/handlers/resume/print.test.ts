@@ -7,11 +7,11 @@ import { HandlerTestLayer } from "../../../test-utils/testing-layer.js"
 
 const withIdentity = (identity: Identity.Identity) => Layer.succeed(Middleware.CurrentIdentity, identity)
 
-/** A stub PdfPrintService layer; override `printResume` per test where needed. */
-const withPdfPrint = (
-  impl: Partial<Services.PdfPrintService.PdfPrintServiceDef> = {},
+/** A stub ResumePrintingService layer; override `printResume` per test where needed. */
+const withResumePrinting = (
+  impl: Partial<Services.ResumePrintingService.ResumePrintingServiceDef> = {},
 ) =>
-  Layer.succeed(Services.PdfPrintService.PdfPrintService, {
+  Layer.succeed(Services.ResumePrintingService.ResumePrintingService, {
     printResume: () => Effect.succeed(new Uint8Array([0x25, 0x50, 0x44, 0x46])),
     ...impl,
   })
@@ -47,7 +47,7 @@ describe("handleResumePrint", () => {
         Effect.provide(Layer.mergeAll(
           withIdentity(unauthorized),
           HandlerTestLayer,
-          withPdfPrint(),
+          withResumePrinting(),
         )),
       )
     })
@@ -63,7 +63,7 @@ describe("handleResumePrint", () => {
         Effect.provide(Layer.mergeAll(
           withIdentity(new Identity.GuestIdentity()),
           HandlerTestLayer,
-          withPdfPrint(),
+          withResumePrinting(),
         )),
       ))
   })
@@ -79,7 +79,7 @@ describe("handleResumePrint", () => {
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
           HandlerTestLayer,
-          withPdfPrint(),
+          withResumePrinting(),
         )),
       ))
 
@@ -95,7 +95,7 @@ describe("handleResumePrint", () => {
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
           HandlerTestLayer,
-          withPdfPrint({
+          withResumePrinting({
             printResume: (config, theme) =>
               Effect.as(
                 Effect.sync(() => calls.push([config, theme])),
@@ -108,7 +108,7 @@ describe("handleResumePrint", () => {
   })
 
   describe("error cases", () => {
-    it.effect("maps PdfPrintError to InternalServerError", () =>
+    it.effect("maps ResumePrintError to InternalServerError", () =>
       Effect.gen(function*() {
         const result = yield* Effect.flip(handleResumePrint(printArgs()))
         assert(
@@ -119,9 +119,9 @@ describe("handleResumePrint", () => {
         Effect.provide(Layer.mergeAll(
           withIdentity(authorizedIdentity),
           HandlerTestLayer,
-          withPdfPrint({
+          withResumePrinting({
             printResume: () =>
-              new Services.PdfPrintService.PdfPrintError({
+              new Services.ResumePrintingService.ResumePrintError({
                 message: "chrome exploded",
                 error: null,
               }),

@@ -48,17 +48,17 @@ const PRINT_BACKSTOP_TIMEOUT = "4 minutes"
  * the print-domain flow: seed the config, load, await print-ready (with the font-stall
  * fallback), render the PDF, under a backstop timeout.
  */
-export const PdfPrintServiceLive = Layer.effect(
-  Services.PdfPrintService.PdfPrintService,
+export const ResumePrintingServiceLive = Layer.effect(
+  Services.ResumePrintingService.ResumePrintingService,
   Effect.gen(function*() {
     const env = yield* Config.Env.Env
     const puppeteer = yield* PuppeteerService
 
-    return new PdfPrintServiceImpl(env, puppeteer)
+    return new ResumePrintingServiceImpl(env, puppeteer)
   }),
 ).pipe(Layer.provide(PuppeteerServiceLive))
 
-class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef {
+class ResumePrintingServiceImpl implements Services.ResumePrintingService.ResumePrintingServiceDef {
   constructor(
     private readonly env: typeof Config.Env.Env.Service,
     private readonly puppeteer: PuppeteerServiceDef,
@@ -78,7 +78,7 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
           return json
         },
         catch: (error) =>
-          new Services.PdfPrintService.PdfPrintError({
+          new Services.ResumePrintingService.ResumePrintError({
             message: "Print config base64 did not decode to JSON",
             error,
           }),
@@ -96,7 +96,7 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
           let fontFallbackUsed = false
 
           const renderError = (error: unknown, afterFontFallback: boolean) =>
-            new Services.PdfPrintService.PdfPrintError({
+            new Services.ResumePrintingService.ResumePrintError({
               message: `Headless chrome failed to render the resume PDF for ${url.origin}${
                 afterFontFallback ? " (after font-stall fallback reload)" : ""
               }`,
@@ -205,12 +205,12 @@ class PdfPrintServiceImpl implements Services.PdfPrintService.PdfPrintServiceDef
           flow(
             Match.value,
             Match.tag("PuppeteerError", (error) =>
-              new Services.PdfPrintService.PdfPrintError({
+              new Services.ResumePrintingService.ResumePrintError({
                 message: error.message,
                 error: error.error,
               })),
             Match.tag("TimeoutError", () =>
-              new Services.PdfPrintService.PdfPrintError({
+              new Services.ResumePrintingService.ResumePrintError({
                 message: `Resume print did not complete within ${PRINT_BACKSTOP_TIMEOUT}`,
                 error: null,
               })),
