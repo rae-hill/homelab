@@ -24,6 +24,7 @@ Upstream monorepos are vendored at `./repos/` as read-only reference material vi
 | `repos/step-cli/`             | https://github.com/smallstep/cli.git                | step CLI source (tag `v0.30.2`, matches nixpkgs-26.05)                                            |
 | `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                                                                      |
 | `repos/openclaw/`             | https://github.com/openclaw/openclaw.git            | OpenClaw AI agent gateway source (tag `v2026.10.5` = nixpkgs-unstable pin; shallow subtree)       |
+| `repos/opencode/`             | https://github.com/anomalyco/opencode.git           | OpenCode CLI + server source (tag `v2.1.4` = pkgs-unstable pin; shallow subtree)                  |
 | `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`)                                                    |
 | `repos/home-manager/`         | https://github.com/nix-community/home-manager.git   | home-manager modules (`release-26.05`, matches the flake input)                                   |
 | `repos/puppeteer/`            | https://github.com/puppeteer/puppeteer.git          | puppeteer-core source (tag `puppeteer-core-v25.16.0`, matches the npm pin)                        |

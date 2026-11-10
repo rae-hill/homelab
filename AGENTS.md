@@ -109,6 +109,7 @@ the pinned tag's source before trusting them.
 | puppeteer / headless chrome printing (`page.pdf`, launch args, `waitForSelector`)   | `./repos/puppeteer/` (tag `puppeteer-core-v25.16.0` = the npm pin in homelab-services-node) |
 | Technitium DNS behavior                                                             | `./repos/technitium-dnsserver/`                                                             |
 | OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)           | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)            |
+| OpenCode behavior (client/server split, `service` mode, registration, HTTP API)     | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                  |
 
 If a needed upstream is not vendored yet, add it as a subtree (see the `effect-services` skill →
 "Adding a New Vendored Subtree") pinned to the tag nixpkgs builds, rather than relying on web
