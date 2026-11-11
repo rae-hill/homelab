@@ -59,10 +59,16 @@ function Home() {
             paddingLeft: 0,
             paddingRight: 0,
             paddingBottom: 0,
+            // The old `printBody` textStyle never applied — Chakra v3 silently drops
+            // `!important` values and nested `@media print` blocks inside textStyle
+            // tokens — so print body text rendered at the 16px screen default, larger
+            // than the headings and far too big to fit one page. The css prop handles
+            // nested media queries reliably.
+            fontSize: "9.5pt",
+            lineHeight: "1.25",
           },
         }}
         py={{ base: 8, md: 14 }}
-        textStyle="printBody"
       >
         {
           /* Semi-transparent "slab of glass", matching the settings modal

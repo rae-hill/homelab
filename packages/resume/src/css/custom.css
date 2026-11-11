@@ -50,14 +50,116 @@ div:has(.confetties-iframe) {
   z-index: var(--chakra-z-index-docked) !important;
 }
 
+/* ---- Fonts --------------------------------------------------------------------------- */
+
+/*
+ * All resume font stacks live here as custom properties; the Chakra theme tokens
+ * (theme.ts → fonts.heading/body/victor/serifr) are `var(--rh-fonts-*)` references, so
+ * every component — including recipe-driven Headings, whose token values Chakra inlines
+ * verbatim into generated rules — resolves through these variables. That indirection is
+ * what lets the @media print block below swap the stacks.
+ *
+ * Why the print stacks differ from the screen stacks:
+ * - "Victor Mono" is a VARIABLE webfont; Chrome's PDF export embedded it as the Thin
+ *   instance regardless of CSS weight, so nothing ever counted as bold for parsers
+ *   (open-resume detects bold via the embedded font's PostScript name).
+ * - Inter (Chakra's default heading font) is variable and usually not installed; Chrome
+ *   fell back per glyph, fragmenting heading text into dozens of PDF runs — some mapping
+ *   to NOTHING in text extraction (dropped letters) — which broke parsers' line
+ *   reconstruction, so section titles like "Experience" were never recognized.
+ * Carlito (≈Calibri) and Caladea (≈Cambria) are the OFL metric-compatible static
+ * defaults; Arimo/Tinos/Gelasio/Liberation follow as alternates, then real client-side
+ * fonts (Arial/Times/Georgia) for machines printing from their own browser. The NixOS
+ * print hosts bundle Carlito/Caladea/Liberation via FONTCONFIG_FILE (nix-config
+ * homelab-api systemd-service + the flake devshell), so server-rendered PDFs always
+ * resolve to the same static faces.
+ */
+:root {
+  --rh-fonts-heading:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  --rh-fonts-body:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  --rh-fonts-victor:
+    Victor Mono,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  --rh-fonts-serifr:
+    "Times New Roman",
+    serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol";
+}
+
 /* ---- Print --------------------------------------------------------------------------- */
+
+@media print {
+  :root {
+    --rh-fonts-heading:
+      Carlito,
+      Arimo,
+      "Liberation Sans",
+      Roboto,
+      Arial,
+      sans-serif;
+    --rh-fonts-body:
+      Caladea,
+      Tinos,
+      Gelasio,
+      "Liberation Serif",
+      "Times New Roman",
+      Georgia,
+      serif;
+    --rh-fonts-victor:
+      Carlito,
+      Arimo,
+      "Liberation Sans",
+      Roboto,
+      Arial,
+      sans-serif;
+    --rh-fonts-serifr:
+      Caladea,
+      Tinos,
+      Gelasio,
+      "Liberation Serif",
+      "Times New Roman",
+      Georgia,
+      serif;
+  }
+}
 
 @page :right {
   @bottom-center {
     content: "Last updated: " var(--chakra-z-index-todays-date) ""
       var(--chakra-z-index-print-footer-revision)
       ".  For an up to date version, visit https://rae-hill.dev/resume";
-    font-family: "Times New Roman", Times, serif;
+    font-family:
+      Caladea, Tinos, "Liberation Serif", "Times New Roman", Times, serif;
     font-size: 6pt;
     color: var(--ifm-color-scheme);
   }
@@ -68,7 +170,8 @@ div:has(.confetties-iframe) {
     content: "Last updated: " var(--chakra-z-index-todays-date) ""
       var(--chakra-z-index-print-footer-revision)
       ".  For an up to date version, visit https://rae-hill.dev/resume";
-    font-family: "Times New Roman", Times, serif;
+    font-family:
+      Caladea, Tinos, "Liberation Serif", "Times New Roman", Times, serif;
     font-size: 6pt;
     color: var(--ifm-color-scheme);
   }

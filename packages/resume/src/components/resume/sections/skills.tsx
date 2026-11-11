@@ -1,5 +1,6 @@
 import { Heading, HStack, Tag, VStack } from "@chakra-ui/react"
 import { useContent, useToggles } from "../../../state/print-config"
+import { SECTION_TITLE_CSS } from "./print-css"
 
 export function Skills() {
   const { toggles } = useToggles()
@@ -23,7 +24,7 @@ export function Skills() {
         },
       }}
     >
-      <Heading textStyle="resumeSectionTitle" as="h2" m={0} fontWeight="light">
+      <Heading as="h2" m={0} fontWeight="light" css={SECTION_TITLE_CSS}>
         Skills
       </Heading>
       <HStack w="full" flex="1" gap={0} alignItems="center" justifyItems="flex-start">

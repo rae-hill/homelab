@@ -6,6 +6,7 @@ import { MdMailOutline, MdOutlineVerified } from "react-icons/md"
 import { PiGraduationCap } from "react-icons/pi"
 import { VscGithub } from "react-icons/vsc"
 import { useContent, useFeaturedMode, useHeadingConfig, useToggles } from "../../../state/print-config"
+import { AvatarLetters } from "../avatar-letters"
 import { IconText } from "../icon-text"
 import * as Links from "../links"
 
@@ -67,6 +68,11 @@ export function ResumeHeading() {
     >
       <VStack w="full" flex="1" gap={0} {...boxAlign(nameAlign)}>
         <HStack alignItems="center" wrap="wrap">
+          {
+            /* Initials are SVG paths, not text: a text "RH" becomes an extractable
+              PDF text run that resume parsers read as a stray all-caps token ahead
+              of the name. The Chakra Avatar still paints the green squircle. */
+          }
           <Avatar.Root
             css={{
               cornerShape: "squircle",
@@ -76,15 +82,10 @@ export function ResumeHeading() {
             mr={2}
             colorPalette="green"
             borderRadius="2rem"
+            aria-label="RH"
           >
-            <Avatar.Fallback
-              fontFamily="victor"
-              fontWeight="bold"
-              css={{
-                fontSize: "2xl !important",
-              }}
-            >
-              RH
+            <Avatar.Fallback>
+              <AvatarLetters />
             </Avatar.Fallback>
           </Avatar.Root>
           <Heading
@@ -92,11 +93,14 @@ export function ResumeHeading() {
             as="h1"
             css={{
               fontSize: "2xl !important",
+              // Plain space (not &nbsp;) so PDF text extraction keeps the name as one
+              // run; nowrap preserves the no-wrap behavior nbsp provided on screen.
+              whiteSpace: "nowrap",
             }}
             mb={0}
             gap={0}
           >
-            Rae&nbsp;Hill
+            Rae Hill
           </Heading>
           <Text textStyle="xs" alignSelf="center" mb={0} pt={2}>
             (she/her)
@@ -141,7 +145,7 @@ export function ResumeHeading() {
       <VStack w="full" flex="1" gap={contactGap} {...boxAlign(contactAlign)}>
         <Box css={visibilityGate(toggles.address)}>
           <IconText icon={LuMapPin} fontSize={iconTextSize}>
-            2794 Barnstormer Street, Fort Collins CO 80524
+            2794 Barnstormer Street, Fort Collins, CO 80524
           </IconText>
         </Box>
         <HStack
@@ -156,7 +160,11 @@ export function ResumeHeading() {
               link="tel:+15052903096"
               fontSize={iconTextSize}
             >
-              (505)&nbsp;290-3096
+              {
+                /* Plain space (not &nbsp;): nbsp splits the PDF text run so parsers
+                  never see a complete phone number. IconText keeps it on one line. */
+              }
+              {"(505) 290-3096"}
             </IconText>
           </Box>
 
@@ -179,13 +187,17 @@ export function ResumeHeading() {
             </IconText>
           </Box>
           <Box css={visibilityGate(toggles.githubLink)}>
+            {
+              /* Full domains (not bare handles) so resume parsers' URL regexes
+                (\S+\.[a-z]+/\S+) match the visible text, not just the href. */
+            }
             <IconText icon={VscGithub} link={Links.GITHUB} fontSize={iconTextSize}>
-              rae-hill
+              github.com/rae-hill
             </IconText>
           </Box>
           <Box css={visibilityGate(toggles.linkedinLink)}>
             <IconText icon={CiLinkedin} link={Links.LINKEDIN} fontSize={iconTextSize}>
-              /in/rae-hill
+              linkedin.com/in/rae-hill
             </IconText>
           </Box>
         </HStack>

@@ -179,7 +179,7 @@ const TOGGLE_ITEMS: ReadonlyArray<ToggleItem> = [
   },
 ]
 
-const FEATURED_MODES: ReadonlyArray<FeaturedMode> = ["Inline", "External"]
+const FEATURED_MODES: ReadonlyArray<FeaturedMode> = ["Inline", "External", "Block"]
 
 const LAYOUT_KINDS: ReadonlyArray<LayoutKind> = ["Stacked", "SideBySide"]
 
@@ -493,6 +493,8 @@ interface HeadingControlsProps {
   readonly nameAlign: BlockAlign
   readonly contactAlign: BlockAlign
   readonly description: HeaderDescription
+  readonly featuredMode: FeaturedMode
+  readonly onFeaturedModeChange: (mode: FeaturedMode) => void
   readonly onIconTextSizeChange: (size: IconTextSize) => void
   readonly onGapChange: (target: HeadingGapTarget, gap: DescriptionGap) => void
   readonly onNameAlignChange: (align: BlockAlign) => void
@@ -510,12 +512,14 @@ function HeadingControls({
   contactAlign,
   contactGap,
   description,
+  featuredMode,
   gap,
   iconTextSize,
   nameAlign,
   onContactAlignChange,
   onDescriptionChange,
   onDescriptionKindChange,
+  onFeaturedModeChange,
   onGapChange,
   onIconTextSizeChange,
   onNameAlignChange,
@@ -523,6 +527,13 @@ function HeadingControls({
 }: HeadingControlsProps) {
   return (
     <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={6} w="full">
+      <Field label="Feature Items Display">
+        <TextSegment
+          value={featuredMode}
+          options={FEATURED_MODES}
+          onChange={(mode) => onFeaturedModeChange(mode)}
+        />
+      </Field>
       <Field label="Contact Text Size">
         <TextSegment
           value={iconTextSize}
@@ -851,13 +862,6 @@ export function PrintConfigFab({
                             </Stack>
                           ))}
                         </SimpleGrid>
-                        <Field label="Show Featured">
-                          <TextSegment
-                            value={featuredMode}
-                            options={FEATURED_MODES}
-                            onChange={(mode) => setFeaturedMode(mode)}
-                          />
-                        </Field>
                       </VStack>
                     </Tabs.Content>
                     <Tabs.Content value="heading" mt={0}>
@@ -869,6 +873,8 @@ export function PrintConfigFab({
                         nameAlign={heading.nameAlign}
                         contactAlign={heading.contactAlign}
                         description={heading.description}
+                        featuredMode={featuredMode}
+                        onFeaturedModeChange={setFeaturedMode}
                         onIconTextSizeChange={setHeadingIconTextSize}
                         onGapChange={setHeadingGap}
                         onNameAlignChange={setHeadingNameAlign}

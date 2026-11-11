@@ -9,6 +9,7 @@ import {
   useToggles,
 } from "../../../state/print-config"
 import { githubIcon } from "../resume-data"
+import { ITEM_HEADING_CSS, PRINT_ROW_GAP_CSS, SECTION_TITLE_CSS } from "./print-css"
 import * as Tech from "./technologies-list"
 
 export function Projects() {
@@ -29,7 +30,7 @@ export function Projects() {
       alignItems="flex-start"
       fontFamily="serifr"
     >
-      <Heading textStyle="resumeSectionTitle" as="h2" m={0} fontWeight="light">
+      <Heading as="h2" m={0} fontWeight="light" css={SECTION_TITLE_CSS}>
         Projects
       </Heading>
       {content.projects.map(({ description, githubLink, id, tags, title }, i) => (
@@ -52,7 +53,11 @@ export function Projects() {
                         },
                       }}
                     >
-                      <chakra.span fontWeight="bold">Skills:</chakra.span> {tags.join(", ")}
+                      {
+                        /* NOT bold: parsers split entries on bold runs and would read
+                          a bold "Skills:" as the next company/project heading. */
+                      }
+                      <chakra.span>Skills:</chakra.span> {tags.join(", ")}
                     </Text>
                   )
                   : <HStack
@@ -62,6 +67,9 @@ export function Projects() {
                     display={toggles.projectTags ? "flex" : "none"}
                     css={{
                       "@media print": {
+                        // Keep wrapped pill rows tight so parsers don't detach a
+                        // wrapped row into its own (junk) subsection.
+                        rowGap: "4px",
                         breakInside: "avoid",
                         pageBreakInside: "avoid",
                       },
@@ -75,25 +83,37 @@ export function Projects() {
                         backgroundColor={Tech.techColor(tag)}
                         color="var(--rh-resume-tag-text-color)"
                         variant="solid"
+                        css={{
+                          "@media print": {
+                            // See experience.tsx: compact pills keep wrapped rows
+                            // under the parsers' subsection line-gap threshold.
+                            minHeight: "0",
+                            paddingBlock: "1px",
+                            breakInside: "avoid",
+                          },
+                        }}
                       >
-                        <Tag.Label>{tag}</Tag.Label>
+                        <Tag.Label css={{ "@media print": { lineHeight: "1" } }}>
+                          {tag}
+                        </Tag.Label>
                       </Tag.Root>
                     ))}
                   </HStack>
 
                 // The title and description belong together and are aligned as a unit.
+                // NOTE: no print `breakInside: avoid` here — this is the LEADING block
+                // of a project entry; pushing it whole to the next page would make the
+                // page start with a project title, which open-resume merges into the
+                // previous entry (its page-boundary line gap goes negative), losing the
+                // project. Letting the block flow keeps every title parseable; the
+                // trailing tag blocks below keep their `avoid` (pushing those is
+                // parser-neutral — they merge back into their own entry).
                 const titleAndDescriptionBlock = (
                   <VStack
                     w="full"
                     h="full"
                     gap={0}
                     justifyContent={descriptionAlign.vertical}
-                    css={{
-                      "@media print": {
-                        breakInside: "avoid",
-                        pageBreakInside: "avoid",
-                      },
-                    }}
                   >
                     <HStack w="full" justifyContent="flex-start" wrap="nowrap">
                       <Link
@@ -105,7 +125,12 @@ export function Projects() {
                         alignItems="center"
                       >
                         <Icon as={githubIcon} boxSize={5} pb={1} />
-                        <Heading textStyle="resumeItemHeading" fontSize="sm" as="h3" m={0}>
+                        {
+                          /* Bold in print so parsers pick up the project name; the
+                            link wrapper stays (PDF link annotations don't affect
+                            text extraction). */
+                        }
+                        <Heading fontSize="sm" as="h3" m={0} css={ITEM_HEADING_CSS}>
                           {title}
                         </Heading>
                       </Link>
@@ -128,6 +153,7 @@ export function Projects() {
                       gap={gap}
                       alignItems="stretch"
                       gridTemplateColumns={gridTemplateColumns(layout)}
+                      css={PRINT_ROW_GAP_CSS}
                     >
                       {tagsFirst ?
                         (
@@ -145,7 +171,7 @@ export function Projects() {
                     </SimpleGrid>
                   )
                   : (
-                    <VStack w="full" gap={gap} align="stretch">
+                    <VStack w="full" gap={gap} align="stretch" css={PRINT_ROW_GAP_CSS}>
                       {tagsFirst ?
                         (
                           <>

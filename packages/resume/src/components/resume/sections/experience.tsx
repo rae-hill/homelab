@@ -7,6 +7,7 @@ import {
   useSectionConfig,
   useToggles,
 } from "../../../state/print-config"
+import { ITEM_HEADING_CSS, PRINT_ROW_GAP_CSS, SECTION_TITLE_CSS } from "./print-css"
 import * as Tech from "./technologies-list"
 
 export function Experience() {
@@ -35,7 +36,7 @@ export function Experience() {
       alignItems="flex-start"
       fontFamily="serifr"
     >
-      <Heading textStyle="resumeSectionTitle" as="h2" m={0} fontWeight="light">
+      <Heading as="h2" m={0} fontWeight="light" css={SECTION_TITLE_CSS}>
         Experience
       </Heading>
       {content.experience.map(
@@ -43,7 +44,16 @@ export function Experience() {
           <chakra.section
             css={{
               "@media print": {
-                breakInside: "avoid",
+                // Deliberately NOT `breakInside: avoid` on the whole entry: forcing
+                // page breaks to land exactly between entries is the WORST case for
+                // resume parsers — open-resume computes subsection line gaps as
+                // prevY - y, which goes negative across a page boundary, so the first
+                // entry on page 2 silently merges into the last entry of page 1 (a
+                // whole job vanishes). Allowing breaks between bullet lines keeps
+                // every entry's lines stream-adjacent, so all entries parse correctly
+                // even across pages. Line-level `breakInside: avoid` (bullets, tag
+                // rows) still prevents mid-line splits.
+                breakInside: "auto",
               },
             }}
             key={id}
@@ -56,12 +66,24 @@ export function Experience() {
               <VStack w="full" gap={0}>
                 <HStack w="full" justifyContent="space-between">
                   <Box>
-                    <Heading textStyle="resumeItemHeading" lineHeight="shorter" fontSize="sm" as="h3" m={0}>
+                    <Heading
+                      lineHeight="shorter"
+                      fontSize="sm"
+                      as="h3"
+                      m={0}
+                      css={ITEM_HEADING_CSS}
+                    >
                       {company}
                     </Heading>
                   </Box>
                   <Box>
-                    <Heading textStyle="resumeItemHeading" lineHeight="shorter" as="h3" fontSize="sm" m={0}>
+                    <Heading
+                      lineHeight="shorter"
+                      as="h3"
+                      fontSize="sm"
+                      m={0}
+                      css={ITEM_HEADING_CSS}
+                    >
                       {location}
                     </Heading>
                   </Box>
@@ -90,7 +112,12 @@ export function Experience() {
                       display: toggles.positionTags ? undefined : "none",
                     }}
                   >
-                    <chakra.span fontWeight="bold">Skills:</chakra.span> {tags.join(", ")}
+                    {
+                      /* NOT bold: resume parsers split experience entries on bold
+                        runs and would treat a bold "Skills:" as the next company
+                        heading. */
+                    }
+                    <chakra.span>Skills:</chakra.span> {tags.join(", ")}
                   </Text>
                 )
                 : (
@@ -99,6 +126,7 @@ export function Experience() {
                     wrap="wrap"
                     {...blockAlignProps(tagAlign)}
                     display={toggles.positionTags ? "flex" : "none"}
+                    css={PRINT_ROW_GAP_CSS}
                   >
                     {tags.map((tag) => (
                       <Tag.Root
@@ -113,10 +141,30 @@ export function Experience() {
                             // Keep the tag row intact across page breaks — move the whole block
                             // to the next page rather than splitting mid-row.
                             breakInside: "avoid",
+                            // Compact pill boxes so WRAPPED pill rows stay within the
+                            // parsers' subsection line-gap threshold (~1.4× body line
+                            // gap); otherwise a wrapped row (e.g. a lone "Rails" pill)
+                            // detaches into its own subsection and parses as a junk
+                            // experience entry. minHeight releases the recipe's
+                            // `minH: 5` (20px) which otherwise dominates the pill
+                            // height; the Label's line-height override pairs with it.
+                            minHeight: "0",
+                            paddingBlock: "1px",
                           },
                         }}
                       >
-                        <Tag.Label>{tag}</Tag.Label>
+                        {
+                          /* Compact pill boxes so WRAPPED pill rows stay within the
+                            parsers' subsection line-gap threshold (~1.4× body line
+                            gap); otherwise a wrapped row (e.g. a lone "Rails" pill)
+                            detaches into its own subsection and parses as a junk
+                            experience entry. The lineHeight override must live on
+                            the Label — its `sm` textStyle line-height (1.25rem)
+                            dictates the pill height. */
+                        }
+                        <Tag.Label css={{ "@media print": { lineHeight: "1" } }}>
+                          {tag}
+                        </Tag.Label>
                       </Tag.Root>
                     ))}
                   </HStack>
@@ -179,6 +227,7 @@ export function Experience() {
                     gap={gap}
                     alignItems="stretch"
                     gridTemplateColumns={gridTemplateColumns(layout)}
+                    css={PRINT_ROW_GAP_CSS}
                   >
                     {tagsFirst ?
                       (
@@ -196,7 +245,7 @@ export function Experience() {
                   </SimpleGrid>
                 )
                 : (
-                  <VStack w="full" gap={gap} align="stretch">
+                  <VStack w="full" gap={gap} align="stretch" css={PRINT_ROW_GAP_CSS}>
                     {tagsFirst ?
                       (
                         <>

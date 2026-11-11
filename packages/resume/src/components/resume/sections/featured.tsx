@@ -3,11 +3,14 @@ import type { IconType } from "react-icons"
 import { MdOutlineVerified } from "react-icons/md"
 import { PiGraduationCap } from "react-icons/pi"
 import { useFeaturedMode, useToggles } from "../../../state/print-config"
+import { SECTION_TITLE_CSS } from "./print-css"
 
 interface FeaturedItem {
   readonly icon: IconType
   readonly iconColor: string
   readonly label: string
+  /** Section heading used by the `Block` display mode. */
+  readonly blockLabel: string
   readonly title: string
   readonly subtitle: string
   readonly detail: string
@@ -18,6 +21,7 @@ const featuredItems: ReadonlyArray<FeaturedItem> = [
     icon: PiGraduationCap,
     iconColor: "var(--rh-resume-tag-colors-violet)",
     label: "Education",
+    blockLabel: "Education",
     title: "BS Applied Mathematics",
     subtitle: "New Mexico State University",
     detail: "Graduated May 2022",
@@ -26,6 +30,7 @@ const featuredItems: ReadonlyArray<FeaturedItem> = [
     icon: MdOutlineVerified,
     iconColor: "var(--rh-resume-tag-colors-green)",
     label: "Certification",
+    blockLabel: "Certifications",
     title: "CompTIA Security+ (SY0-701)",
     subtitle: "Earned August 2025",
     detail: "Expires August 2028",
@@ -87,13 +92,69 @@ function FeaturedBox({
   )
 }
 
+/**
+ * `Block` display: a featured item as a plain full-width paragraph section — a
+ * bold all-caps heading, then one line per attribute (degree, school, date). This is
+ * the parser-friendly rendering: resume parsers (e.g. open-resume) detect section
+ * titles primarily by bold + all-uppercase single-item lines, and score school /
+ * degree / date from SEPARATE lines — combining them into one sentence triggers the
+ * scorers' cross-penalties (degree-in-school-line etc.) and extracts nothing. The
+ * uppercase heading also matters for "Certifications", which matches none of the
+ * parsers' section-title keywords and is only detectable via bold+uppercase.
+ */
+function FeaturedBlock({ blockLabel, detail, subtitle, title }: FeaturedItem) {
+  return (
+    <VStack w="full" alignItems="flex-start" gap={0} fontFamily="serifr">
+      <Heading
+        as="h2"
+        m={0}
+        fontWeight="bold"
+        lineHeight="shorter"
+        textTransform="uppercase"
+        letterSpacing="wide"
+        css={SECTION_TITLE_CSS}
+      >
+        {blockLabel}
+      </Heading>
+      <Text m={0} lineHeight="shorter">
+        {title}
+      </Text>
+      <Text m={0} lineHeight="shorter">
+        {subtitle}
+      </Text>
+      <Text m={0} lineHeight="shorter">
+        {detail}
+      </Text>
+    </VStack>
+  )
+}
+
 export function Featured() {
   const { toggles } = useToggles()
   const { featuredMode } = useFeaturedMode()
   const external = featuredMode === "External"
-  const showEducation = external && toggles.education
-  const showCertification = external && toggles.certification
+  const block = featuredMode === "Block"
+  const showEducation = (external || block) && toggles.education
+  const showCertification = (external || block) && toggles.certification
   const showContainer = showEducation || showCertification
+
+  if (block) {
+    return (
+      <VStack
+        as="section"
+        w="full"
+        alignItems="stretch"
+        mt={5}
+        mb={3}
+        gap={4}
+        display={showContainer ? "flex" : "none"}
+      >
+        {showEducation && <FeaturedBlock {...featuredItems[0]} />}
+        {showCertification && <FeaturedBlock {...featuredItems[1]} />}
+      </VStack>
+    )
+  }
+
   return (
     <HStack
       as="section"

@@ -67,33 +67,13 @@ export const theme = createSystem(defaultConfig, {
         mb: 0,
         fontSize: "xs !important",
       },
-      printBody: {
-        "@media print": {
-          fontSize: "9.5pt !important",
-          lineHeight: "1.25 !important",
-        },
-      },
-      printSubheading: {
-        "@media print": {
-          fontSize: "9.5pt !important",
-        },
-      },
-      /** Section titles ("Experience", "Projects", "Featured Open Source"). */
-      resumeSectionTitle: {
-        fontSize: "md !important",
-      },
-      /**
-       * Per-item headings (company / location / project title). Visually matched to the
-       * surrounding body text (inherit size, normal weight) while remaining semantic
-       * heading elements; print keeps the compact resume size.
-       */
-      resumeItemHeading: {
-        fontSize: "inherit !important",
-        fontWeight: "normal",
-        "@media print": {
-          fontSize: "9.5pt !important",
-        },
-      },
+      // NOTE: the former printBody / printSubheading / resumeSectionTitle /
+      // resumeItemHeading textStyles were REMOVED: Chakra v3 silently drops textStyle
+      // declarations containing `!important` values or nested `@media print` blocks, so
+      // none of them ever applied (print body text fell back to 16px — bigger than the
+      // headings — and spilled across pages). Their replacements live in
+      // `components/resume/sections/print-css.ts` and the route/component `css` props,
+      // which handle both reliably.
     },
     tokens: {
       zIndex: {
@@ -111,13 +91,21 @@ export const theme = createSystem(defaultConfig, {
         foreground: { value: -250 },
       },
       fonts: {
-        victor: {
-          value:
-            "Victor Mono, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Helvetica, Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\" !important",
-        },
-        serifr: {
-          value: `"Times New Roman", serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol" !important`,
-        },
+        // Every stack is a var() reference into css/custom.css, which defines the
+        // screen values on :root and swaps them under @media print for static,
+        // parser-friendly families (Carlito/Caladea/...). The indirection is required
+        // because Chakra INLINES token values verbatim into each generated rule (the
+        // Heading recipe emits the literal stack, not var(--fonts-heading)), so a
+        // literal here could never be repointed at print time. `heading`/`body`
+        // override the Chakra defaults (Inter — a variable font that is usually not
+        // installed; chrome fragments its PDF text runs per glyph, which breaks
+        // resume parsers' line reconstruction).
+        // NOTE: no `!important` in these values — it used to be baked into the token
+        // strings; nothing needs it (style props beat recipes via layer order).
+        heading: { value: "var(--rh-fonts-heading)" },
+        body: { value: "var(--rh-fonts-body)" },
+        victor: { value: "var(--rh-fonts-victor)" },
+        serifr: { value: "var(--rh-fonts-serifr)" },
       },
     },
   },

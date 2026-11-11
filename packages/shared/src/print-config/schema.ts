@@ -34,7 +34,15 @@ export const TagDisplay = Schema.Literals(["Tags", "List"])
 
 export const IconTextSize = Schema.Literals(["sm", "md", "lg", "xl"])
 
-export const FeaturedMode = Schema.Literals(["Inline", "External"])
+/**
+ * How the featured items (education, certification) are displayed:
+ * - `Inline`: contact-line style entries in the resume heading
+ * - `External`: side-by-side bordered boxes under the heading
+ * - `Block`: plain full-width "EDUCATION" / "CERTIFICATIONS" paragraph sections —
+ *   the parser-friendly rendering (heading + one line per attribute, bold-uppercase
+ *   section headings that resume parsers reliably detect)
+ */
+export const FeaturedMode = Schema.Literals(["Inline", "External", "Block"])
 
 export const LayoutSection = Schema.Literals(["experience", "projects"])
 

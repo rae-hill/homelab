@@ -26,7 +26,7 @@ modal also includes a **Print** button that triggers the browser print dialog
 5. **FAB bottom-left**, options in a modal popup, plus a submit-style **Print** button in
    the modal that calls `window.print()`.
 6. **Chakra `Switch`** for booleans; **Chakra `SegmentGroup`** (segmented control) for the
-   Featured Inline/External choice.
+   Featured Inline/External/Block choice.
 
 ## Controls (initial set)
 
@@ -44,9 +44,9 @@ modal also includes a **Print** button that triggers the browser print dialog
 
 ### Segmented control (Chakra `SegmentGroup`)
 
-| Label         | Options               | Meaning                                          |
-| ------------- | --------------------- | ------------------------------------------------ |
-| Show Featured | `Inline` / `External` | How Education/Certification render **in print**: |
+| Label         | Options                         | Meaning                                          |
+| ------------- | ------------------------------- | ------------------------------------------------ |
+| Show Featured | `Inline` / `External` / `Block` | How Education/Certification render **in print**: |
 
 - **Inline** (default): the condensed education/certification lines live in the header
   (as the current print-only education line does in `heading.tsx`). We add a parallel
@@ -54,11 +54,17 @@ modal also includes a **Print** button that triggers the browser print dialog
 - **External**: the `Featured` boxes (`featured.tsx`) — currently screen-only — are
   revealed in print instead, and the inline header lines are suppressed. The
   `Show Education` / `Show Certification` toggles gate the corresponding box.
+- **Block**: classic resume sections — bold uppercase `EDUCATION` / `CERTIFICATIONS`
+  headings placed after the header, each followed by one line per attribute
+  (degree/school/date, or cert name/issued/expires). The inline header lines are
+  suppressed (as in `External`). The `Show Education` / `Show Certification` toggles
+  gate each block.
 
 So in print the effective rule for education/certification is:
 `featuredMode === 'Inline'` → header line (gated by toggle); `=== 'External'` → featured
-box (gated by toggle). On screen, neither inline line shows (screen keeps current look);
-the featured boxes remain screen-visible as today.
+box (gated by toggle); `=== 'Block'` → block section (gated by toggle). On screen,
+neither inline line shows (screen keeps current look); the featured boxes remain
+screen-visible as today.
 
 ## State architecture
 

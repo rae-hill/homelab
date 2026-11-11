@@ -142,6 +142,24 @@
                   name = "CHROME_EXECUTABLE";
                   value = "${pkgs.google-chrome}/bin/google-chrome";
                 }
+                {
+                  # Same static print-font bundle the homelab-api unit exports for
+                  # headless chrome (features/homelab-api/systemd-service.nix →
+                  # FONTCONFIG_FILE): Carlito/Caladea/Liberation so e2e resume
+                  # printing resolves fonts exactly like production. The generated
+                  # conf still includes ~/.nix-profile and /etc/fonts/conf.d, so
+                  # host fonts remain visible to everything else in the devshell.
+                  name = "FONTCONFIG_FILE";
+                  value = toString (
+                    pkgs.makeFontsConf {
+                      fontDirectories = [
+                        pkgs.carlito
+                        pkgs.caladea
+                        pkgs.liberation_ttf
+                      ];
+                    }
+                  );
+                }
               ];
               commands = [
                 {

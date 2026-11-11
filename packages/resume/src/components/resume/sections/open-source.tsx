@@ -3,6 +3,7 @@ import type { IconType } from "react-icons"
 import { FaRust } from "react-icons/fa"
 import { SiTypescript } from "react-icons/si"
 import { VscGithub } from "react-icons/vsc"
+import { SECTION_TITLE_CSS } from "./print-css"
 
 type OSS = {
   readonly title: string
@@ -125,7 +126,7 @@ export function OpenSource() {
       alignItems="flex-start"
       fontFamily="serifr"
     >
-      <Heading textStyle="resumeSectionTitle" fontFamily="victor" as="h2" m={0}>
+      <Heading fontFamily="victor" as="h2" m={0} css={SECTION_TITLE_CSS}>
         Featured Open Source
       </Heading>
       <VStack w="full" gap={0}>

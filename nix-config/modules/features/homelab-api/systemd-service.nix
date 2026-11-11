@@ -21,6 +21,22 @@ in
       commitHash =
         inputs.self.rev
           or (throw "Cannot deploy homelab-api from a dirty tree: HOMELAB_COMMIT_HASH requires a clean git commit");
+      # Static, metric-compatible print fonts for the headless chrome that renders
+      # POST /resume/print: Carlito (≈Calibri), Caladea (≈Cambria), Liberation
+      # (≈Arial/Times/Courier). The resume's print stylesheet names these families
+      # first (packages/resume/src/css/custom.css → the @media print font override);
+      # exporting FONTCONFIG_FILE makes chrome resolve them identically on every
+      # deployment, independent of host font state. Variable or missing fonts make
+      # chrome fragment PDF text runs and embed wrong weights, which breaks resume
+      # parsers (bold detection, line reconstruction). Mirrored by the flake devshell
+      # so e2e printing matches production. makeFontsConf output IS the fonts.conf.
+      printFontsConf = pkgs.makeFontsConf {
+        fontDirectories = [
+          pkgs.carlito
+          pkgs.caladea
+          pkgs.liberation_ttf
+        ];
+      };
     in
     {
       options.services.homelab-api = {
@@ -224,6 +240,13 @@ in
             ACME_KEY_SIZE=256
             ${if cfg.serialNumbersFile != null then "SERIAL_NUMBERS_FILE=${cfg.serialNumbersFile}" else ""}
             ${if cfg.chromeExecutable != null then "CHROME_EXECUTABLE=${cfg.chromeExecutable}" else ""}
+            ${
+              if cfg.chromeExecutable != null then
+                "# Static print-font bundle for headless chrome (resume PDF printing)"
+                + "\nFONTCONFIG_FILE=${printFontsConf}"
+              else
+                ""
+            }
             ${if cfg.resumeSiteUrl != null then "RESUME_SITE_URL=${cfg.resumeSiteUrl}" else ""}
             ${
               if cfg.openRouterApiKeyFile != null then
