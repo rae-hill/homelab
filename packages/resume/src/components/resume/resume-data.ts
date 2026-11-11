@@ -61,7 +61,7 @@ export const experiences: ReadonlyArray<ExperienceEntry> = [
     company: "Shutterfly (Spoonflower)",
     roles: [
       {
-        title: "Senior Software Engineer 2",
+        title: "Senior Software Engineer II",
         date: "July 2022 – March 2025",
       },
     ],
@@ -102,7 +102,7 @@ export const experiences: ReadonlyArray<ExperienceEntry> = [
     company: "SimSpace",
     roles: [
       {
-        title: "Software Engineer 2",
+        title: "Software Engineer II",
         date: "March 2021 – July 2022",
       },
     ],
@@ -184,9 +184,9 @@ export interface ProjectEntry {
 
 export const projects: ReadonlyArray<ProjectEntry> = [
   {
-    title: "NixOS declarative homelab with Grafana, OpenTelemetry, and Prometheus",
+    title: "NixOS Homelab",
     description:
-      "NixOS infrastructure and TypeScript full stack applications powering my homelab servers, observability stack, certificate authority, and SSO with OIDC.",
+      "NixOS infrastructure and TypeScript full stack applications powering my homelab servers, Grafana/OpenTelemetry/Prometheus observability stack, certificate authority, and SSO with OIDC.",
     githubLink: "https://github.com/rae-hill",
     icon: SiTypescript,
     iconColor: "#3178C6",

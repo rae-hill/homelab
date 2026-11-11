@@ -46,7 +46,7 @@ const experience = [
     id: "shutterfly",
     company: "Shutterfly (Spoonflower)",
     location: "Durham, NC (Remote)",
-    roles: [{ title: "Senior Software Engineer 2", date: "July 2022 – March 2025" }],
+    roles: [{ title: "Senior Software Engineer II", date: "July 2022 – March 2025" }],
     description:
       "Led the authentication replatforming initiative, migrated to AWS WAF Captcha, integrated with a partner tax platform for federal withholdings and royalties, and redesigned the entire artist marketplace experience from scratch.",
     bulletPoints: bullets("shutterfly", [
@@ -73,7 +73,7 @@ const experience = [
     id: "simspace",
     company: "SimSpace",
     location: "Boston, MA (Remote)",
-    roles: [{ title: "Software Engineer 2", date: "March 2021 – July 2022" }],
+    roles: [{ title: "Software Engineer II", date: "March 2021 – July 2022" }],
     description:
       "Engineered a sophisticated quotas management UI to design specifications and analyzed Kubernetes system performance using a NodeJS-based browser emulation platform.",
     bulletPoints: bullets("simspace", [
@@ -136,9 +136,12 @@ const experience = [
 const projects = [
   {
     id: "nixos-homelab",
-    title: "NixOS declarative homelab with Grafana, OpenTelemetry, and Prometheus",
+    // Short title on purpose: resume parsers (open-resume's description-line heuristic
+    // fires on any single ≥8-word line) misread an 8+-word title as a description and
+    // lose the project name entirely. Detail lives in the description instead.
+    title: "NixOS Homelab",
     description:
-      "NixOS infrastructure and TypeScript full stack applications powering my homelab servers, observability stack, certificate authority, and SSO with OIDC.",
+      "NixOS infrastructure and TypeScript full stack applications powering my homelab servers, Grafana/OpenTelemetry/Prometheus observability stack, certificate authority, and SSO with OIDC.",
     githubLink: "https://github.com/rae-hill",
     tags: [
       "Nix",
