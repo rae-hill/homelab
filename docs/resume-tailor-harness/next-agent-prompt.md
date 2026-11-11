@@ -20,7 +20,11 @@ create worktrees unless asked.
 4. `docs/resume-tailor-harness/07-v2-plan.md` — **the v2 plan of record (T12–T19)**: owner
    directives M1–M12, clarifications C1–C3, verified current state, per-task designs, waves,
    gates. Docs 01–05 carry v2 override banners; doc 07 wins on conflicts.
-5. Section docs as needed: `01-shared-state-and-contracts.md` (schemas/codec),
+5. `docs/resume-tailor-harness/08-docx-output-plan.md` — **the v3 plan of record (T20–T24)**:
+   DOCX output for resume printing — owner directives N1–N10, clarifications C1–C4, research
+   fact sheets (effect content-type mechanics, `@turbodocx/html-to-docx`, Chakra split menus),
+   per-task designs, owner fidelity gate. Wins over docs 03/07 on print-pipeline conflicts.
+6. Section docs as needed: `01-shared-state-and-contracts.md` (schemas/codec),
    `02-ai-pipeline.md` (OpenRouter two-stage pipeline, prompts, guards, evals),
    `03-api-endpoint.md` (endpoint/authz/tests), `04-frontend-ui.md` (tab/modal/redux/services),
    `05-nix-and-secrets.md` (sops/env/kanidm/deploy smoke), `06-stretch-db-and-cache.md`
@@ -59,14 +63,27 @@ create worktrees unless asked.
   overwrite-confirm via `Equal.equals` — no more auto-apply or "Pre-tailor:" snapshots),
   Tempo→logs correlation + trace-id logging + `Redacted`-at-source, and GATED T19 (model-facing
   edits → Effect JsonPatch ops + path-allowlist policy). New decisions D10–D15; D1/D4 overridden.
+- **v3 (DOCX output) is LANDED through T24 (2026-11-10):** `08-docx-output-plan.md` is the plan
+  of record. `POST /resume/print?outputFormat=pdf|docx` (default pdf; dual magic-byte success
+  schemas → correct per-format Content-Type); `ResumePrintingService` (renamed from
+  `PdfPrintService`) + `DocumentRenderingServiceDocx.formatHtml` wrapping
+  `@turbodocx/html-to-docx`; docx path = puppeteer print-media capture with computed-style
+  inlining + SVG→PNG via sharp (external in rolldown; runtime closure patched + smoke-checked in
+  the homelab-api nix derivation); Chakra split menus on the Download FAB + settings Print button.
+  T19 stays backburnered. **Owner fidelity gate on the sample DOCX is the remaining step.**
 
 ## Your job
 
-**Remaining v2 work: T19 (GATED) + owner deploy-time checklist.** T12–T18 landed 2026-11-09
-(hashes in progress.md; full e2e green). **T19** (model-facing edits → Effect JsonPatch ops,
-doc 07 §H) is DEFERRED by the owner (2026-11-09) pending v2 field verification, and starts ONLY
-after their explicit go; its gate requires building the doc 02 §I eval fixtures first (they don't
-exist on disk). Deploy-time checklist (owner, after augustus
+**v3 = doc 08 (T20–T24), DOCX output for resume printing: ALL TASKS LANDED 2026-11-10** (hashes
+in progress.md's status table; full gate + FULL e2e green; nix trio green with the sharp runtime
+closure smoke-checked in-build). **Remaining: the owner DOCX fidelity gate** — sample at
+`/tmp/opencode/resume-sample.docx` (regenerate: `DOCX_SAMPLE_PATH=… e2e src/resume`); iterate the
+capture script (`services-node/src/layers/docx-html-capture.ts`: style whitelist, SVG handling,
+margins/fonts) on owner feedback, and get the OQ7 ruling (DOCX currently forces the light theme).
+**T19** (model-facing edits → Effect JsonPatch ops, doc 07 §H) remains DEFERRED by the owner
+(reconfirmed 2026-11-10 — "JsonPatch on the backburner"); it starts ONLY after their explicit go,
+and its gate requires building the doc 02 §I eval fixtures first (they don't exist on disk).
+v2 T12–T18 landed 2026-11-09 (hashes in progress.md; full e2e green). Deploy-time checklist (owner, after augustus
 redeploy): live Tempo "View logs for this span" click, `journalctl -u homelab-api --since "-1
 hour" | grep -c 'sk-or-'` → 0, browser pass over the new review UI (tabs, confirm-only-when-
 non-pristine, policy switches, legacy-entry notice), CI push green-or-loud. Per task: `yarn lint &&

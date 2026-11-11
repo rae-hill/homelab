@@ -3,7 +3,7 @@
  * (defined in `packages/resume` as `concat(constantPrefix, "__print-config")`,
  * re-exported there from this constant so both sides share one source).
  *
- * This is part of the remote-print wire contract: `PdfPrintService` seeds the
+ * This is part of the remote-print wire contract: `ResumePrintingService` seeds the
  * print config into the site's localStorage under this key (via
  * `page.evaluateOnNewDocument`) BEFORE navigating, instead of embedding it as
  * an `importPrintSettings` query param — real-world configs exceed GitHub

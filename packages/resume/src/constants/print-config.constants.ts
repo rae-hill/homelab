@@ -5,7 +5,7 @@ import { constantPrefix } from "./index.constants"
 
 /**
  * Canonical value lives in `shared` (print-config wire contract): the server's
- * PdfPrintService seeds the print config into localStorage under this same key
+ * ResumePrintingService seeds the print config into localStorage under this same key
  * before loading the site. Must stay identical to `concat(constantPrefix, "__print-config")`.
  */
 export const PRINT_CONFIG_LOCAL_STORAGE_KEY = PrintConfig.PRINT_CONFIG_LOCAL_STORAGE_KEY

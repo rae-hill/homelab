@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "^4.1.x",
+    "@turbodocx/html-to-docx": "^1.23.3",
     "bufferutil": "^4.1.0",
     "effect": "^4.1.x",
     "homelab-data": "workspace:*",
@@ -28,6 +29,7 @@
     "jose": "^6.2.1",
     "puppeteer-core": "^25.16.0",
     "shared": "workspace:*",
+    "sharp": "^0.34.5",
     "utf-8-validate": "^6.0.6"
   },
   "devDependencies": {

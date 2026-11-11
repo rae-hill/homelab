@@ -28,6 +28,15 @@ export default defineConfig({
   input: "./src/main.ts",
   output: { dir: "./dist/bundle" },
   platform: "node",
+  // `sharp` is a native addon, lazily loaded by @turbodocx/html-to-docx via
+  // `try { require("sharp") } catch { sharp = null }`. Its JS wrapper cannot
+  // be bundled (the .node binaries load via runtime require of the
+  // platform-specific `@img/*` packages), so keep both external: esmExternal-
+  // RequirePlugin turns the require into a real runtime call, resolved from
+  // the node_modules next to the bundle (repo root in dev; the nix derivation
+  // copies the closure into $out/lib/bundle/node_modules — doc 08 T24).
+  // If resolution fails the library degrades to native SVG embedding.
+  external: ["sharp", /^@img\//],
   plugins: [
     stubOptionalNative,
     esmExternalRequirePlugin(),

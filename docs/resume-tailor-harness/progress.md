@@ -10,27 +10,32 @@ does NOT apply to `packages/resume` — it's React/RTK/Chakra, not the SolidJS h
 
 ## Status
 
-| Task | Doc | Scope one-liner                                                                                                                                   | Status                                                                                                                                     | Commit         |
-| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
-| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)                                                               | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                                             | `62d248e97683` |
-| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services                                                                   | **done** (JSON-Schema emission snapshot deferred to T5)                                                                                    | `0dab24d048fa` |
-| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests                                                               | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                                | `afd402ddc11c` |
-| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton                                                        | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                                 | `db5134460c1d` |
-| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                                                                               | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                                | `db5134460c1d` |
-| T6   | 02  | Validation pipeline + merge + quota + evals                                                                                                       | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                                 | `db5134460c1d` |
-| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice                                                              | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                                      | `5e45edd1782a` |
-| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                                                                            | **done** (manual browser check still pending — no headless UI test in v1)                                                                  | `1f1b8e76b862` |
-| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                                                                               | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`)                | `e30f55bb2`    |
-| T10  | 03  | e2e tests (vitest; live-AI gated)                                                                                                                 | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                                            | `7900cdab4a17` |
-| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                                                                       | deferred                                                                                                                                   | —              |
-| T12  | 07  | v2: errors.ts retirement → raw nested error JSON (logs + 500 `error` field) (M1)                                                                  | **done** (Schema.Defect serializer per owner directive; old-format tests skipped TODO(v2))                                                 | `fc3364dac`    |
-| T13  | 07  | v2: 5 service extractions — validation(policy)/listing-extraction/prompt-config(version)/sanitization(arg consts)/merge-delta (E1–E4, M9, M12/C3) | **done** (interrupted-agent recovery + coordinator fixes: extraction env-model bug, test layer-capture pattern, policy/rationale fixtures) | `2714b1a77`    |
-| T14  | 07  | v2: `Schemas.Tailoring` move + `Schema.fromJsonString` parsing + `HashingServiceSha256` (M2–M4)                                                   | **done** (native effect/crypto Digest; hash values unchanged — equivalence tests)                                                          | `ebf9b9037`    |
-| T15  | 07  | v2: wire — request `policy` + response `changes` (JsonPatch-native) (M7, C2)                                                                      | **done** (policy = `Schema.optionalKey` BOTH sides — typed clients may omit; + shell-leak & self-import-cycle fixes)                       | `6d9def5f1`    |
-| T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | **done** (addedBullets experience-only — projects have no bulletPoints; strict policy rejects adds)                                        | `0c603a34e`    |
-| T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | **done** (no auto-apply/snapshots; generatePresetName removed; legacy entries decode changes:null)                                         | `3987b85f6`    |
-| T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | **done** (fiber.cache.span extraction; grafana customQuery eval-verified; 222 trace_id lines + 0 sk-or- in the e2e log dump)               | `052cda611`    |
-| T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | **deferred** (owner 2026-11-09: field-verify v2 first; then §H eval gate + explicit go)                                                    | —              |
+| Task | Doc | Scope one-liner                                                                                                                                   | Status                                                                                                                                                                                             | Commit         |
+| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| T1   | 01  | Extract content schemas+defaults to `shared`; extend `ContentState` (blurb/aboutMe)                                                               | **done** (barrel is `export * as Schema`, so schemas are `ResumeContent.Schema.X`; types flat)                                                                                                     | `62d248e97683` |
+| T2   | 01  | `ContentPatchBase64` codec (decode-to-state) + wire schemas in homelab-services                                                                   | **done** (JSON-Schema emission snapshot deferred to T5)                                                                                                                                            | `0dab24d048fa` |
+| T3   | 03  | `POST /resume/tailor` endpoint + handler + `Resume_Tailor` authz chain + unit tests                                                               | **done** (Live layer is a PLACEHOLDER failing 500 until T4)                                                                                                                                        | `afd402ddc11c` |
+| T4   | 02  | `TailorService`/`OpenRouterClientService`/`TailorQuotaService` tags + env + layer skeleton                                                        | **done** (quota refactored to layer-owned Ref + Clock per owner directive)                                                                                                                         | `db5134460c1d` |
+| T5   | 02  | Cleanup stage + prompts + model-facing wire schemas                                                                                               | **done** (slugs pinned in env.ts `cc692e5ea`: sonnet-5.5 + gpt-6-luna; README OQ1 resolved)                                                                                                        | `db5134460c1d` |
+| T6   | 02  | Validation pipeline + merge + quota + evals                                                                                                       | **done** (offline evals; live evals gated RUN_TAILOR_LIVE)                                                                                                                                         | `db5134460c1d` |
+| T7   | 04  | NEW `homelab-services-browser` pkg + entry-store/preset services + thin tailor slice                                                              | **done** (25 browser tests; usePresets refactored, API unchanged; save onCollision default=overwrite)                                                                                              | `5e45edd1782a` |
+| T8   | 04  | Tailoring tab + details modal + auto-apply flow + blurb/aboutMe wiring                                                                            | **done** (manual browser check still pending — no headless UI test in v1)                                                                                                                          | `1f1b8e76b862` |
+| T9   | 05  | sops key + env template + kanidm claim + enum drift fix + local dev                                                                               | **done** (owner sops edit `7077d7b2b444`; agent wiring `e30f55bb2` eval-verified; owner split kanidm groups `9727a4ceb1ff`)                                                                        | `e30f55bb2`    |
+| T10  | 03  | e2e tests (vitest; live-AI gated)                                                                                                                 | **done** (resume 9✓+1 skip; FULL suite 15 files 112✓+1 skip exit 0; required undici-bundle fix)                                                                                                    | `7900cdab4a17` |
+| T11+ | 06  | Stretch: postgres persistence, category bases, cache decorator (NOT v1, D9)                                                                       | deferred                                                                                                                                                                                           | —              |
+| T12  | 07  | v2: errors.ts retirement → raw nested error JSON (logs + 500 `error` field) (M1)                                                                  | **done** (Schema.Defect serializer per owner directive; old-format tests skipped TODO(v2))                                                                                                         | `fc3364dac`    |
+| T13  | 07  | v2: 5 service extractions — validation(policy)/listing-extraction/prompt-config(version)/sanitization(arg consts)/merge-delta (E1–E4, M9, M12/C3) | **done** (interrupted-agent recovery + coordinator fixes: extraction env-model bug, test layer-capture pattern, policy/rationale fixtures)                                                         | `2714b1a77`    |
+| T14  | 07  | v2: `Schemas.Tailoring` move + `Schema.fromJsonString` parsing + `HashingServiceSha256` (M2–M4)                                                   | **done** (native effect/crypto Digest; hash values unchanged — equivalence tests)                                                                                                                  | `ebf9b9037`    |
+| T15  | 07  | v2: wire — request `policy` + response `changes` (JsonPatch-native) (M7, C2)                                                                      | **done** (policy = `Schema.optionalKey` BOTH sides — typed clients may omit; + shell-leak & self-import-cycle fixes)                                                                               | `6d9def5f1`    |
+| T16  | 07  | v2: prompt v2 — rewrite+add bullets, lang/framework/runtime fabrication bound, version bumps (M10)                                                | **done** (addedBullets experience-only — projects have no bulletPoints; strict policy rejects adds)                                                                                                | `0c603a34e`    |
+| T17  | 07  | v2: frontend review-then-apply — Summary\|Changes tabs, confirm modal (Equal.equals), policy UI (M8, M11, C1)                                     | **done** (no auto-apply/snapshots; generatePresetName removed; legacy entries decode changes:null)                                                                                                 | `3987b85f6`    |
+| T18  | 07  | v2: Tempo→logs fix + trace-id in JSON logs + Redacted-at-source (M5, M6)                                                                          | **done** (fiber.cache.span extraction; grafana customQuery eval-verified; 222 trace_id lines + 0 sk-or- in the e2e log dump)                                                                       | `052cda611`    |
+| T19  | 07  | v2: model-facing edits → Effect JsonPatch ops + path-allowlist policy — **GATED** (M12)                                                           | **deferred** (owner 2026-11-09 + reconfirmed 2026-11-10 "backburner": field-verify v2 first; then §H eval gate + explicit go)                                                                      | —              |
+| T20  | 08  | v3: rename `PdfPrintService` → `ResumePrintingService` (+`ResumePrintError`), format-agnostic file/id/span names                                  | **done** (pure rename; `grep PdfPrint packages/` clean; gates + `e2e src/resume` green)                                                                                                            | `f57c00803`    |
+| T21  | 08  | v3: `DocumentRenderingServiceDocx` (`formatHtml`) + `@turbodocx/html-to-docx` + `sharp` deps + rolldown externals + bundle spike                  | **done** (makeX factory + 6 fake-injection tests incl. real-library conversion; spike: sharp external via createRequire, resolves from bundle dir + renders, server boots)                         | `ebb4ff4dd`    |
+| T22  | 08  | v3: wire `outputFormat=pdf\|docx` (dual magic-byte success schemas) + puppeteer computed-style HTML capture → docx branch                         | **done** (C4 PROVEN: typed client decoded DOCX + raw content-type e2e pulled forward; sample 121KB, 28 sharp-rasterized icons) — **fidelity gate: owner review pending** (OQ7 theme question open) | `6277c0d57`    |
+| T23  | 08  | v3: frontend — Chakra split menus (settings Print button + Download FAB), format-aware request/download, `window.print` fallback when `!canPrint` | **done** (shared `useResumeDownload` + `ResumeFormatMenuItems`; DOCX forces light theme per OQ7 recommendation; gates + resume build green)                                                        | `1e4443a9d`    |
+| T24  | 08  | v3: e2e docx + raw content-type assertions; nix hashes + sharp runtime closure in `$out/lib/bundle/node_modules`; full suite                      | **done** (nix trio + full root gate + FULL e2e 114✓+1skip all green; sharp runtime closure smoke-checks a real PNG conversion inside the build)                                                    | `634c666e1`    |
 
 Waves (README task graph): **A:** T1→T2→T3. **B (parallel after T2):** T7 and T4→T5→T6.
 **C:** T8 (after T3+T7), T9 any time, T10 last. Every task ends with
@@ -175,11 +180,29 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
 (`e7137e69d`), CI-hang bounds landed (`b372d0713`), kanidm groups split by owner
 (`9727a4ceb1ff`).
 
-1. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
+1. **v3 work queue = doc 08 (T20–T24): DOCX output for resume printing** (owner, 2026-11-10):
+   `outputFormat=pdf|docx` on `POST /resume/print`; rename `PdfPrintService` →
+   `ResumePrintingService` (+ format param); NEW `DocumentRenderingServiceDocx.formatHtml`
+   wrapping `@turbodocx/html-to-docx`; puppeteer full-HTML capture with in-page computed-style
+   inlining (the library never fetches external CSS and resolves no cascade); dual content-type
+   success schemas (magic-byte-discriminated union — source-cited research in doc 08); Chakra
+   v3 split menus on the Download FAB + the settings-dialog Print button (replacing
+   `window.print()`). Strictly serial: T20→T21→T22→**[GATE: owner DOCX fidelity review]**→T23→T24.
+   Plan of record: `docs/resume-tailor-harness/08-docx-output-plan.md`. **T19 (JsonPatch) is
+   explicitly ON THE BACKBURNER (owner, 2026-11-10)** — still gated, NOT in this queue.
+   **STATUS (2026-11-10 evening): T20–T24 ALL LANDED** (hashes in the status table; full root
+   gate green, FULL e2e 15 files 114✓+1 skip, `nix build` trio green with the sharp runtime
+   closure smoke-checked inside the derivation). **Remaining: the OWNER FIDELITY GATE** — review
+   `/tmp/opencode/resume-sample.docx` (regenerate: `DOCX_SAMPLE_PATH=… e2e src/resume`) in
+   Word/LibreOffice + the target parser, rule on OQ7 (DOCX currently forces the light theme),
+   then deploy. Capture-script tuning (style whitelist, margins/fonts, SVG handling) iterates
+   on gate feedback.
+2. **v2 work queue = doc 07 (T12–T19):** **STATUS (2026-11-09 evening): T12–T18 ALL LANDED +
    full e2e green (15 files, 112✓+1 skip, exit 0). Remaining: T19 — GATED (needs explicit owner
    go; its §H eval gate must first build the doc 02 §I fixtures, which don't exist on disk) + the
    owner deploy-time checklist (Tempo link click, augustus redaction grep, browser pass over the
-   new review UI, CI push).** The owner's tailoring-quality suggestions were ELICITED
+   new review UI, CI push). (2026-11-10: owner keeps T19 DEFERRED — "on the backburner"; the
+   doc 08 v3 queue takes priority.)** The owner's tailoring-quality suggestions were ELICITED
    (2026-11-09) and grew into the full v2 directive set (M1–M12 + clarifications C1–C3) — plan of
    record: `docs/resume-tailor-harness/07-v2-plan.md`. Waves: **V2-A** T12→T13→T14 (serial) →
    **V2-B** T15→T16→T19 (T19 GATED: §H evals + owner go) ∥ T18 → **V2-C** T17; **full `e2e` suite
@@ -189,22 +212,23 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
    (`RUN_TAILOR_LIVE=1 e2e src/resume` + the real key in gitignored
    `packages/homelab-server/private/openrouter-api-key`); bump `promptVersion` on any prompt change
    (v2: it becomes the prompt-config service's `version` property).
-2. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
+3. **Confirm CI green:** `b372d0713` bounded the e2e hang (5s per health check, 10s boot OIDC
    fetch, probe `--max-time 10` + progress echoes). Next push should show the E2E job pass — or
    fail loudly with the log dump instead of stalling silently after "starting bundled server".
-3. **Manual browser checklist (partially confirmed by the owner's live run):** still
+4. **Manual browser checklist (partially confirmed by the owner's live run):** still
    unconfirmed — "Pre-tailor: …" preset snapshot toast; details modal
    (verdict/tips/keywords/meta); Apply-from-modal + Delete; blurb/aboutMe editable in Heading
    tab and rendering on the resume; print output contains no tailor data.
-4. **Redaction grep unconfirmed** (doc 05 Test Plan): on augustus,
+5. **Redaction grep unconfirmed** (doc 05 Test Plan): on augustus,
    `journalctl -u homelab-api --since "-1 hour" | grep -c 'sk-or-'` must be 0.
-5. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
+6. **Backlog (unscheduled):** Cypress browser e2e (doc 03 backlog, owner-requested "at some
    point"); doc 06 stretch phase — postgres persistence + category-keyed bases + cache decorator
    (owner wants to do persistence together); "update entry from current content" nicety (README
    OQ4); frozen-base registry mechanics (doc 01 §B — only needed when defaults change);
-   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change). (Kanidm
-   dedicated tailor group — DONE by owner `9727a4ceb1ff`: `homelab.resume.printing` +
-   `homelab.resume.tailoring`.)
+   PersistedPrintConfig versioning (doc 01 OQ2 — defer until first breaking change);
+   `POST /resume/print-plain` plain-DOCX templating endpoint (owner idea 2026-11-10 — doc 08
+   §Future work). (Kanidm dedicated tailor group — DONE by owner `9727a4ceb1ff`:
+   `homelab.resume.printing` + `homelab.resume.tailoring`.)
 
 ## Session log
 
@@ -544,3 +568,95 @@ wiring deployed (`7077d7b2b444`, `e30f55bb2`), slugs pinned (`cc692e5ea`), 404 f
   15 files, 112✓ + 1 skip (live-AI gated), exit 0.
 - main is 6 ahead of origin/main (5 openclaw + the merge) — PUSH PENDING owner decision.
 - The `nimble-otter` opencode worktree is fully merged and can be removed.
+
+### 2026-11-10 — v3 planning session (owner directives → doc 08)
+
+- Owner opened the v3 phase: **DOCX output for resume printing** — `outputFormat=pdf|docx` on
+  `POST /resume/print`; motivation: PDF parsers frequently mangle the resume, DOCX should parse
+  better (hypothesis verified at the owner fidelity gate BEFORE frontend polish lands). **T19
+  JsonPatch explicitly put on the backburner.** Plan of record written:
+  `08-docx-output-plan.md` (T20–T24, strictly serial: rename → docx rendering service →
+  wire+capture → [GATE] → frontend split menus → e2e+nix hashes).
+- Research baked into doc 08 (source-cited, so implementers don't redo it):
+  (a) effect 4.1.2 HttpApi resolves response content-type **statically per success-schema
+  member**; an endpoint may declare multiple success schemas at 200 with distinct content-types;
+  union encoding is first-match, so the two Uint8Array members need **magic-byte Type-side
+  filters** (`%PDF` / `PK\x03\x04`) — and the typed client REJECTS undeclared content-types, so
+  both MIME types must be declared (`WithHeaders` override exists but breaks client dispatch →
+  rejected). (b) `@turbodocx/html-to-docx` 1.23.3: default export `HtmlToDocx(html, header?,
+  options?, footer?)` → `Promise<Buffer>`; parses inline `style` attrs, **never fetches external
+  stylesheets, no CSS cascade** → the puppeteer capture must bake `getComputedStyle` whitelisted
+  props into inline styles in-page (under print-media emulation, pruning `display:none` app
+  chrome). Optional `sharp` (SVG→PNG) deliberately NOT added. (c) Chakra v3 split menu =
+  `Menu.Root` > `Group attached` > main Button/IconButton + `Menu.Trigger asChild` chevron >
+  `Portal`>`Menu.Positioner`>`Menu.Content`>`Menu.Item`.
+- Agent decisions flagged for owner in doc 08: C1 (the endpoint is `/resume/print`, not
+  `/resume/tailor`), C2/C3 naming (`ResumePrintingService`/`ResumePrintError`,
+  `DocumentRenderingServiceDocx`/`DocumentRenderingServiceError`/`DocxDocumentOptions`), C4/OQ5
+  (dual content-type union; octet-stream fallback), OQ1 (settings Print button keeps a
+  `window.print()` fallback when `!canPrint`), OQ4 (inline-SVG icon handling pending the gate).
+
+### 2026-11-10 (second) — v3 implementation: T20–T22 landed, first DOCX sample awaiting the fidelity gate
+
+- **T20** (`f57c00803`): pure rename `PdfPrintService`→`ResumePrintingService` /
+  `PdfPrintError`→`ResumePrintError` across tags, layers, barrels, shell, handler, tests, stale
+  comments; gates + `e2e src/resume` green.
+- **T21** (`ebb4ff4dd`): `DocumentRenderingServiceDocx` (platform-neutral `DocxDocumentOptions`,
+  makeX factory + 6 fake-injection unit tests incl. a real-library conversion). Deps:
+  `@turbodocx/html-to-docx@1.23.3` + `sharp`. **Bundle spike green**: rolldown
+  `external: ["sharp", /^@img\//]`; the library's lazy `require("sharp")` becomes a real
+  `createRequire` call via esmExternalRequirePlugin; sharp resolves from `dist/bundle`, renders a
+  PNG; the server boots.
+- **T22** (`6277c0d57`): `outputFormat` wire (decoding default `pdf`, wire-optional — deployed
+  SPA builds keep working) + dual magic-byte success schemas (C4 **PROVEN** end-to-end: the typed
+  client decoded the DOCX response — it dispatches on declared content-types — and the raw-HTTP
+  test asserted both MIME types; pulled forward from T24) + capture path (print-media emulation →
+  prune print-hidden chrome → SVG→data-URL `<img>` → two-pass computed-style inlining) + docx
+  e2e with a `DOCX_SAMPLE_PATH` artifact hook. **First fidelity sample:
+  `/tmp/opencode/resume-sample.docx`** — 121KB, valid OOXML, 80K-char document.xml with real
+  resume text, 28 sharp-rasterized PNG icons. **GATE: owner review pending; OQ7 (theme for docx
+  renders) opened — dark theme would inline light-on-dark colors onto Word's white page.**
+- New gotchas:
+  - `@turbodocx/html-to-docx` parses ONLY inline `style` attributes (no external-CSS fetch, no
+    cascade) — capture must bake computed styles; two-pass (read ALL, then write ALL) so our own
+    overrides never pollute later `getComputedStyle` reads. `<head>` computes to `display:none` —
+    prune special-cases it (removed wholesale).
+  - In vitest/vite, bare `require` in the library's ESM dist is undefined → its try/catch silently
+    sets sharp=null (unit tests never touch the sharp path; the bundle works via createRequire).
+  - `HttpApiEndpoint["~Request"]` uses the query **Type** side → `OptionalWithDefault` query
+    fields become REQUIRED in typed-client args (stopgap `outputFormat:"pdf"` at call sites; T23
+    parameterizes).
+  - e2e raw-POST tests: fresh `getToken` + DPoP proof per request (nonce replay safety).
+- Next: **T23** frontend split menus (proceeding in parallel with the owner fidelity review — the
+  UI is orthogonal to capture-script tuning), then **T24** nix hashes (yarn.lock changed in T21!)
+  - full suite. T19 remains backburnered.
+
+### 2026-11-10 (third) — v3 implementation COMPLETE: T23 + T24 landed, awaiting owner fidelity gate
+
+- **T23** (`1e4443a9d`): frontend split menus — `requestResumePdf`/`downloadPdf` → format-aware
+  `requestResumeDocument`/`downloadResumeDocument` (per-format MIME + `.docx` extension); shared
+  `useResumeDownload` hook + `ResumeFormatMenuItems` (`components/resume-download.tsx`); Download
+  FAB and the settings-dialog Print button both became Chakra v3 split menus (`Menu.Root` >
+  `Group attached` > main button + `Menu.Trigger asChild` chevron); `!canPrint` keeps the
+  `window.print()` fallback (OQ1). **OQ7 recommendation implemented: DOCX renders force the light
+  theme** (dark computed colors would inline onto Word's white page) — owner may veto.
+- **T24** (`634c666e1`): sharp deduped to `^0.34.5` — the lockfile ALREADY carried a full
+  sharp@0.34.5 + @img set (covered by 24 existing missing-hashes.json entries), while `yarn add
+  sharp` had pulled a parallel 0.35.5 tree (~24 NEW checksum-less lock entries → fetcher failure
+  "unable to find missing hash for @img/sharp-darwin-arm64@npm:0.35.5"). Aligning versions erased
+  the 0.35.5 set: zero missing-hashes churn. Hash `sha256-ZsQLgstpYPqrf6M4PL4aK5AC5wLJL2mRewZ3ooJrYZU=`
+  set in all three package.nix files. homelab-api installPhase now copies the sharp runtime
+  closure into `$out/lib/bundle/node_modules` (sharp wholesale + pure-JS deps via its
+  package.json + build-platform `@img/sharp-*` glob — hoisting puts the binaries at ROOT @img,
+  NOT nested; the first build failed on exactly that) and patchelfs the generic-linux ELFs
+  (RPATH-only: shared objects have NO `.interp`, so `--set-interpreter` fails — second build
+  failure, fixed) to glibc/libstdc++ store paths preserving the `$ORIGIN` libvips chain. A
+  fail-fast smoke check runs a real 1×1 PNG sharp conversion inside the build ("sharp runtime
+  closure OK" in the drv log) — silent augustus degradation is now impossible.
+- Validation: `nix build .#homelab-api .#homelab-ui .#resume-site` ✓; full root gate ✓ (lint 0
+  errors); FULL e2e suite ✓ 15 files, **114 passed + 1 skip** (was 112 — the two new print tests),
+  exit 0.
+- **v3 code work is COMPLETE. Remaining: owner fidelity gate** (sample at
+  `/tmp/opencode/resume-sample.docx`; regenerate with `DOCX_SAMPLE_PATH=… e2e src/resume`), OQ7
+  ruling, then owner deploy. Known cosmetic: rolldown warns IMPORT_IS_UNDEFINED for html-to-docx's
+  lru-cache default import — proven harmless (e2e docx renders green with 28 rasterized icons).
