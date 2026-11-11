@@ -1,1 +1,0 @@
-{ todoman-config = ./config.nix; }

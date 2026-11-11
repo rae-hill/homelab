@@ -90,7 +90,7 @@ nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 plugins and per-language settings (including Markdown: `lineWidth` 100, `textWrap` maintain) live in
 `dprint.json`, so `dprint fmt <path>` auto-discovers the config — no need to pass `--plugins`
 manually when formatting a single file.
-`nixfmt` (RFC style) formats `.nix` files, **excluding the vendored `repos/` subtrees** (read-only
+`nixfmt` (RFC style) formats `.nix` files, **excluding the vendored `repos/` submodules** (read-only
 upstream sources — never reformat them). Invoke it via `nix run .#nixfmt` so you always use the
 flake-pinned `nixfmt` (exposed as `packages.<system>.nixfmt`) rather than whatever is on `PATH` —
 this keeps the version identical across the hook, the devshell, and the editor. These are separate

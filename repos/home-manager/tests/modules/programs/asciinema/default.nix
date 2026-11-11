@@ -1,3 +1,0 @@
-{
-  asciinema-settings = ./settings.nix;
-}

@@ -1,4 +1,0 @@
-{
-  "extends": ["./a.json", "./b.json"],
-  "files": ["own"]
-}

@@ -1,9 +1,0 @@
-disabled = [
-  "bool_comparison",
-  "bool_simplification",
-  "deprecated_is_null",
-  "faster_groupby",
-  "faster_zipattrswith",
-  "repeated_keys",
-  "useless_parens",
-]

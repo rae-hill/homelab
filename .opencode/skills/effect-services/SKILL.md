@@ -1,34 +1,39 @@
 ---
 name: effect-services
-description: Effect-TS service and code patterns plus the vendored reference repos under ./repos/ (effect, kobalte, astro, nanostores, nixpkgs, home-manager, kanidm, crypto, step-ca, step-cli, technitium, nix-darwin). Use when writing Effect services/layers/code, looking up upstream source for reference, adding a new git subtree, or updating vendored subtrees.
+description: Effect-TS service and code patterns plus the vendored reference repos under ./repos/ (effect, kobalte, astro, nanostores, nixpkgs, home-manager, kanidm, crypto, step-ca, step-cli, technitium, nix-darwin). Use when writing Effect services/layers/code, looking up upstream source for reference, adding a new vendored submodule, or updating vendored submodules.
 ---
 
 # Effect Services & Code Patterns
 
 ## Vendored Repositories
 
-Upstream monorepos are vendored at `./repos/` as read-only reference material via git subtrees.
+Upstream repos are vendored at `./repos/` as read-only reference material via **shallow git
+submodules** pinned to exact upstream commits — the `flake.lock` rev for the distro repos, the tag
+nixpkgs builds for app repos. Submodule contents are excluded from Nix's flake-source ingestion,
+so `repos/` never bloats builds or deploy copies. After a fresh clone, run
+`git submodule update --init` to populate them.
 
-| Directory                     | Source                                              | Purpose                                                                                           |
-| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform                                                                         |
-| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library                                                                      |
-| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                                                                                   |
-| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management                                                                       |
-| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05)                                                           |
-| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)                                                               |
-| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source                                                                    |
-| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool                                                              |
-| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | go.step.sm/crypto library (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins `v0.74.0`) |
-| `repos/step-ca/`              | https://github.com/smallstep/certificates.git       | step-ca server source (tag `v0.29.0`, matches nixpkgs-26.05)                                      |
-| `repos/step-cli/`             | https://github.com/smallstep/cli.git                | step CLI source (tag `v0.30.2`, matches nixpkgs-26.05)                                            |
-| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                                                                      |
-| `repos/openclaw/`             | https://github.com/openclaw/openclaw.git            | OpenClaw AI agent gateway source (tag `v2026.10.5` = nixpkgs-unstable pin; shallow subtree)       |
-| `repos/opencode/`             | https://github.com/anomalyco/opencode.git           | OpenCode CLI + server source (tag `v2.1.4` = pkgs-unstable pin; shallow subtree)                  |
-| `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`)                                                    |
-| `repos/home-manager/`         | https://github.com/nix-community/home-manager.git   | home-manager modules (`release-26.05`, matches the flake input)                                   |
-| `repos/puppeteer/`            | https://github.com/puppeteer/puppeteer.git          | puppeteer-core source (tag `puppeteer-core-v25.16.0`, matches the npm pin)                        |
-| `repos/open-resume/`          | https://github.com/xitanggg/open-resume.git         | OpenResume PDF resume-parser reference (`src/app/lib/parse-resume-from-pdf/`; `main`, squashed)   |
+| Directory                     | Source                                              | Purpose                                                                                                      |
+| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform                                                                                    |
+| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library                                                                                 |
+| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                                                                                              |
+| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management                                                                                  |
+| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05; pinned to the `nixpkgs` rev in `flake.lock`)                         |
+| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable; pinned to the `nixpkgs-unstable` rev in `flake.lock`)                    |
+| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source                                                                               |
+| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool                                                                         |
+| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | go.step.sm/crypto library (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins `v0.74.0`)            |
+| `repos/step-ca/`              | https://github.com/smallstep/certificates.git       | step-ca server source (tag `v0.29.0`, matches nixpkgs-26.05)                                                 |
+| `repos/step-cli/`             | https://github.com/smallstep/cli.git                | step CLI source (tag `v0.30.2`, matches nixpkgs-26.05)                                                       |
+| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                                                                                 |
+| `repos/openclaw/`             | https://github.com/openclaw/openclaw.git            | OpenClaw AI agent gateway source (tag `v2026.10.5` = nixpkgs-unstable pin)                                   |
+| `repos/opencode/`             | https://github.com/anomalyco/opencode.git           | OpenCode CLI + server source (tag `v2.1.4` = pkgs-unstable pin)                                              |
+| `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS; pinned to the `nix-darwin` rev in `flake.lock`)                                   |
+| `repos/home-manager/`         | https://github.com/nix-community/home-manager.git   | home-manager modules (pinned to the `home-manager` rev in `flake.lock`)                                      |
+| `repos/puppeteer/`            | https://github.com/puppeteer/puppeteer.git          | puppeteer-core source (tag `puppeteer-core-v25.16.0`, matches the npm pin)                                   |
+| `repos/open-resume/`          | https://github.com/xitanggg/open-resume.git         | OpenResume PDF resume-parser reference (`src/app/lib/parse-resume-from-pdf/`; pinned at `main`)              |
+| `repos/proton-mcp/`           | https://github.com/jorgenclaw/proton-mcp.git        | Proton MCP server — audited SUSPICIOUS, vendored as a reference foil only (see `docs/openclaw-mini-plan.md`) |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`
@@ -37,34 +42,41 @@ Upstream monorepos are vendored at `./repos/` as read-only reference material vi
 - Key NixOS reference paths: `repos/nixpkgs-26.05/nixos/modules/services/`, `repos/nixpkgs-unstable/nixos/modules/services/`, `repos/nixpkgs-26.05/pkgs/`
 - Key home-manager reference paths: `repos/home-manager/modules/programs/`, `repos/home-manager/modules/services/`, `repos/home-manager/modules/targets/` — prefer these over reading `/nix/store/*-home-manager-source`
 
-### Adding a New Vendored Subtree
+### Adding a New Vendored Submodule
+
+Vendor new upstreams as **shallow git submodules** pinned to an exact upstream
+commit — the tag nixpkgs builds (apps) or the `flake.lock` rev (distro repos).
+Submodule contents are excluded from Nix's flake-source ingestion, so vendored
+trees never bloat builds or deploy copies:
 
 ```sh
-git subtree add \
-  --prefix=repos/<name> \
-  <git-url> \
-  <branch> \
-  --squash
+# 1. shallow-fetch the exact pin into place (GitHub supports want-by-sha)
+git init repos/<name>
+git -C repos/<name> remote add origin <git-url>
+git -C repos/<name> fetch --depth 1 origin <tag-or-sha>
+git -C repos/<name> checkout FETCH_HEAD
+
+# 2. register the submodule (reuses the existing checkout)
+git submodule add <git-url> repos/<name>
+git config -f .gitmodules submodule.repos/<name>.shallow true
+# lock-backed repos also record their branch, e.g.:
+# git config -f .gitmodules submodule.repos/<name>.branch nixos-unstable
+
+# 3. commit
+git add .gitmodules repos/<name>
+git commit --no-verify -m "repos: vendor <name> at <tag-or-sha>"
 ```
 
-Example (Effect):
+Never vendor with `git subtree`: subtree content lands inside the superproject
+tree and is ingested into every flake source (~2 GB per deploy copy before the
+2026-11 submodule conversion). Add the new repo to the table above.
 
-```sh
-git subtree add \
-  --prefix=repos/effect \
-  https://github.com/Effect-TS/effect.git \
-  main \
-  --squash
-```
+### Keeping Vendored Submodules Up To Date
 
-Use `--squash` to avoid bringing in the full upstream commit history.
-
-### Keeping Vendored Subtrees Up To Date
-
-The vendored subtrees are **not** refreshed automatically and drift stale over
-time. Before relying on vendored source as a reference — especially for an
-upstream whose behavior changed across versions — **pull the latest first**,
-then confirm it matches the version this repo actually builds.
+The vendored submodules are **not** refreshed automatically and drift stale
+over time. Before relying on vendored source as a reference — especially for
+an upstream whose behavior changed across versions — **re-pin first**, then
+confirm it matches the version this repo actually builds.
 
 > **Critical: corroborate the vendored version with the pinned Nix distro.**
 > Reference source is only trustworthy if it matches the version NixOS builds.
@@ -74,35 +86,45 @@ then confirm it matches the version this repo actually builds.
 > **not** exist in the version you deploy — leading to confidently wrong
 > guidance. Always check the version skew.
 
-Refresh branch-tracking subtrees (nixpkgs follows release branches):
-
-```sh
-git subtree pull --prefix=repos/nixpkgs-26.05 \
-  https://github.com/NixOS/nixpkgs.git nixos-26.05 --squash
-git subtree pull --prefix=repos/nixpkgs-unstable \
-  https://github.com/NixOS/nixpkgs.git nixos-unstable --squash
-```
-
-For an application vendored to match a Nix-built version (e.g. kanidm), pin the
-subtree to the **tag** nixpkgs builds, not `master`:
+Re-pin an app submodule to the **tag** nixpkgs builds, not `master`:
 
 ```sh
 # 1. find the version nixpkgs 26.05 builds:
 #    repos/nixpkgs-26.05/pkgs/servers/kanidm/1_11.nix -> version = "1.11.2";
-# 2. pull that exact tag:
-git subtree pull --prefix=repos/kanidm \
-  https://github.com/kanidm/kanidm.git v1.11.2 --squash
+# 2. shallow-fetch and check out that exact tag:
+git -C repos/kanidm fetch --depth 1 origin v1.11.2
+git -C repos/kanidm checkout FETCH_HEAD
+# 3. stage the new gitlink and commit:
+git add repos/kanidm
+git commit --no-verify -m "repos(kanidm): re-pin to v1.11.2"
 ```
+
+The four **lock-backed** repos (`nixpkgs-26.05`, `nixpkgs-unstable`,
+`home-manager`, `nix-darwin`) pin the exact rev recorded in `flake.lock` — not
+a branch tip. Whenever `nix flake update` moves one of those inputs, re-point
+its submodule at the new rev so the vendored source stays corroborated with
+what the hosts actually build:
+
+```sh
+rev=$(jq -r '.nodes["nixpkgs-unstable"].locked.rev' flake.lock)
+git -C repos/nixpkgs-unstable fetch --depth 1 origin "$rev"
+git -C repos/nixpkgs-unstable checkout FETCH_HEAD
+git add repos/nixpkgs-unstable
+```
+
+(For the root `nixpkgs` input, resolve the node name via
+`.nodes[.root].inputs.nixpkgs` — flake.lock dedupes it to `nixpkgs_N`.)
 
 Notes:
 
-- Subtree pulls create a **merge commit** and require a clean _tracked_
-  working tree (untracked files are fine). Treat it as a history-modifying
-  action.
+- Submodules sit in **detached HEAD** by design — never commit inside
+  `repos/<name>`; the superproject tracks only the gitlink SHA.
+- Re-pinning is a normal gitlink commit, not a merge — unlike the old subtree
+  workflow it never copies vendored file contents into superproject history.
 - Never reformat or edit files under `repos/` — they are read-only upstream.
-- After a nixpkgs bump that changes an app's pinned version, re-pull that app's
-  subtree to the new tag so the two stay corroborated.
-- Quick version check after pulling: compare the app's `Cargo.toml`/`go.mod`/
+- After a nixpkgs bump that changes an app's pinned version, re-pin that app's
+  submodule to the new tag so the two stay corroborated.
+- Quick version check after re-pinning: compare the app's `Cargo.toml`/`go.mod`/
   `package.json` version against the `version = "..."` in the corresponding
   `repos/nixpkgs-26.05/pkgs/.../<name>.nix`.
 

@@ -100,7 +100,7 @@ writes or edits, via the formatter configured in `nix-config/modules/home/jacob-
   same version used by the pre-commit hook, devshell, and nixvim conform config, so formatting
   is deterministic everywhere.
 
-Never reformat the vendored `repos/` subtrees (read-only upstream sources; excluded via
+Never reformat the vendored `repos/` submodules (read-only upstream sources; excluded via
 `dprint.json` and the hook's `repos/` filter).
 
 Manual/bulk fallback for files the harness did not touch (e.g. repo-wide reformat, human runs):

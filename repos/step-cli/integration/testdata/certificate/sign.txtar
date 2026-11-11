@@ -1,2 +1,0 @@
-exec step certificate sign test.csr cacert.pem cakey.pem
-check_certificate

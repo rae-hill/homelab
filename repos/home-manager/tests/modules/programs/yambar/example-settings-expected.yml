@@ -1,9 +1,0 @@
-bar:
-  background: '00000066'
-  height: 26
-  location: top
-  right:
-  - clock:
-      content:
-      - string:
-          text: '{time}'

@@ -1,1 +1,0 @@
-{ aperture-settings = ./settings.nix; }

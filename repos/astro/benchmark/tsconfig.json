@@ -1,8 +1,0 @@
-{
-  "extends": "../configs/tsconfig.base.json",
-  "include": ["./*.js", "./bench/**/*.js", "./make-project/**/*.js"],
-  "references": [
-    { "path": "./packages/timer/tsconfig.json" },
-    { "path": "./packages/adapter/tsconfig.json" }
-  ]
-}

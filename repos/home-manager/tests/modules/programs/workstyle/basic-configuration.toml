@@ -1,7 +1,0 @@
-alice = "A"
-bob = "B"
-
-[other]
-deduplicate_icons = false
-fallback_icon = "F"
-separator = ": "

@@ -1,1 +1,0 @@
-{ screen-settings = ./settings.nix; }

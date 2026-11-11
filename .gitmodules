@@ -1,0 +1,80 @@
+[submodule "repos/nixpkgs-26.05"]
+	path = repos/nixpkgs-26.05
+	url = https://github.com/NixOS/nixpkgs.git
+	shallow = true
+	branch = nixos-26.05
+[submodule "repos/nixpkgs-unstable"]
+	path = repos/nixpkgs-unstable
+	url = https://github.com/NixOS/nixpkgs.git
+	shallow = true
+	branch = nixos-unstable
+[submodule "repos/home-manager"]
+	path = repos/home-manager
+	url = https://github.com/nix-community/home-manager.git
+	shallow = true
+	branch = release-26.05
+[submodule "repos/nix-darwin"]
+	path = repos/nix-darwin
+	url = https://github.com/nix-darwin/nix-darwin.git
+	shallow = true
+	branch = nix-darwin-26.05
+[submodule "repos/astro"]
+	path = repos/astro
+	url = https://github.com/withastro/astro.git
+	shallow = true
+[submodule "repos/crypto"]
+	path = repos/crypto
+	url = https://github.com/smallstep/crypto.git
+	shallow = true
+[submodule "repos/effect"]
+	path = repos/effect
+	url = https://github.com/Effect-TS/effect.git
+	shallow = true
+[submodule "repos/kanidm-provision"]
+	path = repos/kanidm-provision
+	url = https://github.com/oddlama/kanidm-provision.git
+	shallow = true
+[submodule "repos/kobalte"]
+	path = repos/kobalte
+	url = https://github.com/kobaltedev/kobalte.git
+	shallow = true
+[submodule "repos/nanostores"]
+	path = repos/nanostores
+	url = https://github.com/nanostores/nanostores.git
+	shallow = true
+[submodule "repos/open-resume"]
+	path = repos/open-resume
+	url = https://github.com/xitanggg/open-resume.git
+	shallow = true
+[submodule "repos/openclaw"]
+	path = repos/openclaw
+	url = https://github.com/openclaw/openclaw.git
+	shallow = true
+[submodule "repos/opencode"]
+	path = repos/opencode
+	url = https://github.com/anomalyco/opencode.git
+	shallow = true
+[submodule "repos/proton-mcp"]
+	path = repos/proton-mcp
+	url = https://github.com/jorgenclaw/proton-mcp.git
+	shallow = true
+[submodule "repos/puppeteer"]
+	path = repos/puppeteer
+	url = https://github.com/puppeteer/puppeteer.git
+	shallow = true
+[submodule "repos/step-ca"]
+	path = repos/step-ca
+	url = https://github.com/smallstep/certificates.git
+	shallow = true
+[submodule "repos/step-cli"]
+	path = repos/step-cli
+	url = https://github.com/smallstep/cli.git
+	shallow = true
+[submodule "repos/technitium-dnsserver"]
+	path = repos/technitium-dnsserver
+	url = https://github.com/TechnitiumSoftware/DnsServer.git
+	shallow = true
+[submodule "repos/kanidm"]
+	path = repos/kanidm
+	url = https://github.com/kanidm/kanidm.git
+	shallow = true

@@ -1,3 +1,0 @@
-# Smartypants Backticks test
-
-``Smarty''

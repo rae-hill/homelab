@@ -1,3 +1,0 @@
-{
-  dbus-packages = ./packages.nix;
-}

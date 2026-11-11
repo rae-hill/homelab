@@ -1,3 +1,0 @@
-{
-  wallust = ./wallust.nix;
-}

@@ -1,8 +1,0 @@
-{
-  "extends": "../../../configs/tsconfig.build.json",
-  "include": ["./src", "./virtual.d.ts"],
-  "references": [
-    { "path": "../../astro/tsconfig.json" },
-    { "path": "../../internal-helpers/tsconfig.json" }
-  ]
-}

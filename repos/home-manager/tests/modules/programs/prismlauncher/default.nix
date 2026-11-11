@@ -1,3 +1,0 @@
-{
-  prismlauncher-settings = ./settings.nix;
-}

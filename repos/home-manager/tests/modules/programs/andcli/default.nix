@@ -1,1 +1,0 @@
-{ andcli-settings = ./settings.nix; }

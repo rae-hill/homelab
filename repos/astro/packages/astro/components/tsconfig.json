@@ -1,8 +1,0 @@
-{
-  "extends": "../../../configs/tsconfig.base.json",
-  "compilerOptions": {
-    "emitDeclarationOnly": false,
-    "jsx": "preserve"
-  },
-  "references": [{ "path": "../tsconfig.build.json" }]
-}

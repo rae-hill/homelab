@@ -1,5 +1,0 @@
-build-users-group = nixbld
-
-max-jobs = 32
-cores = 1
-sandbox = false

@@ -1,3 +1,0 @@
-{
-  sshAuthSock-initialization = ./initialization.nix;
-}

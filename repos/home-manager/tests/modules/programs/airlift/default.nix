@@ -1,1 +1,0 @@
-{ airlift-settings = ./settings.nix; }

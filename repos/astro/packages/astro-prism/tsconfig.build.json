@@ -1,4 +1,0 @@
-{
-  "extends": "../../configs/tsconfig.build.json",
-  "include": ["./src", "./virtual.d.ts"]
-}

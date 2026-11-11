@@ -1,3 +1,0 @@
-{
-  direnv = ./basic-config.nix;
-}

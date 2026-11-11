@@ -1,3 +1,0 @@
-{
-  exo-service = ./service.nix;
-}

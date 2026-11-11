@@ -1,1 +1,0 @@
-{ alistral-settings = ./settings.nix; }

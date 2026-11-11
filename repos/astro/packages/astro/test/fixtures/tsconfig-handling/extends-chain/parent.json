@@ -1,4 +1,0 @@
-{
-  "extends": "./grandparent.json",
-  "include": ["lib"]
-}

@@ -1,3 +1,0 @@
-certificate 279438320
-public-key 279438318
-private-key 279438317

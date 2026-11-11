@@ -1,4 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "include": ["types/generics/pass.astro", "types/generics/GenericList.svelte"]
-}

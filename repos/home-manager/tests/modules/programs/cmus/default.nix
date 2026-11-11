@@ -1,1 +1,0 @@
-{ cmus = ./cmus.nix; }

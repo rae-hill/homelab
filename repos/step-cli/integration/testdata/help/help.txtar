@@ -1,2 +1,0 @@
-exec step --help
-stdout 'plumbing for distributed systems'

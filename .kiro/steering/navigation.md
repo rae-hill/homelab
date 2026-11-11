@@ -57,7 +57,7 @@ nix-config/
 
 ## NixOS Package & Module Reference
 
-Vendored nixpkgs subtrees provide browsable NixOS module source for determining available options:
+Vendored nixpkgs submodules provide browsable NixOS module source for determining available options:
 
 | User says                                       | Resolves to                                                            |
 | ----------------------------------------------- | ---------------------------------------------------------------------- |
@@ -81,15 +81,20 @@ When options differ between branches, prefer the branch matching the host's nixp
 
 ### Updating Vendored Nixpkgs
 
+The nixpkgs submodules are pinned to the exact revs recorded in `flake.lock` — re-point the
+submodule whenever `nix flake update` moves the input:
+
 ```sh
-git subtree pull --prefix=repos/nixpkgs-26.05 https://github.com/NixOS/nixpkgs.git nixos-26.05 --squash
-git subtree pull --prefix=repos/nixpkgs-unstable https://github.com/NixOS/nixpkgs.git nixos-unstable --squash
+rev=$(jq -r '.nodes["nixpkgs-unstable"].locked.rev' flake.lock)
+git -C repos/nixpkgs-unstable fetch --depth 1 origin "$rev"
+git -C repos/nixpkgs-unstable checkout FETCH_HEAD
+git add repos/nixpkgs-unstable
 ```
 
-> These subtrees go stale (not auto-refreshed). For the full refresh workflow —
-> including pinning app subtrees (e.g. `repos/kanidm`) to the **tag** nixpkgs
+> These submodules go stale (not auto-refreshed). For the full update workflow —
+> including pinning app submodules (e.g. `repos/kanidm`) to the **tag** nixpkgs
 > 26.05 actually builds and corroborating the version skew — see
-> `.kiro/steering/effect-services.md` → "Keeping Vendored Subtrees Up To Date".
+> `.kiro/steering/effect-services.md` → "Keeping Vendored Submodules Up To Date".
 
 ## Hosts
 

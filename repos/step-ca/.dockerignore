@@ -1,5 +1,0 @@
-bin
-coverage.txt
-*.test
-*.out
-.travis-releases

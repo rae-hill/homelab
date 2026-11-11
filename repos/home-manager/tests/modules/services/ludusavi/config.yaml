@@ -1,9 +1,0 @@
-backup:
-  path: ~/.local/state/backups/ludusavi
-language: en-US
-restore:
-  path: ~/.local/state/backups/ludusavi
-roots:
-- path: ~/.local/share/Steam
-  store: steam
-theme: light

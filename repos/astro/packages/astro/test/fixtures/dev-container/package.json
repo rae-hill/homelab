@@ -1,8 +1,0 @@
-{
-	"name": "@test/dev-container",
-	"version": "0.0.0",
-	"private": true,
-	"dependencies": {
-		"astro": "workspace:*"
-	}
-}

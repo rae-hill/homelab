@@ -1,3 +1,0 @@
-{
-  imapnotify = ./imapnotify.nix;
-}

@@ -1,3 +1,0 @@
-{
-  aichat-settings = ./settings.nix;
-}

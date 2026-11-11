@@ -2,7 +2,11 @@
 
 ## Vendored Repositories
 
-Upstream monorepos are vendored at `./repos/` as read-only reference material via git subtrees.
+Upstream repos are vendored at `./repos/` as read-only reference material via **shallow git
+submodules** pinned to exact upstream commits — the `flake.lock` rev for the distro repos, the tag
+nixpkgs builds for app repos. Submodule contents are excluded from Nix's flake-source ingestion,
+so `repos/` never bloats builds or deploy copies. After a fresh clone, run
+`git submodule update --init` to populate them.
 
 | Directory                     | Source                                              | Purpose                                        |
 | ----------------------------- | --------------------------------------------------- | ---------------------------------------------- |
@@ -24,34 +28,41 @@ Upstream monorepos are vendored at `./repos/` as read-only reference material vi
 - Key reference packages: `repos/effect/packages/effect/`, `repos/effect/packages/platform/`, `repos/effect/packages/platform-node/`, `repos/kobalte/packages/core/`, `repos/nanostores/`
 - Key NixOS reference paths: `repos/nixpkgs-26.05/nixos/modules/services/`, `repos/nixpkgs-unstable/nixos/modules/services/`, `repos/nixpkgs-26.05/pkgs/`
 
-### Adding a New Vendored Subtree
+### Adding a New Vendored Submodule
+
+Vendor new upstreams as **shallow git submodules** pinned to an exact upstream
+commit — the tag nixpkgs builds (apps) or the `flake.lock` rev (distro repos).
+Submodule contents are excluded from Nix's flake-source ingestion, so vendored
+trees never bloat builds or deploy copies:
 
 ```sh
-git subtree add \
-  --prefix=repos/<name> \
-  <git-url> \
-  <branch> \
-  --squash
+# 1. shallow-fetch the exact pin into place (GitHub supports want-by-sha)
+git init repos/<name>
+git -C repos/<name> remote add origin <git-url>
+git -C repos/<name> fetch --depth 1 origin <tag-or-sha>
+git -C repos/<name> checkout FETCH_HEAD
+
+# 2. register the submodule (reuses the existing checkout)
+git submodule add <git-url> repos/<name>
+git config -f .gitmodules submodule.repos/<name>.shallow true
+# lock-backed repos also record their branch, e.g.:
+# git config -f .gitmodules submodule.repos/<name>.branch nixos-unstable
+
+# 3. commit
+git add .gitmodules repos/<name>
+git commit --no-verify -m "repos: vendor <name> at <tag-or-sha>"
 ```
 
-Example (Effect):
+Never vendor with `git subtree`: subtree content lands inside the superproject
+tree and is ingested into every flake source (~2 GB per deploy copy before the
+2026-11 submodule conversion).
 
-```sh
-git subtree add \
-  --prefix=repos/effect \
-  https://github.com/Effect-TS/effect.git \
-  main \
-  --squash
-```
+### Keeping Vendored Submodules Up To Date
 
-Use `--squash` to avoid bringing in the full upstream commit history.
-
-### Keeping Vendored Subtrees Up To Date
-
-The vendored subtrees are **not** refreshed automatically and drift stale over
-time. Before relying on vendored source as a reference — especially for an
-upstream whose behavior changed across versions — **pull the latest first**,
-then confirm it matches the version this repo actually builds.
+The vendored submodules are **not** refreshed automatically and drift stale
+over time. Before relying on vendored source as a reference — especially for
+an upstream whose behavior changed across versions — **re-pin first**, then
+confirm it matches the version this repo actually builds.
 
 > **Critical: corroborate the vendored version with the pinned Nix distro.**
 > Reference source is only trustworthy if it matches the version NixOS builds.
@@ -61,35 +72,45 @@ then confirm it matches the version this repo actually builds.
 > **not** exist in the version you deploy — leading to confidently wrong
 > guidance. Always check the version skew.
 
-Refresh branch-tracking subtrees (nixpkgs follows release branches):
-
-```sh
-git subtree pull --prefix=repos/nixpkgs-26.05 \
-  https://github.com/NixOS/nixpkgs.git nixos-26.05 --squash
-git subtree pull --prefix=repos/nixpkgs-unstable \
-  https://github.com/NixOS/nixpkgs.git nixos-unstable --squash
-```
-
-For an application vendored to match a Nix-built version (e.g. kanidm), pin the
-subtree to the **tag** nixpkgs builds, not `master`:
+Re-pin an app submodule to the **tag** nixpkgs builds, not `master`:
 
 ```sh
 # 1. find the version nixpkgs 26.05 builds:
 #    repos/nixpkgs-26.05/pkgs/servers/kanidm/1_11.nix -> version = "1.11.2";
-# 2. pull that exact tag:
-git subtree pull --prefix=repos/kanidm \
-  https://github.com/kanidm/kanidm.git v1.11.2 --squash
+# 2. shallow-fetch and check out that exact tag:
+git -C repos/kanidm fetch --depth 1 origin v1.11.2
+git -C repos/kanidm checkout FETCH_HEAD
+# 3. stage the new gitlink and commit:
+git add repos/kanidm
+git commit --no-verify -m "repos(kanidm): re-pin to v1.11.2"
 ```
+
+The four **lock-backed** repos (`nixpkgs-26.05`, `nixpkgs-unstable`,
+`home-manager`, `nix-darwin`) pin the exact rev recorded in `flake.lock` — not
+a branch tip. Whenever `nix flake update` moves one of those inputs, re-point
+its submodule at the new rev so the vendored source stays corroborated with
+what the hosts actually build:
+
+```sh
+rev=$(jq -r '.nodes["nixpkgs-unstable"].locked.rev' flake.lock)
+git -C repos/nixpkgs-unstable fetch --depth 1 origin "$rev"
+git -C repos/nixpkgs-unstable checkout FETCH_HEAD
+git add repos/nixpkgs-unstable
+```
+
+(For the root `nixpkgs` input, resolve the node name via
+`.nodes[.root].inputs.nixpkgs` — flake.lock dedupes it to `nixpkgs_N`.)
 
 Notes:
 
-- Subtree pulls create a **merge commit** and require a clean _tracked_
-  working tree (untracked files are fine). Treat it as a history-modifying
-  action.
+- Submodules sit in **detached HEAD** by design — never commit inside
+  `repos/<name>`; the superproject tracks only the gitlink SHA.
+- Re-pinning is a normal gitlink commit, not a merge — unlike the old subtree
+  workflow it never copies vendored file contents into superproject history.
 - Never reformat or edit files under `repos/` — they are read-only upstream.
-- After a nixpkgs bump that changes an app's pinned version, re-pull that app's
-  subtree to the new tag so the two stay corroborated.
-- Quick version check after pulling: compare the app's `Cargo.toml`/`go.mod`/
+- After a nixpkgs bump that changes an app's pinned version, re-pin that app's
+  submodule to the new tag so the two stay corroborated.
+- Quick version check after re-pinning: compare the app's `Cargo.toml`/`go.mod`/
   `package.json` version against the `version = "..."` in the corresponding
   `repos/nixpkgs-26.05/pkgs/.../<name>.nix`.
 

@@ -63,7 +63,8 @@ nix-config/
 
 ### NixOS Package & Module Reference
 
-Vendored nixpkgs subtrees provide browsable NixOS module source for determining available options:
+Vendored nixpkgs submodules provide browsable NixOS module source for determining available options
+(after a fresh clone, run `git submodule update --init` to populate `repos/`):
 
 | User says                                       | Resolves to                                                            |
 | ----------------------------------------------- | ---------------------------------------------------------------------- |
@@ -78,8 +79,8 @@ To find available NixOS service options, read the module source directly from th
 - **Service modules:** `repos/nixpkgs-26.05/nixos/modules/services/<category>/<service>.nix`
 - **Prometheus exporters:** `repos/nixpkgs-26.05/nixos/modules/services/monitoring/prometheus/exporters/<name>.nix`
 - **Package derivations:** `repos/nixpkgs-26.05/pkgs/by-name/<prefix>/<name>/package.nix`
-- **home-manager modules:** `repos/home-manager/modules/programs/<name>.nix` (subtree tracks
-  `release-26.05`, matching the flake's home-manager input; prefer it over reading
+- **home-manager modules:** `repos/home-manager/modules/programs/<name>.nix` (submodule pinned
+  to the flake's home-manager input rev; prefer it over reading
   `/nix/store/*-home-manager-source`)
 
 When options differ between branches, prefer the branch matching the host's nixpkgs input:
@@ -87,9 +88,9 @@ When options differ between branches, prefer the branch matching the host's nixp
 - Augustus, cicero, praeconinus, nixos → `nixpkgs` (nixos-26.05)
 - Packages from `pkgs-unstable` overlay → `nixpkgs-unstable`
 
-Never edit or reformat anything under `./repos/` (read-only vendored subtrees). For the subtree
-refresh workflow — including pinning app subtrees to the tag nixpkgs 26.05 actually builds — see
-the `effect-services` skill → "Keeping Vendored Subtrees Up To Date".
+Never edit or reformat anything under `./repos/` (read-only vendored submodules). For the submodule
+update workflow — including pinning app submodules to the tag nixpkgs 26.05 actually builds — see
+the `effect-services` skill → "Keeping Vendored Submodules Up To Date".
 
 ### Vendored App Source — Prefer Over Web Docs
 
@@ -100,20 +101,20 @@ describe a different version than the one deployed, and sometimes lie outright. 
 docs only for upstreams not vendored here or for tutorial-style material, and corroborate against
 the pinned tag's source before trusting them.
 
-| Question about                                                                          | Resolves to                                                                                                    |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| step-ca server behavior (provisioners, ACME challenges, attestation, policy, renew)     | `./repos/step-ca/` (smallstep/certificates, tag `v0.29.0` = nixpkgs-26.05)                                     |
-| step CLI behavior (flags, issuance/renewal flows, KMS/attestation handling)             | `./repos/step-cli/` (smallstep/cli, tag `v0.30.2` = nixpkgs-26.05)                                             |
-| go.step.sm/crypto (KMS drivers, YubiKey PIV, pemutil, x509util)                         | `./repos/crypto/` (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins v0.74.0)                        |
-| Kanidm server/CLI behavior                                                              | `./repos/kanidm/`                                                                                              |
-| puppeteer / headless chrome printing (`page.pdf`, launch args, `waitForSelector`)       | `./repos/puppeteer/` (tag `puppeteer-core-v25.16.0` = the npm pin in homelab-services-node)                    |
-| Technitium DNS behavior                                                                 | `./repos/technitium-dnsserver/`                                                                                |
-| OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)               | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)                               |
-| OpenCode behavior (client/server split, `service` mode, registration, HTTP API)         | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                                     |
-| open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, `main` squashed; parser in `src/app/lib/parse-resume-from-pdf/`) |
+| Question about                                                                          | Resolves to                                                                                                     |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| step-ca server behavior (provisioners, ACME challenges, attestation, policy, renew)     | `./repos/step-ca/` (smallstep/certificates, tag `v0.29.0` = nixpkgs-26.05)                                      |
+| step CLI behavior (flags, issuance/renewal flows, KMS/attestation handling)             | `./repos/step-cli/` (smallstep/cli, tag `v0.30.2` = nixpkgs-26.05)                                              |
+| go.step.sm/crypto (KMS drivers, YubiKey PIV, pemutil, x509util)                         | `./repos/crypto/` (tag `v0.77.1` = step-cli's go.mod pin; step-ca v0.29.0 pins v0.74.0)                         |
+| Kanidm server/CLI behavior                                                              | `./repos/kanidm/`                                                                                               |
+| puppeteer / headless chrome printing (`page.pdf`, launch args, `waitForSelector`)       | `./repos/puppeteer/` (tag `puppeteer-core-v25.16.0` = the npm pin in homelab-services-node)                     |
+| Technitium DNS behavior                                                                 | `./repos/technitium-dnsserver/`                                                                                 |
+| OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)               | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)                                |
+| OpenCode behavior (client/server split, `service` mode, registration, HTTP API)         | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                                      |
+| open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, pinned at `main`; parser in `src/app/lib/parse-resume-from-pdf/`) |
 
-If a needed upstream is not vendored yet, add it as a subtree (see the `effect-services` skill →
-"Adding a New Vendored Subtree") pinned to the tag nixpkgs builds, rather than relying on web
+If a needed upstream is not vendored yet, add it as a submodule (see the `effect-services` skill →
+"Adding a New Vendored Submodule") pinned to the tag nixpkgs builds, rather than relying on web
 lookups.
 
 ### Hosts

@@ -1,8 +1,0 @@
-{
-	"name": "@test/passthrough-image-service",
-	"version": "0.0.0",
-	"private": true,
-	"dependencies": {
-		"astro": "workspace:*"
-	}
-}

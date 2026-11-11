@@ -1,7 +1,0 @@
-{
-  "extends": "../../../configs/tsconfig.language-tools.json",
-  "compilerOptions": {
-    "emitDeclarationOnly": false
-  },
-  "references": [{ "path": "../yaml2ts/tsconfig.json" }]
-}
