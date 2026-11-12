@@ -14,6 +14,7 @@ export const SECTION_TITLE_CSS = {
   "@media print": {
     textTransform: "uppercase",
     fontWeight: "bold",
+    display: "unset",
   },
 }
 

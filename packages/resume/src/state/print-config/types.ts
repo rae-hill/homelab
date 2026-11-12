@@ -150,7 +150,7 @@ export const initialPrintConfigState: PrintConfigState = {
     githubLink: true,
     linkedinLink: true,
   },
-  featuredMode: "Inline",
+  featuredMode: "External",
   sections: {
     experience: {
       layout: { kind: "Stacked", order: "TagsBelow" },

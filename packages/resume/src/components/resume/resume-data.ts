@@ -273,12 +273,14 @@ const tagOccurrences: ReadonlyArray<string> = [
   ...projects.flatMap((project) => project.tags),
 ]
 
+export const allTagsUnsorted = Array.from(new Set(tagOccurrences))
+
 /**
  * The union of every tag used across experience entries and projects. Duplicates
  * are collapsed and the result is sorted so downstream consumers (e.g. the tag
  * cloud) receive a stable, deterministic ordering.
  */
-export const allTags: ReadonlyArray<string> = Array.from(new Set(tagOccurrences)).sort(
+export const allTags: ReadonlyArray<string> = allTagsUnsorted.sort(
   (a, b) => a.localeCompare(b),
 )
 

@@ -2,7 +2,7 @@ import { Heading, HStack, Icon, Separator, Text, VStack } from "@chakra-ui/react
 import type { IconType } from "react-icons"
 import { MdOutlineVerified } from "react-icons/md"
 import { PiGraduationCap } from "react-icons/pi"
-import { useFeaturedMode, useToggles } from "../../../state/print-config"
+import { useContent, useFeaturedMode, useHeadingConfig, useToggles } from "../../../state/print-config"
 import { SECTION_TITLE_CSS } from "./print-css"
 
 interface FeaturedItem {
@@ -13,7 +13,7 @@ interface FeaturedItem {
   readonly blockLabel: string
   readonly title: string
   readonly subtitle: string
-  readonly detail: string
+  readonly detail?: string
 }
 
 const featuredItems: ReadonlyArray<FeaturedItem> = [
@@ -22,9 +22,9 @@ const featuredItems: ReadonlyArray<FeaturedItem> = [
     iconColor: "var(--rh-resume-tag-colors-violet)",
     label: "Education",
     blockLabel: "Education",
-    title: "BS Applied Mathematics",
+    title: "Bachelor of Mathematics",
     subtitle: "New Mexico State University",
-    detail: "Graduated May 2022",
+    detail: "August 2018 - May 2022",
   },
   {
     icon: MdOutlineVerified,
@@ -32,8 +32,7 @@ const featuredItems: ReadonlyArray<FeaturedItem> = [
     label: "Certification",
     blockLabel: "Certifications",
     title: "CompTIA Security+ (SY0-701)",
-    subtitle: "Earned August 2025",
-    detail: "Expires August 2028",
+    subtitle: "August 2025 - August 2028",
   },
 ]
 
@@ -85,9 +84,11 @@ function FeaturedBox({
       <Text m={0} textStyle="xs" fontFamily="serifr" opacity={0.85}>
         {subtitle}
       </Text>
-      <Text m={0} textStyle="xs" fontFamily="serifr" opacity={0.65}>
-        {detail}
-      </Text>
+      {detail !== undefined && (
+        <Text m={0} textStyle="xs" fontFamily="serifr" opacity={0.65}>
+          {detail}
+        </Text>
+      )}
     </VStack>
   )
 }
@@ -132,6 +133,8 @@ function FeaturedBlock({ blockLabel, detail, subtitle, title }: FeaturedItem) {
 export function Featured() {
   const { toggles } = useToggles()
   const { featuredMode } = useFeaturedMode()
+  const { heading: { description, gap } } = useHeadingConfig()
+  const { content: { blurb } } = useContent()
   const external = featuredMode === "External"
   const block = featuredMode === "Block"
   const showEducation = (external || block) && toggles.education
@@ -144,47 +147,92 @@ export function Featured() {
         as="section"
         w="full"
         alignItems="stretch"
-        mt={2}
+        mt={gap}
         mb={2}
         gap={2}
         display={showContainer ? "flex" : "none"}
       >
         {showEducation && <FeaturedBlock {...featuredItems[0]} />}
         {showCertification && <FeaturedBlock {...featuredItems[1]} />}
+        {description.kind === "Blurb" && (
+          <VStack
+            w="full"
+            flex="1"
+            gap={0}
+            display={{ base: "none", "2xl": "flex" }}
+            alignItems="flex-start"
+          >
+            <Heading as="h2" m={0} display="none" fontWeight="light" css={SECTION_TITLE_CSS}>
+              Summary
+            </Heading>
+            <Text
+              m={0}
+              w="full"
+              fontFamily="serifr"
+              lineHeight="shorter"
+              opacity={0.9}
+              textAlign={description.textAlign}
+            >
+              {blurb}
+            </Text>
+          </VStack>
+        )}
       </VStack>
     )
   }
 
   return (
-    <HStack
-      as="section"
-      w="full"
-      // Full-width below 2xl; capped and centered over the Projects column at 2xl.
-      maxW={{ base: "full", "2xl": "32rem" }}
-      mx="auto"
-      mt={5}
-      mb={3}
-      gap={0}
-      alignItems="stretch"
-      borderWidth={1}
-      borderStyle="solid"
-      borderColor="fg.muted"
-      borderRadius="14px"
-      overflow="hidden"
-      display={showContainer ? "flex" : "none"}
-    >
-      <FeaturedBox {...featuredItems[0]} printVisible={showEducation} />
-      <Separator
-        orientation="vertical"
-        alignSelf="stretch"
-        h="auto"
-        css={{
-          "@media print": {
-            display: showEducation && showCertification ? "block" : "none",
-          },
-        }}
-      />
-      <FeaturedBox {...featuredItems[1]} printVisible={showCertification} />
-    </HStack>
+    <VStack>
+      <HStack
+        as="section"
+        w="full"
+        // Full-width below 2xl; capped and centered over the Projects column at 2xl.
+        maxW={{ base: "full", "2xl": "32rem" }}
+        mx="auto"
+        mt={5}
+        mb={3}
+        gap={0}
+        alignItems="stretch"
+        borderWidth={1}
+        borderStyle="solid"
+        borderColor="fg.muted"
+        borderRadius="14px"
+        overflow="hidden"
+        display={showContainer ? "flex" : "none"}
+      >
+        <FeaturedBox {...featuredItems[0]} printVisible={showEducation} />
+        <Separator
+          orientation="vertical"
+          alignSelf="stretch"
+          h="auto"
+          css={{
+            "@media print": {
+              display: showEducation && showCertification ? "block" : "none",
+            },
+          }}
+        />
+        <FeaturedBox {...featuredItems[1]} printVisible={showCertification} />
+      </HStack>
+      {description.kind === "Blurb" && (
+        <VStack
+          w="full"
+          flex="1"
+          gap={0}
+          display={{ base: "none", "2xl": "flex" }}
+          alignItems={{ base: "center", "2xl": "flex-start" }}
+        >
+          <Text
+            m={0}
+            w="full"
+            fontFamily="serifr"
+            lineHeight="shorter"
+            opacity={0.9}
+            textAlign={description.textAlign}
+          >
+            {blurb}
+          </Text>
+        </VStack>
+      )}
+    </VStack>
   )
 }

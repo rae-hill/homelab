@@ -1,7 +1,8 @@
-import { Box, HStack, Text } from "@chakra-ui/react"
+import { Box, Heading, HStack, Text } from "@chakra-ui/react"
 
 import { useToggles } from "../../../state/print-config"
-import { allTags } from "../resume-data"
+import { allTags, allTagsUnsorted } from "../resume-data"
+import { SECTION_TITLE_CSS } from "./print-css"
 import * as Tech from "./technologies-list"
 import { rfcTags } from "./technologies-list"
 
@@ -26,7 +27,7 @@ function hash01(input: string): number {
  */
 const shuffledTags: ReadonlyArray<string> = [...allTags].sort(
   (a, b) => hash01(`${a}~seed`) - hash01(`${b}~seed`),
-)
+).concat(rfcTags)
 
 interface TagPillProps {
   readonly tag: string
@@ -71,7 +72,28 @@ export function TagCloud() {
       justifyContent={{ base: "flex-start", "2xl": "center" }}
       display={toggles.tagCloud ? "flex" : "none"}
     >
+      <Heading as="h2" m={0} display="none" fontWeight="light" css={SECTION_TITLE_CSS}>
+        Skills
+      </Heading>
+      <Text
+        css={{
+          "@media print": {
+            display: "unset",
+          },
+        }}
+        display="none"
+        m={0}
+        w="full"
+        lineHeight="shorter"
+      >
+        {allTagsUnsorted.join(", ")}
+      </Text>
       <HStack
+        css={{
+          "@media print": {
+            display: "none",
+          },
+        }}
         wrap="wrap"
         justifyContent="center"
         alignItems="center"
@@ -80,17 +102,6 @@ export function TagCloud() {
         mx="auto"
       >
         {shuffledTags.map((tag) => <TagPill key={tag} tag={tag} />)}
-      </HStack>
-      <HStack
-        wrap="wrap"
-        justifyContent="center"
-        alignItems="center"
-        gap={2}
-        maxW="32rem"
-        mx="auto"
-        mt={6}
-      >
-        {rfcTags.map((tag) => <TagPill key={tag} tag={tag} />)}
       </HStack>
     </Box>
   )

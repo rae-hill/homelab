@@ -9,6 +9,7 @@ import { useContent, useFeaturedMode, useHeadingConfig, useToggles } from "../..
 import { AvatarLetters } from "../avatar-letters"
 import { IconText } from "../icon-text"
 import * as Links from "../links"
+import { SECTION_TITLE_CSS } from "./print-css"
 
 /** Terse pipe-separated tagline lines shown when the mode is `SkillList`. */
 const SKILL_LINES: ReadonlyArray<string> = [
@@ -52,9 +53,8 @@ export function ResumeHeading() {
       fontFamily="victor"
       w="full"
       pt={10}
-      mb={3}
       gap={gap}
-      minH={{ base: "auto", "2xl": "20rem" }}
+      minH="auto"
       alignItems={{ base: "center", "2xl": "flex-start" }}
       justifyContent="center"
       textAlign={{ base: "center", "2xl": "left" }}
@@ -109,29 +109,14 @@ export function ResumeHeading() {
           </VStack>
         </HStack>
       </VStack>
-      <VStack
-        w="full"
-        flex="1"
-        gap={description.kind === "SkillList" ? skillListGap : 1}
-        {...(description.kind === "SkillList" ?
-          boxAlign(description.align)
-          : { alignItems: { base: "center", "2xl": "flex-start" } })}
-      >
-        {description.kind === "Blurb" ?
-          (
-            <Text
-              m={0}
-              w="full"
-              fontFamily="serifr"
-              fontStyle="italic"
-              lineHeight="shorter"
-              opacity={0.9}
-              textAlign={description.textAlign}
-            >
-              {content.blurb}
-            </Text>
-          )
-          : SKILL_LINES.map((line) => (
+      {description.kind === "SkillList" && (
+        <VStack
+          w="full"
+          flex="1"
+          gap={skillListGap}
+          {...boxAlign(description.align)}
+        >
+          {SKILL_LINES.map((line) => (
             <Text
               key={line}
               m={0}
@@ -143,7 +128,8 @@ export function ResumeHeading() {
               {line}
             </Text>
           ))}
-      </VStack>
+        </VStack>
+      )}
       <VStack w="full" flex="1" gap={contactGap} {...boxAlign(contactAlign)}>
         <Box css={visibilityGate(toggles.address)}>
           <IconText icon={LuMapPin} fontSize={iconTextSize}>
@@ -222,6 +208,29 @@ export function ResumeHeading() {
           )}
         </HStack>
       </VStack>
+      {description.kind === "Blurb" && (
+        <VStack
+          w="full"
+          flex="1"
+          gap={0}
+          display={{ base: "flex", "2xl": "none" }}
+          alignItems="flex-start"
+        >
+          <Heading as="h2" m={0} display="none" fontWeight="light" css={SECTION_TITLE_CSS}>
+            Summary
+          </Heading>
+          <Text
+            m={0}
+            w="full"
+            fontFamily="serifr"
+            lineHeight="shorter"
+            opacity={0.9}
+            textAlign={description.textAlign}
+          >
+            {content.blurb}
+          </Text>
+        </VStack>
+      )}
     </VStack>
   )
 }
