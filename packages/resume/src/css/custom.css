@@ -153,11 +153,12 @@ div:has(.confetties-iframe) {
   }
 }
 
+/*
 @page :right {
   @bottom-center {
     content: "Last updated: " var(--chakra-z-index-todays-date) ""
       var(--chakra-z-index-print-footer-revision)
-      ".  For an up to date version, visit https://rae-hill.dev/resume";
+      ".  For an up to date version, visit https://resume.rae-hill.dev";
     font-family:
       Caladea, Tinos, "Liberation Serif", "Times New Roman", Times, serif;
     font-size: 6pt;
@@ -169,13 +170,14 @@ div:has(.confetties-iframe) {
   @bottom-center {
     content: "Last updated: " var(--chakra-z-index-todays-date) ""
       var(--chakra-z-index-print-footer-revision)
-      ".  For an up to date version, visit https://rae-hill.dev/resume";
+      ".  For an up to date version, visit https://resume.rae-hill.dev";
     font-family:
       Caladea, Tinos, "Liberation Serif", "Times New Roman", Times, serif;
     font-size: 6pt;
     color: var(--ifm-color-scheme);
   }
 }
+*/
 
 @media print {
   div:has(.confetties-iframe) {
