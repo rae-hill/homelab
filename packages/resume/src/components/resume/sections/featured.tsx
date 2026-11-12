@@ -108,10 +108,10 @@ function FeaturedBlock({ blockLabel, detail, subtitle, title }: FeaturedItem) {
       <Heading
         as="h2"
         m={0}
-        fontWeight="bold"
+        fontWeight="light"
         lineHeight="shorter"
-        textTransform="uppercase"
-        letterSpacing="wide"
+        // textTransform="uppercase"
+        // letterSpacing="wide"
         css={SECTION_TITLE_CSS}
       >
         {blockLabel}
@@ -144,9 +144,9 @@ export function Featured() {
         as="section"
         w="full"
         alignItems="stretch"
-        mt={5}
-        mb={3}
-        gap={4}
+        mt={2}
+        mb={2}
+        gap={2}
         display={showContainer ? "flex" : "none"}
       >
         {showEducation && <FeaturedBlock {...featuredItems[0]} />}

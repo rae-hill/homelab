@@ -729,6 +729,7 @@ export function PrintConfigFab({
         placement="bottom"
         motionPreset="slide-in-bottom"
         scrollBehavior="inside"
+        preventScroll={false}
       >
         <Tooltip
           showArrow

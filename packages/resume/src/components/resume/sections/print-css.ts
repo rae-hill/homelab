@@ -11,6 +11,10 @@
 /** Section titles ("Experience", "Projects", "Education", …): `md` on screen and print. */
 export const SECTION_TITLE_CSS = {
   fontSize: "md !important",
+  "@media print": {
+    textTransform: "uppercase",
+    fontWeight: "bold",
+  },
 }
 
 /**

@@ -77,34 +77,36 @@ export function ResumeHeading() {
             css={{
               cornerShape: "squircle",
             }}
-            w={"3rem"}
-            h={"3rem"}
+            w={"4rem"}
+            h={"4rem"}
             mr={2}
             colorPalette="green"
             borderRadius="2rem"
             aria-label="RH"
           >
-            <Avatar.Fallback>
+            <Avatar.Fallback as={HStack} justifyContent="center">
               <AvatarLetters />
             </Avatar.Fallback>
           </Avatar.Root>
-          <Heading
-            fontFamily="inherit"
-            as="h1"
-            css={{
-              fontSize: "2xl !important",
-              // Plain space (not &nbsp;) so PDF text extraction keeps the name as one
-              // run; nowrap preserves the no-wrap behavior nbsp provided on screen.
-              whiteSpace: "nowrap",
-            }}
-            mb={0}
-            gap={0}
-          >
-            Rae Hill
-          </Heading>
-          <Text textStyle="xs" alignSelf="center" mb={0} pt={2}>
-            (she/her)
-          </Text>
+          <VStack gap={0}>
+            <Heading
+              fontFamily="inherit"
+              as="h1"
+              css={{
+                fontSize: "2xl !important",
+                // Plain space (not &nbsp;) so PDF text extraction keeps the name as one
+                // run; nowrap preserves the no-wrap behavior nbsp provided on screen.
+                whiteSpace: "nowrap",
+              }}
+              mb={0}
+              gap={0}
+            >
+              Rae Hill
+            </Heading>
+            <Text textStyle="xs" alignSelf="flex-start" mb={0}>
+              (she/her)
+            </Text>
+          </VStack>
         </HStack>
       </VStack>
       <VStack

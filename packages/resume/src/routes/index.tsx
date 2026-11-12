@@ -91,7 +91,7 @@ function Home() {
             },
             "@page": {
               size: "letter portrait",
-              margin: "0.75in",
+              margin: "1in",
               bg: "bg",
             },
           }}
