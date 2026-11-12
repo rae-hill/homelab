@@ -1,0 +1,26 @@
+# Flake evaluation gate — moved here from lint-staged (pre-commit). Pre-commit
+# tasks run inside lint-staged's stash/restore window, so evaluating the flake
+# there ingested transient worktree states into the Nix store (see
+# docs/nix-store-poisoning/README.md). Pre-push runs against the committed tree.
+#
+# Runs only when the pushed range touches .nix files or flake.lock.
+
+zero=0000000000000000000000000000000000000000
+nix_change=0
+
+# stdin: one "<local-ref> <local-sha> <remote-ref> <remote-sha>" line per ref
+# shellcheck disable=SC2034
+while read -r local_ref local_sha remote_ref remote_sha; do
+	if [ "$local_sha" = "$zero" ]; then continue; fi # branch deletion
+	if [ "$remote_sha" = "$zero" ]; then
+		nix_change=1 # new branch: no cheap range to diff
+	elif ! changed=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null); then
+		nix_change=1 # unknown remote sha (diverged/force push): check to be safe
+	elif printf '%s\n' "$changed" | grep -qE '\.nix$|^flake\.lock$'; then
+		nix_change=1
+	fi
+done
+
+if [ "$nix_change" != 1 ]; then exit 0; fi
+
+nix flake check --no-build

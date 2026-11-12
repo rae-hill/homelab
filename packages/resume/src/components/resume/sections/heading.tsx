@@ -216,7 +216,7 @@ export function ResumeHeading() {
           display={{ base: "flex", "2xl": "none" }}
           alignItems="flex-start"
         >
-          <Heading as="h2" m={0} display="none" fontWeight="light" css={SECTION_TITLE_CSS}>
+          <Heading as="h2" m={0} display="none" lineHeight="shorter" fontWeight="light" css={SECTION_TITLE_CSS}>
             Summary
           </Heading>
           <Text

@@ -13,7 +13,9 @@ git commit --no-verify -m "..."
 This repo has a **husky `pre-commit` hook** wired to `lint-staged` (see
 `lint-staged.config.js` and `.husky/pre-commit`). The hook runs formatters, ESLint,
 `yarn test:staged`, `yarn lint`, `yarn typecheck`, and — for `.nix` files —
-`nix run .#nixfmt` + `nix flake check`.
+`nix run .#nixfmt`. `nix flake check --no-build` runs from `.husky/pre-push`
+instead: inside lint-staged's stash/restore window it would evaluate the flake
+against transient worktree states (see `docs/nix-store-poisoning/README.md`).
 
 In an agent/CLI environment this hook misbehaves and interferes with tool-driven commits:
 
@@ -21,8 +23,8 @@ In an agent/CLI environment this hook misbehaves and interferes with tool-driven
   afterward. If anything in the hook fails or is killed partway through, the stash/restore
   dance can leave changes in an unexpected state. This does not play well with
   non-interactive CLI tool-calls, which cannot intervene in a half-finished stash.
-- The `.nix` branch runs `nix run .#nixfmt` and `nix flake check`, which are heavy; in a
-  minimal non-interactive shell they can be **SIGKILL'd** (resource/time limits) or error
+- The `.nix` branch runs `nix run .#nixfmt`, which is heavy; in a minimal
+  non-interactive shell it can be **SIGKILL'd** (resource/time limits) or error
   (`dprint fmt .` → `Is a directory`), aborting the commit midway.
 
 Because an **agent always runs its own checks** before committing (see

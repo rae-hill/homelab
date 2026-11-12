@@ -162,7 +162,7 @@ export function Featured() {
             display={{ base: "none", "2xl": "flex" }}
             alignItems="flex-start"
           >
-            <Heading as="h2" m={0} display="none" fontWeight="light" css={SECTION_TITLE_CSS}>
+            <Heading lineHeight="shorter" as="h2" m={0} display="none" fontWeight="light" css={SECTION_TITLE_CSS}>
               Summary
             </Heading>
             <Text
