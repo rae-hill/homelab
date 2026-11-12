@@ -56,16 +56,27 @@
           (inputs.import-tree ./nix-config/modules)
         ];
 
-        # Lint the extracted e2e script (scripts/e2e.sh) through the ShellCheck
-        # gate: `nix flake check` / `nix build .#checks.x86_64-linux.shellcheck`
-        # builds this spec, which runs ShellCheck over the exact script text.
-        # The devshell `e2e` command execs the same file.
+        # Lint repo shell scripts through the ShellCheck gate: `nix flake check` /
+        # `nix build .#checks.x86_64-linux.shellcheck` builds these specs, which
+        # run ShellCheck over the exact script text.
+        # - scripts/e2e.sh: the devshell `e2e` command execs the same file.
+        # - .husky/pre-push: the flake-eval gate moved out of lint-staged's
+        #   stash/restore window (see docs/nix-store-poisoning/README.md);
+        #   husky executes hook files with sh.
         flake.lintedShellScripts = [
           (
             pkgs:
             config.constants.shell.checkScriptText pkgs {
               name = "e2e";
               text = builtins.readFile ./scripts/e2e.sh;
+            }
+          )
+          (
+            pkgs:
+            config.constants.shell.checkScriptText pkgs {
+              name = "husky-pre-push";
+              text = builtins.readFile ./.husky/pre-push;
+              shell = "sh";
             }
           )
         ];
