@@ -760,7 +760,7 @@ export function PrintConfigFab({
             rounded="full"
             size="xl"
             shadow="lg"
-            colorPalette="gray"
+            variant="surface"
             // Use `aria-disabled` rather than the native `disabled` attribute so the button
             // still receives hover events and the "cheatcode" tooltip shows while locked.
             aria-disabled={!editingEnabled}

@@ -73,8 +73,8 @@ export function DownloadFab({
             borderBottomRightRadius={0}
             borderTopLeftRadius="full"
             borderBottomLeftRadius="full"
+            variant="surface"
             onClick={onDownload}
-            colorPalette="gray"
             spinner={busy}
             px={5}
           >
@@ -88,8 +88,7 @@ export function DownloadFab({
             rounded="full"
             size="lg"
             aria-disabled={busy}
-            colorPalette="gray"
-            variant="solid"
+            variant="surface"
             spinner={busy}
             borderLeft="xs"
           >
