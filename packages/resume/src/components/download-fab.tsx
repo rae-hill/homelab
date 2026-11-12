@@ -1,6 +1,7 @@
-import { Group, IconButton, Menu, Portal, Spinner } from "@chakra-ui/react"
+import { Group, IconButton, Menu, Portal, Text } from "@chakra-ui/react"
 import { LuChevronDown, LuDownload } from "react-icons/lu"
 
+import { useCallback, useState } from "react"
 import { useCanPrintResume } from "../state/homelab"
 import { Tooltip } from "./chakra/tooltip"
 import { ResumeFormatMenuItems, useResumeDownload } from "./resume-download"
@@ -24,18 +25,24 @@ export interface DownloadFabProps {
  * `__root.tsx`.
  */
 export function DownloadFab({
-  bottom = [100, 100, 14],
-  left = [10, 10, 140],
+  bottom = [8, 8, 14],
+  left = [100, 100, 140],
 }: DownloadFabProps) {
+  const [selectedFileFormat, setSelectedFileFormat] = useState<"pdf" | "docx">("pdf")
   const canPrint = useCanPrintResume()
   const { busyFormat, download } = useResumeDownload()
+
+  const hidePrint = { "@media print": { display: "none" } }
+  const busy = busyFormat !== null
+
+  const onDownload = useCallback(() => download(selectedFileFormat), [download, selectedFileFormat])
+
+  const onSelectPdf = useCallback(() => setSelectedFileFormat("pdf"), [])
+  const onSelectDocx = useCallback(() => setSelectedFileFormat("docx"), [])
 
   if (!canPrint) {
     return null
   }
-
-  const hidePrint = { "@media print": { display: "none" } }
-  const busy = busyFormat !== null
 
   return (
     <Menu.Root positioning={{ placement: "top-start" }}>
@@ -46,7 +53,7 @@ export function DownloadFab({
         position="fixed"
         left={left}
         bottom={bottom}
-        shadow="lg"
+        filter="drop-shadow(0px 8px 16px color-mix(in srgb, #18181b 10%, transparent)) drop-shadow(0px 0px 1px color-mix(in srgb, #18181b 30%, transparent))"
       >
         <Tooltip
           showArrow
@@ -60,13 +67,19 @@ export function DownloadFab({
         >
           <IconButton
             aria-label="download resume pdf"
-            rounded="full"
-            size="xl"
-            colorPalette="purple"
+            size="lg"
             aria-disabled={busy}
-            onClick={() => download("pdf")}
+            borderTopRightRadius={0}
+            borderBottomRightRadius={0}
+            borderTopLeftRadius="full"
+            borderBottomLeftRadius="full"
+            onClick={onDownload}
+            colorPalette="cyan"
+            spinner={busy}
+            px={5}
           >
-            {busyFormat === "pdf" ? <Spinner size="sm" /> : <LuDownload />}
+            <LuDownload />
+            <Text textStyle="sm">Download {selectedFileFormat.toUpperCase()}</Text>
           </IconButton>
         </Tooltip>
         <Menu.Trigger asChild>
@@ -74,17 +87,19 @@ export function DownloadFab({
             aria-label="choose download format"
             rounded="full"
             size="lg"
-            colorPalette="purple"
             aria-disabled={busy}
+            colorPalette="cyan"
+            variant="subtle"
+            spinner={busy}
           >
-            {busyFormat === "docx" ? <Spinner size="sm" /> : <LuChevronDown />}
+            <LuChevronDown />
           </IconButton>
         </Menu.Trigger>
       </Group>
       <Portal>
         <Menu.Positioner>
           <Menu.Content css={hidePrint}>
-            <ResumeFormatMenuItems download={download} disabled={busy} />
+            <ResumeFormatMenuItems onSelectDocx={onSelectDocx} onSelectPdf={onSelectPdf} disabled={busy} />
           </Menu.Content>
         </Menu.Positioner>
       </Portal>

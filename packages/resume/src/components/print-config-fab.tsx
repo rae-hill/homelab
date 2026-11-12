@@ -10,7 +10,6 @@ import {
   Portal,
   SegmentGroup,
   SimpleGrid,
-  Spinner,
   Stack,
   Switch,
   Tabs,
@@ -47,6 +46,7 @@ import {
   LuX,
 } from "react-icons/lu"
 
+import { useCallback, useState } from "react"
 import { MdOutlineVisibility } from "react-icons/md"
 import { useKonamiCode } from "../hooks/useKonamiCode"
 import { useResizableHeight } from "../hooks/useResizableHeight"
@@ -679,6 +679,12 @@ export function PrintConfigFab({
   // Imperative drag-to-resize for the modal (height mutated directly, no re-render).
   const { handleProps, ref: resizeRef } = useResizableHeight({ minPx: 160 })
 
+  const [selectedFileFormat, setSelectedFileFormat] = useState<"pdf" | "docx">("pdf")
+
+  const downloadSelectedFormat = useCallback(() => download(selectedFileFormat), [download, selectedFileFormat])
+  const selectPdf = useCallback(() => setSelectedFileFormat("pdf"), [])
+  const selectDocx = useCallback(() => setSelectedFileFormat("docx"), [])
+
   const searchParams = search as {
     [OPEN_QUERY_PARAM]?: boolean | string
     [TAB_QUERY_PARAM]?: string
@@ -689,6 +695,8 @@ export function PrintConfigFab({
       searchParams[OPEN_QUERY_PARAM] === "true")
   const rawTab = searchParams[TAB_QUERY_PARAM]
   const tab: SettingsTab = TABS.includes(rawTab as SettingsTab) ? (rawTab as SettingsTab) : "print"
+
+  const busy = busyFormat !== null
 
   function setOpen(next: boolean) {
     navigate({
@@ -974,10 +982,10 @@ export function PrintConfigFab({
                           <Button
                             colorPalette="teal"
                             aria-disabled={busyFormat !== null}
-                            onClick={() => download("pdf")}
+                            onClick={downloadSelectedFormat}
+                            spinner={busy}
                           >
-                            {busyFormat === "pdf" ? <Spinner size="sm" /> : null}
-                            Print
+                            Download {selectedFileFormat.toUpperCase()}
                           </Button>
                           <Menu.Trigger asChild>
                             <IconButton
@@ -986,14 +994,18 @@ export function PrintConfigFab({
                               variant="solid"
                               aria-disabled={busyFormat !== null}
                             >
-                              {busyFormat === "docx" ? <Spinner size="sm" /> : <LuChevronDown />}
+                              <LuChevronDown />
                             </IconButton>
                           </Menu.Trigger>
                         </Group>
                         <Portal>
                           <Menu.Positioner>
                             <Menu.Content>
-                              <ResumeFormatMenuItems download={download} disabled={busyFormat !== null} />
+                              <ResumeFormatMenuItems
+                                onSelectPdf={selectPdf}
+                                onSelectDocx={selectDocx}
+                                disabled={busy}
+                              />
                             </Menu.Content>
                           </Menu.Positioner>
                         </Portal>

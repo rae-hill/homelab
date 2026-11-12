@@ -71,7 +71,8 @@ export function useResumeDownload(): ResumeDownloadState {
 }
 
 export interface ResumeFormatMenuItemsProps {
-  readonly download: (format: ResumeDocumentFormat) => void
+  readonly onSelectPdf: () => void
+  readonly onSelectDocx: () => void
   readonly disabled?: boolean
 }
 
@@ -79,13 +80,13 @@ export interface ResumeFormatMenuItemsProps {
  * The two format options shared by both split menus. Render inside a
  * `Menu.Content`.
  */
-export function ResumeFormatMenuItems({ disabled = false, download }: ResumeFormatMenuItemsProps) {
+export function ResumeFormatMenuItems({ disabled = false, onSelectDocx, onSelectPdf }: ResumeFormatMenuItemsProps) {
   return (
     <>
-      <Menu.Item value="pdf" disabled={disabled} onClick={() => download("pdf")}>
+      <Menu.Item value="pdf" disabled={disabled} onClick={onSelectPdf}>
         PDF
       </Menu.Item>
-      <Menu.Item value="docx" disabled={disabled} onClick={() => download("docx")}>
+      <Menu.Item value="docx" disabled={disabled} onClick={onSelectDocx}>
         DOCX (Word)
       </Menu.Item>
     </>
