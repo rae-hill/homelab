@@ -74,7 +74,7 @@ export function DownloadFab({
             borderTopLeftRadius="full"
             borderBottomLeftRadius="full"
             onClick={onDownload}
-            colorPalette="cyan"
+            colorPalette="gray"
             spinner={busy}
             px={5}
           >
@@ -88,9 +88,10 @@ export function DownloadFab({
             rounded="full"
             size="lg"
             aria-disabled={busy}
-            colorPalette="cyan"
-            variant="subtle"
+            colorPalette="gray"
+            variant="solid"
             spinner={busy}
+            borderLeft="xs"
           >
             <LuChevronDown />
           </IconButton>
