@@ -103,7 +103,7 @@ export function downloadResumeDocument(
 ): void {
   const meta = DOCUMENT_META[format]
   const today = new Date()
-  const days = (today.getDay() + 1).toString().padStart(2, "0")
+  const days = (today.getDate() + 1).toString().padStart(2, "0")
   const months = (today.getMonth() + 1).toString().padStart(2, "0")
   const year = today.getFullYear()
   const rhex = Math.random().toString(16).substring(2, 10)
