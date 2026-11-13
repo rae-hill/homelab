@@ -100,6 +100,8 @@
     x509PermittedCommonNames = [
       "G1447DK9FP"
       "D2TN90JVJV"
+      "W9PRY4JLCY"
+      "C0WR4XR52G"
     ];
 
     nvidia = {
