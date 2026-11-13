@@ -140,7 +140,7 @@ describe("TailorEntryStoreService", () => {
           meta: null,
           error: null,
         },
-      ] as any[],
+      ] as Array<any>,
     }
 
     storage.setItem(TAILOR_ENTRIES_STORAGE_KEY, JSON.stringify(legacyEnvelope))

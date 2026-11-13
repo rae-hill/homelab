@@ -34,6 +34,26 @@ function printSizeCss(fontSize: IconTextProps["fontSize"]) {
   return fontSize === undefined ? {} : { "@media print": { fontSize: PRINT_FONT_SIZE[fontSize] } }
 }
 
+/**
+ * Contact text wrapping rules. Screen: normal wrapping, so narrow mobile
+ * viewports wrap instead of overflowing the container. Print: nowrap keeps
+ * each contact a single unbroken PDF text run — parsers match phone/email/URL
+ * regexes against individual runs, so mid-item wrapping or splitting loses the
+ * value. The PDF is rendered in print media and is the only ATS-relevant
+ * output, so screen wrapping is invisible to parsers. The print font-size
+ * mapping is merged into the same `@media print` block (a second block via
+ * object spread would clobber the nowrap rule).
+ */
+function contactTextCss(fontSize: IconTextProps["fontSize"]) {
+  return {
+    whiteSpace: "normal" as const,
+    "@media print": {
+      whiteSpace: "nowrap" as const,
+      ...(fontSize === undefined ? {} : { fontSize: PRINT_FONT_SIZE[fontSize] }),
+    },
+  }
+}
+
 export function IconText({
   children,
   fontSize,
@@ -41,10 +61,7 @@ export function IconText({
   link,
   noMargins = false,
 }: IconTextProps) {
-  // nowrap keeps each contact a single unbroken PDF text run — parsers match
-  // phone/email/URL regexes against individual runs, so mid-item wrapping or
-  // splitting loses the value.
-  const textCss = { whiteSpace: "nowrap" as const, ...printSizeCss(fontSize) }
+  const textCss = contactTextCss(fontSize)
   return link === undefined ?
     (
       <HStack {...(noMargins ? {} : { mx: "2" })} wrap="nowrap" alignItems="center">
