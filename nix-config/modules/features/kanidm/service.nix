@@ -187,6 +187,14 @@ in
                 "radius.access_admin"
               ];
             };
+            "w9pry4jlcy" = {
+              displayName = "mbp";
+              mailAddresses = [ "W9PRY4JLCY@a.plato-splunk.media" ];
+              groups = [
+                "radius.access"
+                "radius.access_admin"
+              ];
+            };
             "c0wr4xr52g" = {
               displayName = "mini";
               mailAddresses = [ "C0WR4XR52G@a.plato-splunk.media" ];
