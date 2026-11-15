@@ -150,8 +150,8 @@ in
                 name = "client";
                 forceCN = true;
                 claims = {
-                  "maxTLSCertDuration" = "480h";
-                  "defaultTLSCertDuration" = "72h";
+                  "maxTLSCertDuration" = "729h";
+                  "defaultTLSCertDuration" = "168h";
                 };
                 challenges = [
                   "device-attest-01"
@@ -160,18 +160,7 @@ in
                   "step"
                 ];
                 options = {
-                  x509 = {
-                    template = ''
-                      {
-                        "subject": {
-                          "commonName": {{ toJson .Insecure.CR.Subject.CommonName }}
-                        },
-                        "sans": {{ toJson (append .SANs (dict "type" "dn" "value" (toJson (dict "commonName" (.Insecure.CR.Subject.CommonName | lower))))) }},
-                        "keyUsage": ["digitalSignature"],
-                        "extKeyUsage": ["clientAuth"]
-                      }
-                    '';
-                  };
+                  x509 = { };
                 };
               }
               {
