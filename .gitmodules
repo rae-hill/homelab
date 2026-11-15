@@ -78,3 +78,7 @@
 	path = repos/kanidm
 	url = https://github.com/kanidm/kanidm.git
 	shallow = true
+[submodule "repos/monitorOS"]
+	path = repos/monitorOS
+	url = https://github.com/eriskhan/monitorOS.git
+	shallow = true
