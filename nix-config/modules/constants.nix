@@ -102,6 +102,7 @@
       "D2TN90JVJV"
       "W9PRY4JLCY"
       "C0WR4XR52G"
+      "27193970"
     ];
 
     nvidia = {
