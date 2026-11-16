@@ -56,7 +56,7 @@ in
             "--allow-no-files"
             "--plugins"
           ]
-          ++ c.dprintPluginPaths
+          ++ c.dprintPluginPaths pkgs
           ++ [
             "--"
             "$FILE"

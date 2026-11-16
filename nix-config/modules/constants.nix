@@ -1,7 +1,6 @@
 {
   inputs,
   lib,
-  pkgs,
   config,
   ...
 }:
@@ -85,16 +84,17 @@
     };
 
     dprint = {
-      dprintPlugins = with pkgs.dprint-plugins; [
-        dprint-plugin-typescript
-        dprint-plugin-json
-        dprint-plugin-markdown
-        dprint-plugin-toml
-        g-plane-malva
-        g-plane-markup_fmt
-        g-plane-pretty_yaml
-      ];
-      dprintPluginPaths = map (p: "${p}/plugin.wasm") config.constants.dprintPlugins;
+      dprintPlugins =
+        pkgs: with pkgs.dprint-plugins; [
+          dprint-plugin-typescript
+          dprint-plugin-json
+          dprint-plugin-markdown
+          dprint-plugin-toml
+          g-plane-malva
+          g-plane-markup_fmt
+          g-plane-pretty_yaml
+        ];
+      dprintPluginPaths = pkgs: map (p: "${p}/plugin.wasm") (config.constants.dprint.dprintPlugins pkgs);
     };
 
     x509PermittedIps = [

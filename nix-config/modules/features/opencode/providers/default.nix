@@ -1,7 +1,7 @@
 { inputs, ... }:
 {
-  flake.modules.nixos.opencode-providers = {
-    imports = with inputs.self.modules.nixos; [
+  flake.modules.homeManager.opencode-providers = {
+    imports = with inputs.self.modules.homeManager; [
       opencode-providers-alibaba
     ];
   };

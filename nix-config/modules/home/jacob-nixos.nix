@@ -25,6 +25,7 @@ in
       hm.vscode
       hm.zsh
       hm.desktop-theming
+      hm.opencode
 
       (
         {

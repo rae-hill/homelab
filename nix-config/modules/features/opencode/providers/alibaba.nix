@@ -1,9 +1,14 @@
-{ config, inputs, ... }:
+{ inputs, ... }:
 {
-  flake.modules.nixos.opencode-providers-alibaba =
-    { pkgs, pkgs-unstable, ... }:
+  flake.modules.homeManager.opencode-providers-alibaba =
     {
-      providers = {
+      config,
+      pkgs,
+      pkgs-unstable,
+      ...
+    }:
+    {
+      programs.opencode.settings.providers = {
         "qwencloud-token-plan-personal" = {
           name = "QwenCloud";
           package = "@opencode/ai/providers/anthropic-compatible";
