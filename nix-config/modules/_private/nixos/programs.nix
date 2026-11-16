@@ -8,7 +8,17 @@
 {
   programs.dconf.enable = true;
 
-  programs.firefox.enable = true;
+  programs.firefox = {
+    enable = true;
+    policies = {
+      SecurityDevices.Add = {
+        "p11-kit-proxy" = "${pkgs.p11-kit}/lib/p11-kit-proxy.so";
+      };
+    };
+    nativeMessagingHosts = {
+      packages = [ pkgs.web-eid-app ];
+    };
+  };
 
   programs.steam = {
     enable = true;
@@ -92,4 +102,8 @@
     totem
     yelp
   ];
+
+  environment.etc."pkcs11/modules/opensc-pkcs11".text = ''
+    module: ${pkgs.opensc}/lib/opensc-pkcs11.so
+  '';
 }

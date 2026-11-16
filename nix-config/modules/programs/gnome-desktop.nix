@@ -1,6 +1,11 @@
 {
   flake.modules.nixos.gnome-desktop =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       services.desktopManager.gnome = {
         enable = true;
@@ -13,8 +18,6 @@
       services.gnome.gcr-ssh-agent.enable = false;
 
       services.printing.enable = true;
-
-      services.pcscd.enable = true;
 
       services.pulseaudio.enable = false;
 

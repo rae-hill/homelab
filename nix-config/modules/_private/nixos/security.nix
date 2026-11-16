@@ -12,6 +12,8 @@
 
   security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];
 
+  services.pcscd.enable = true;
+
   networking.firewall = {
     enable = true;
 
