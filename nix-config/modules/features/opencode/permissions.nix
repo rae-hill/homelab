@@ -88,7 +88,7 @@ let
   ];
 in
 {
-  flake.modules.nixos.opencode-permissions =
+  flake.modules.homeManager.opencode-permissions =
     { ... }:
     {
       programs.opencode.settings.permissions = [

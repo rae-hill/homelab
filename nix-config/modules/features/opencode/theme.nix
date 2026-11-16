@@ -1,6 +1,6 @@
 { inputs, ... }:
 {
-  flake.modules.nixos.opencode-theme =
+  flake.modules.homeManager.opencode-theme =
     { pkgs, pkgs-unstable, ... }:
     {
       # OpenCode V2 keeps terminal-client settings (theme, ...) in cli.json;

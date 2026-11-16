@@ -10,6 +10,11 @@
     imports = with inputs.self.modules.nixos; [
       opencode-catalog
       opencode-caddy-host
+    ];
+  };
+
+  flake.modules.homeManager.opencode = {
+    imports = with inputs.self.modules.homeManager; [
       opencode-program
     ];
   };

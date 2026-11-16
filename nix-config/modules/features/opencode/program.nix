@@ -1,6 +1,6 @@
 { inputs, ... }:
 {
-  flake.modules.nixos.opencode-program =
+  flake.modules.homeManager.opencode-program =
     { pkgs, pkgs-unstable, ... }:
     {
       imports = with inputs.self.modules.nixos; [

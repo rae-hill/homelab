@@ -8,7 +8,7 @@ let
   opencodeSvc = config.constants.services.opencode;
 in
 {
-  flake.modules.nixos.opencode-web =
+  flake.modules.homeManager.opencode-web =
     { ... }:
     {
       programs.opencode.web = {

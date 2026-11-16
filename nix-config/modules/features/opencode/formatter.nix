@@ -36,7 +36,7 @@ let
   ];
 in
 {
-  flake.modules.nixos.opencode-formatter =
+  flake.modules.homeManager.opencode-formatter =
     { pkgs, pkgs-unstable, ... }:
     {
       programs.opencode.settings.formatter = {
