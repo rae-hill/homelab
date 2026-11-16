@@ -10,6 +10,7 @@
     imports = with inputs.self.modules.nixos; [
       opencode-catalog
       opencode-caddy-host
+      opencode-program
     ];
   };
 }

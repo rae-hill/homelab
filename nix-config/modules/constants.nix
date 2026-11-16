@@ -1,4 +1,10 @@
-{ inputs, lib, ... }:
+{
+  inputs,
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 {
   options.constants = lib.mkOption {
     type = lib.types.attrs;
@@ -76,6 +82,19 @@
           v6 = "fd7a:115c:a1e0::b43a:4e2f";
         };
       };
+    };
+
+    dprint = {
+      dprintPlugins = with pkgs.dprint-plugins; [
+        dprint-plugin-typescript
+        dprint-plugin-json
+        dprint-plugin-markdown
+        dprint-plugin-toml
+        g-plane-malva
+        g-plane-markup_fmt
+        g-plane-pretty_yaml
+      ];
+      dprintPluginPaths = map (p: "${p}/plugin.wasm") config.constants.dprintPlugins;
     };
 
     x509PermittedIps = [
