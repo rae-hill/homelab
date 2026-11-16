@@ -8,7 +8,7 @@
   modulesPath,
   ...
 }:
-
+# TODO: move to features/systems/nixos/hardware.nix
 {
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")

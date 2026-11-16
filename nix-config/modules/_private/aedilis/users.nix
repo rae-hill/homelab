@@ -1,5 +1,6 @@
 { pkgs, ... }:
 {
+  # TODO: move to features/systems/aedilis/users.nix
   users.users = {
     admin = {
       isNormalUser = true;

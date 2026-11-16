@@ -46,8 +46,9 @@
     LC_TIME = "en_US.UTF-8";
   };
 
-  hardware.keyboard.qmk.enable = true;
+  hardware.keyboard.qmk.enable = true; # done
 
+  # done
   fonts = {
     packages = with pkgs; [
       victor-mono

@@ -1,5 +1,6 @@
 { inputs, config, ... }:
 {
+  # TODO: move to systems/___/sops.nix
   sops.defaultSopsFile = inputs.self + "/nix-config/secrets/aedilis.yaml";
   sops.age.keyFile = "/home/admin/.config/sops/age/keys.txt";
 

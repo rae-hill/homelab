@@ -6,8 +6,10 @@
   ...
 }:
 {
+  # done (gnome)
   programs.dconf.enable = true;
 
+  # done
   programs.firefox = {
     enable = true;
     policies = {
@@ -20,27 +22,36 @@
     };
   };
 
+  # done
   programs.steam = {
     enable = true;
     gamescopeSession.enable = true;
     remotePlay.openFirewall = true;
   };
 
+  # done
   programs.gamemode.enable = true;
 
+  # done
   programs._1password.enable = true;
 
+  # done
   programs._1password-gui = {
     enable = true;
-    polkitPolicyOwners = [ "jacob" ];
+    polkitPolicyOwners = [
+      "jacob"
+      "rae"
+    ];
   };
 
+  # done
   # No home-manager module :(
   programs.zoom-us = {
     enable = true;
     package = pkgs-unstable.zoom-us;
   };
 
+  # done
   environment.etc = {
     "1password/custom_allowed_browsers" = {
       text = ''
@@ -50,42 +61,47 @@
     };
   };
 
+  # done
   programs.zsh.enable = true;
 
+  # done
   services.udev.packages = with pkgs; [
-    via
-    qmk-udev-rules
-    gnome-settings-daemon
+    via # done
+    qmk-udev-rules # done
+    gnome-settings-daemon # done
   ];
 
+  # done
   environment.systemPackages = with pkgs; [
-    home-manager
-    vim
-    geekbench
-    git
-    git-credential-manager
-    mangohud
-    starship
-    zsh
-    via
-    quickemu
+    home-manager # won't include
+    vim # done
+    geekbench # won't include
+    git # done
+    git-credential-manager # won't include
+    mangohud # won't include
+    starship # won't include
+    zsh # won't include
+    via # done
+    quickemu # done
     adwaita-icon-theme
-    gnomeExtensions.appindicator
-    gnomeExtensions.uxplay-control
-    uxplay
-    openssl
-    cifs-utils
-    restic
-    step-cli
-    podman-compose
-    nvidia-vaapi-driver
+    gnomeExtensions.appindicator # done
+    gnomeExtensions.uxplay-control # done
+    uxplay # done
+    openssl # done
+    cifs-utils # done
+    restic # done
+    step-cli # done
+    podman-compose # done
+    nvidia-vaapi-driver # done
   ];
 
+  # done
   environment.variables = {
     LIBVA_DRIVER_NAME = "nvidia";
     NVD_BACKEND = "direct";
   };
 
+  # done
   environment.gnome.excludePackages = with pkgs; [
     orca
     geary
@@ -103,6 +119,7 @@
     yelp
   ];
 
+  # done
   environment.etc."pkcs11/modules/opensc-pkcs11".text = ''
     module: ${pkgs.opensc}/lib/opensc-pkcs11.so
   '';

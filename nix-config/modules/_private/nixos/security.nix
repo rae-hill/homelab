@@ -6,20 +6,25 @@
   ...
 }:
 {
+  # done
   security.sudo.execWheelOnly = true;
 
+  # done
   security.rtkit.enable = true;
 
+  # done
   security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];
 
+  # done
   services.pcscd.enable = true;
 
   networking.firewall = {
     enable = true;
 
+    # TODO: Move to features/systems/nixos/security.nix
     allowedTCPPorts = [
-      10300
-      10200
+      10300 # Remove
+      10200 # Remove
       49545
       58042
       56503
@@ -50,6 +55,7 @@
     };
   };
 
+  # done
   services.openssh = {
     openFirewall = false;
     settings = {
@@ -58,11 +64,13 @@
     };
   };
 
+  # done
   programs.ssh = {
     startAgent = true;
     enableAskPassword = true;
   };
 
+  # TODO: add to features/systems/nixos/ssh-certs.nix
   services.ssh-cert-renewer = {
     sshKeyName = "ssh_host_ed25519_key";
     enable = true;

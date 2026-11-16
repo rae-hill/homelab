@@ -6,14 +6,18 @@
   ...
 }:
 {
+  # done
   security.sudo.execWheelOnly = true;
 
   # Trust the internal root CA (for step-ca-issued certs on the Tailscale endpoints).
+  # done
   security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];
 
   networking.firewall = {
+    # done
     enable = true;
 
+    # TODO: move to systems/___/security.nix
     # Public, internet-facing ports.
     #
     # aedilis is a personal RECURSIVE resolver (NOT authoritative). Recursion is

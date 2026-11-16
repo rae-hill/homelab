@@ -5,14 +5,19 @@
   ...
 }:
 {
+  # done
   boot.loader.systemd-boot.enable = true;
+
+  # done
   boot.loader.efi.canTouchEfiVariables = true;
   # Bound boot entries kept on the small FAT32 ESP (/boot). Without this,
   # systemd-boot copies every generation's kernel + initrd to the ESP and
   # eventually fills it ("No space left on device" at the bootloader step).
   # Especially important here because linuxPackages_latest rolls kernels often.
+  # done
   boot.loader.systemd-boot.configurationLimit = 10;
 
+  # done
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
   networking.networkmanager.enable = true;

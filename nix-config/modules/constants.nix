@@ -130,6 +130,19 @@
       openSha256 = "sha256-nQnXGCcvo4i7eGaVft3Xc9dRUPPH0v9Zi87cfI4i/Ys=";
     };
 
+    ssh = {
+      public-keys = {
+        yk2 = "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIKpkbeZ6o6dX4eTh/Ak1i9rnb41XohfQdUISJ9QQepnkAAAABHNzaDo=";
+      };
+      principles = {
+        rae = "rae@plato-splunk.media";
+      };
+    };
+
+    sops = {
+
+    };
+
     users = {
       jacob = {
         name = "jacob";

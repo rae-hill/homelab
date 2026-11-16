@@ -1,5 +1,6 @@
 { pkgs, ... }:
 {
+  # TODO: Move to features/systems/nixos/users.nix
   users.users = {
     jacob = {
       isNormalUser = true;

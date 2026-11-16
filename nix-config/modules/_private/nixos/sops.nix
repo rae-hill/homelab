@@ -6,6 +6,7 @@
   ...
 }:
 {
+  # TODO: move to features/systems/nixos/sops.nix
   sops.defaultSopsFile = inputs.self + "/nix-config/secrets/nixos.yaml";
   sops.age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
 

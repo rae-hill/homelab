@@ -7,25 +7,31 @@
 {
   # OVHCloud base-image settings (preserved from the provisioned configuration.nix)
   # Workaround for https://github.com/NixOS/nix/issues/8502
+  # TODO: move to features/systems/aedilis/ (something?)
   services.logrotate.checkConfig = false;
-
-  boot.tmp.cleanOnBoot = true;
   zramSwap.enable = true;
 
+  # done
+  boot.tmp.cleanOnBoot = true;
+
   # BIOS/GRUB boot on the OVH VPS (no EFI).
+  # done
   boot.loader.grub.enable = true;
   # Bound the GRUB generation menu. GRUB keeps kernels on the root fs (not a tiny
   # ESP), so this is lower-risk than the systemd-boot hosts, but bounding the menu
   # keeps /boot tidy and consistent with the rest of the fleet.
+  # done
   boot.loader.grub.configurationLimit = 10;
 
+  # TODO: move to features/systems/aedilis/networking.nix
   networking.domain = "vps.ovh.us";
 
+  # done
   networking.networkmanager.enable = true;
 
+  # TODO: move to features/systems/aedilis/networking.nix
   networking.useNetworkd = true;
   networking.interfaces.ens3.useDHCP = true;
-
   # OVH IPv6. OVH VPS does not auto-configure IPv6 (no DHCPv6/SLAAC); the address
   # and gateway must be set statically from the OVH dashboard values. OVH assigns
   # the address as a /128 and treats the gateway as OFF-link — the gateway is not
@@ -61,10 +67,9 @@
     ];
   };
 
+  # done (see system-locale.nix)
   time.timeZone = "America/Denver";
-
   i18n.defaultLocale = "en_US.UTF-8";
-
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "en_US.UTF-8";
     LC_IDENTIFICATION = "en_US.UTF-8";
@@ -77,10 +82,12 @@
     LC_TIME = "en_US.UTF-8";
   };
 
+  # done
   networking.hosts = {
     "127.0.0.1" = [ "dns.plato-splunk.media" ];
   };
 
+  # done
   services.resolved = {
     enable = true;
     settings.Resolve = {
@@ -103,19 +110,23 @@
     };
   };
 
+  # TODO: move to features/systems/aedilis/users.nix
   services.getty.autologinUser = "admin";
 
   # The shared openssh module defaults AllowUsers to [ "jacob" ]; aedilis only has admin.
+  # TODO: move to features/systems/aedilis/ssh.nix
   services.openssh.settings.AllowUsers = [ "admin" ];
 
+  # done
   services.tailscale.enable = true;
   services.tailscale.extraSetFlags = [ "--webclient" ];
-
   # Allow Caddy to obtain a Tailscale TLS cert (used for Tailscale-only vhosts).
   systemd.services.tailscaled.environment.TS_PERMIT_CERT_UID = "caddy";
 
+  # done
   nixpkgs.config.allowUnfree = true;
 
   # Match the installed base image to avoid state migration surprises.
+  # TODO: move to features/systems/aedilis/nix.nix
   system.stateVersion = "23.11";
 }
