@@ -26,11 +26,11 @@ When the user refers to a package by name in a TypeScript/frontend/backend/test 
 
 When the user says "the Nix package for X," resolve to the appropriate service module:
 
-| User says                   | Resolves to                                                             |
-| --------------------------- | ----------------------------------------------------------------------- |
-| Nix package for homelab-api | `./nix-config/modules/services/service-homelab-api/package.nix`         |
-| Nix package for homelab-ui  | `./nix-config/modules/services/service-homelab-ui/package.nix`          |
-| homelab-api systemd service | `./nix-config/modules/services/service-homelab-api/systemd-service.nix` |
+| User says                   | Resolves to                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| Nix package for homelab-api | `./nix-config/modules/homelab/homelab-api/package.nix`         |
+| Nix package for homelab-ui  | `./nix-config/modules/homelab/homelab-ui/package.nix`          |
+| homelab-api systemd service | `./nix-config/modules/homelab/homelab-api/systemd-service.nix` |
 
 ### Nix Config Quick Reference
 
@@ -41,17 +41,33 @@ nix-config/
 ├── lib/                        # Shared Nix helpers (shell.nix)
 ├── checks/                     # Flake checks (shellcheck.nix)
 ├── modules/
+│   ├── ai/                     # AI modules (ai-opencode/, ai-openclaw/, ai-openwebui/,
+│   │                           #   ai-ollama, ai-wyoming)
+│   ├── apps/                   # App modules (apps-habitsync/, apps-home-assistant/,
+│   │                           #   apps-it-tools/, apps-jellyfin/, apps-minecraft,
+│   │                           #   apps-planka/)
+│   ├── data/                   # Data modules (data-postgres/)
 │   ├── desktop/                # Desktop modules (GNOME, nvidia, firefox, uxplay, git,
-│   │                           #   restic, kanidm client, virtualization, homebrew)
+│   │                           #   restic, virtualization, homebrew)
 │   ├── editors/                # Editors (editors-nixvim/, editors-vscode.nix)
 │   ├── games/                  # Gaming modules (steam, mangohud, complete set)
-│   ├── shell/                  # Shell modules (zsh, starship, ssh, complete set)
-│   ├── system/                 # System modules (system-base, boot, networking, audio,
-│   │                           #   fonts, podman, security, locale)
-│   ├── themes/                 # Themes (themes-catppuccin.nix)
-│   ├── programs/               # Remaining programs (program-cifs, program-opencode/)
-│   └── services/               # System services (service-caddy, service-step-ca,
-│                               #   service-homelab-api/, service-kanidm/, etc.)
+│   ├── homelab/                # Homelab core (homelab-api/, homelab-ui/, homelab-catalog/,
+│   │                           #   homelab-resume-site/, homelab-failure-notifs,
+│   │                           #   homelab-ssh-cert-renewer)
+│   ├── identity/               # Identity (identity-kanidm/, identity-step-ca, identity-acme,
+│   │                           #   identity-kanidm-client, identity-kanidm-posix)
+│   ├── networking/             # Networking (networking-caddy, networking-technitium/,
+│   │                           #   networking-radius/, networking-unpoller)
+│   ├── observability/          # Observability (observability-{alloy,grafana,loki,
+│   │                           #   prometheus,tempo})
+│   ├── provisioners/           # Provisioners (provisioners-technitium/,
+│   │                           #   provisioners-client-cert/)
+│   ├── shell/                  # Shell modules (zsh, starship, ssh incl. the openssh
+│   │                           #   daemon module, complete set)
+│   ├── system/                 # System modules (system-base, boot, networking
+│   │                           #   (+forwarding/-dns-host), security, locale, fonts,
+│   │                           #   podman, programs, cifs, audio)
+│   └── themes/                 # Themes (themes-catppuccin.nix)
 ├── home-configs/               # Home-manager configs per user/host
 │   ├── jacob-nixos.nix
 │   ├── jacob-augustus.nix
@@ -60,7 +76,8 @@ nix-config/
 ├── system-configs/             # Per-host entry points (aedilis, augustus, cicero, mini,
 │                               #   nixos, praeconinus)
 │   └── <host>/                 # default.nix + hardware/filesystems/security/users/
-│                               #   sops/system/programs.nix
+│                               #   sops/system/programs.nix (aedilis also has
+│                               #   technitium.nix; cicero also has observability/)
 └── secrets/                    # SOPS-encrypted secrets per host
 ```
 

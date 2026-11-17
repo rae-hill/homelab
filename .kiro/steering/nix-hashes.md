@@ -4,8 +4,8 @@ When yarn dependencies change (adding/removing/updating packages), the Nix build
 
 ## Affected Files
 
-- `nix-config/modules/services/service-homelab-api/package.nix`
-- `nix-config/modules/services/service-homelab-ui/package.nix`
+- `nix-config/modules/homelab/homelab-api/package.nix`
+- `nix-config/modules/homelab/homelab-ui/package.nix`
 
 Both use the same `fetchYarnBerryDeps` hash since they share the same monorepo `yarn.lock`.
 

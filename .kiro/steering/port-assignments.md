@@ -16,13 +16,13 @@ Update `docs/port-assignments.md` when:
 
 ## Where Ports Are Defined
 
-| Source                                                      | Purpose                                                 |
-| ----------------------------------------------------------- | ------------------------------------------------------- |
-| `nix-config/service-registry.nix`                           | Centralized port constants (most services)              |
-| `nix-config/modules/services/service-*`                     | Service-specific ports (exporters, internal gRPC, etc.) |
-| `nix-config/system-configs/<host>/security.nix`             | Firewall rules (which ports are externally accessible)  |
-| `nix-config/system-configs/<host>/programs.nix`             | Host-specific service configurations                    |
-| `nix-config/modules/services/service-cicero-observability/` | Cicero-specific metrics/observability ports             |
+| Source                                                                         | Purpose                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `nix-config/service-registry.nix`                                              | Centralized port constants (most services)              |
+| `nix-config/modules/{networking,observability,apps,ai,homelab,identity,data}/` | Service-specific ports (exporters, internal gRPC, etc.) |
+| `nix-config/system-configs/<host>/security.nix`                                | Firewall rules (which ports are externally accessible)  |
+| `nix-config/system-configs/<host>/programs.nix`                                | Host-specific service configurations                    |
+| `nix-config/system-configs/cicero/observability/`                              | Cicero-specific metrics/observability ports             |
 
 ## Conventions
 

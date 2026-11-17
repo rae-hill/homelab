@@ -72,7 +72,7 @@ in
     openRouterApiKeyFile = config.sops.secrets.homelab_api_openrouter_key.path;
     # Headless chrome for POST /resume/print (remote-printing feature). Chrome makes the
     # best PDFs; the wrapper resolves its own runtime deps via absolute store paths.
-    # resumeSiteUrl defaults to the tailnet resume-site vhost via modules/services/service-resume-site.
+    # resumeSiteUrl defaults to the tailnet resume-site vhost via modules/homelab/homelab-resume-site.
     chromeExecutable = "${pkgs.google-chrome}/bin/google-chrome-stable";
     apiKeys = {
       jacob = {
@@ -96,7 +96,7 @@ in
   };
 
   # The loopback resume-site vhost was replaced by the tailnet catalog entry
-  # https://resume.plato-splunk.media (modules/services/service-resume-site, imported in
+  # https://resume.plato-splunk.media (modules/homelab/homelab-resume-site, imported in
   # system-configs/augustus/default.nix) — it also points services.homelab-api.resumeSiteUrl at
   # itself, so nothing to configure here.
 

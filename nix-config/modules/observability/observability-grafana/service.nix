@@ -91,7 +91,7 @@ in
               access = "proxy";
               orgId = 1;
               jsonData = {
-                # Loki labels come from Alloy journald relabels (see modules/services/alloy.nix):
+                # Loki labels come from Alloy journald relabels (see modules/observability/observability-alloy.nix):
                 # `unit`, `hostname`, `syslevel`, `container`, `transport`. The homelab-api unit is
                 # `homelab-api.service`. There is NO `service_name` label, so Grafana's derived-field
                 # matcher finds nothing. Use a custom query keyed on the actual `unit` label.

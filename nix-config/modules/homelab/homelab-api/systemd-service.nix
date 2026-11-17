@@ -163,7 +163,7 @@ in
           description = ''
             RESUME_SITE_URL override for the PDF print service — the origin headless
             chrome loads when rendering POST /resume/print. Defaults (via the
-            modules/services/service-resume-site catalog module) to the tailnet-served local build,
+            modules/homelab/homelab-resume-site catalog module) to the tailnet-served local build,
             https://resume.plato-splunk.media, so printing does not depend on the
             public GitHub Pages deployment. Null keeps the code default
             (https://resume.rae-hill.dev).

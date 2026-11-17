@@ -1,6 +1,6 @@
 ---
 name: nix-hashes
-description: Procedure for updating stale fetchYarnBerryDeps hashes in nix-config/modules/services/service-homelab-api/package.nix and service-homelab-ui/package.nix. Use after yarn add/remove/up or any yarn.lock change, or when a Nix build fails with 'fetchYarnDeps hash is out of date'.
+description: Procedure for updating stale fetchYarnBerryDeps hashes in nix-config/modules/homelab/homelab-api/package.nix and homelab-ui/package.nix. Use after yarn add/remove/up or any yarn.lock change, or when a Nix build fails with 'fetchYarnDeps hash is out of date'.
 ---
 
 # Updating Nix fetchYarnBerryDeps Hashes
@@ -9,8 +9,8 @@ When yarn dependencies change (adding/removing/updating packages), the Nix build
 
 ## Affected Files
 
-- `nix-config/modules/services/service-homelab-api/package.nix`
-- `nix-config/modules/services/service-homelab-ui/package.nix`
+- `nix-config/modules/homelab/homelab-api/package.nix`
+- `nix-config/modules/homelab/homelab-ui/package.nix`
 
 Both use the same `fetchYarnBerryDeps` hash since they share the same monorepo `yarn.lock`.
 

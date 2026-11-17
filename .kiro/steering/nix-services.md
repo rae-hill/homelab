@@ -6,7 +6,7 @@ Systemd service failures on **augustus** are reported **directly to Pushover**. 
 
 ### How It Works
 
-1. The `failure-notifs` module (`nix-config/modules/services/service-failure-notifs.nix`) defines a oneshot systemd service triggered by `OnFailure=`
+1. The `failure-notifs` module (`nix-config/modules/homelab/homelab-failure-notifs.nix`) defines a oneshot systemd service triggered by `OnFailure=`
 2. When a monitored service fails, systemd invokes `failure-notifs.service` with `MONITOR_UNIT`, `MONITOR_SERVICE_RESULT`, and `MONITOR_EXIT_STATUS` environment variables (metadata is only propagated when a single unit triggers the handler)
 3. The service `POST`s directly to the Pushover Messages API (`https://api.pushover.net/1/messages.json`) with `token` + `user` + `message` (mirroring how Grafana talks to Pushover). There is no intermediary — the former Apprise container was removed because it was unreliable.
 

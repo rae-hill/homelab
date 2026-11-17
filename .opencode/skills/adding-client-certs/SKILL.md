@@ -7,7 +7,7 @@ description: End-to-end workflow for adding a new step-ca client-certificate use
 
 Companion to `docs/step-client-certs-plan.md` (read its §4 for the authorization model).
 Provisioners in this repo are **always hand-coded** in
-`nix-config/modules/services/service-step-ca.nix` — never created dynamically via the step-ca admin
+`nix-config/modules/identity/identity-step-ca.nix` — never created dynamically via the step-ca admin
 API. This skill is the checklist that compensates.
 
 Two models:
@@ -101,9 +101,9 @@ step crypto jwk create client-<use>-pub.json client-<use>-priv.json \
 (ACME device-attest templates read the CSR via `.Insecure.CR`; keep the existing `eap`
 template's DN-SAN line if editing that provisioner.)
 
-### 2b. Model B: JWK provisioner block in `services/service-step-ca.nix`
+### 2b. Model B: JWK provisioner block in `identity/identity-step-ca.nix`
 
-Follow the existing host-JWK pattern (`services/service-step-ca.nix:169-232`):
+Follow the existing host-JWK pattern (`identity/identity-step-ca.nix:169-232`):
 
 ```nix
 {
@@ -186,7 +186,7 @@ step ca certificate "<use>@plato-splunk.media" cert.crt key.pem \
   --token "$tok" --password-file <key-pw-file>       # key.pem written encrypted
 ```
 
-(Token flow mirrors `services/service-ssh-cert-renewer.nix:55-105`.)
+(Token flow mirrors `homelab/homelab-ssh-cert-renewer.nix:55-105`.)
 
 ### Model A (YubiKey; key plugged in)
 
@@ -236,7 +236,7 @@ step certificate verify --roots certs/alford-root.crt cert.crt
 - [ ] Model + use name + owner + durations decided
 - [ ] Provisioner UUID generated (and namespace OID exists in `constants.nix`)
 - [ ] (B) JWK keypair created; pub fields copied into provisioner block
-- [ ] Provisioner hand-coded in `services/service-step-ca.nix` with template (UUID ext + OU/owner,
+- [ ] Provisioner hand-coded in `identity/identity-step-ca.nix` with template (UUID ext + OU/owner,
       devices-map variant for serial identities) + claims
 - [ ] (A/serial) serial added to `x509PermittedCommonNames` + `devices` map
 - [ ] sops secrets added + declared on consuming host(s)
@@ -250,8 +250,8 @@ step certificate verify --roots certs/alford-root.crt cert.crt
 ## References
 
 - Plan + authorization model: `docs/step-client-certs-plan.md` (§2 Model A, §3 Model B, §4 lockdown)
-- CA config: `nix-config/modules/services/service-step-ca.nix` (provisioners `:106-233`, policy `:55-75`)
-- Token-flow precedent: `nix-config/modules/services/service-ssh-cert-renewer.nix:55-105`
+- CA config: `nix-config/modules/identity/identity-step-ca.nix` (provisioners `:106-233`, policy `:55-75`)
+- Token-flow precedent: `nix-config/modules/homelab/homelab-ssh-cert-renewer.nix:55-105`
 - Source of truth (vendored, pinned to deployed versions): `repos/step-ca/` (v0.29.0),
   `repos/step-cli/` (v0.30.2), `repos/crypto/` (v0.77.1) — prefer these over web docs
 - EAP-TLS/Apple serial precedent: `docs/eap-tls-prerequisites.md`,

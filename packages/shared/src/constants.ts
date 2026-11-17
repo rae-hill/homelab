@@ -3,14 +3,14 @@ export const BASE_KEY = "plato-splunk.services.homelab-api"
 /**
  * The kanidm claim-map role (and homelab-server resource URI) required to print resumes
  * via `POST /resume/print`. Provisioned by the `homelab.resume.printing` kanidm group
- * (nix-config/modules/services/service-homelab-api/oidc.nix → claimMaps.roles).
+ * (nix-config/modules/homelab/homelab-api/oidc.nix → claimMaps.roles).
  */
 export const RESUME_PRINT_ROLE = "Resume_Print"
 
 /**
  * The kanidm claim-map role (and homelab-server resource URI) required to tailor resumes
  * via `POST /resume/tailor`. Granted by the `homelab.resume.tailoring` kanidm group's claim
- * map (nix-config/modules/services/service-homelab-api/oidc.nix → claimMaps.roles). Owner split
+ * map (nix-config/modules/homelab/homelab-api/oidc.nix → claimMaps.roles). Owner split
  * print/tailor into dedicated groups on 2026-11-08 (doc 05 OQ1 — ACLs diverged).
  */
 export const RESUME_TAILOR_ROLE = "Resume_Tailor"

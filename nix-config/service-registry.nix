@@ -281,7 +281,7 @@ in
         frontendUrl = mkUrl "homelab";
         insecureUrl = mkInsecureUrl "homelab-api";
         port = 35427;
-        # Tailnet-served build of the resume SPA (modules/services/service-resume-site catalog entry):
+        # Tailnet-served build of the resume SPA (modules/homelab/homelab-resume-site catalog entry):
         # browsable mirror of resume.rae-hill.dev AND the origin homelab-api's
         # headless chrome renders POST /resume/print from.
         resumeSiteUrl = mkUrl "resume";
