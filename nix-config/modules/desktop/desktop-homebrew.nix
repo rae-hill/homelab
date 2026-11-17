@@ -1,6 +1,6 @@
 { config, ... }:
 {
-  flake.modules.darwin.homebrew =
+  flake.modules.darwin.desktop-homebrew =
     {
       config,
       lib,

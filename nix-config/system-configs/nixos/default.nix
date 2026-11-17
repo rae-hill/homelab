@@ -17,15 +17,17 @@ in
       inputs.catppuccin.nixosModules.catppuccin
       inputs.nixvim.nixosModules.nixvim
       inputs.sops-nix.nixosModules.sops
+      inputs.quadlet-nix.nixosModules.quadlet
 
       nixos.system-base
-      nixos.gnome-desktop
-      nixos.nvidia
-      nixos.virtualization
+      nixos.desktop-gnome
+      nixos.desktop-nvidia
+      nixos.desktop-virtualization
       nixos.cifs
-      nixos.restic
-      nixos.uxplay
-      nixos.kanidm-client
+      nixos.desktop-restic
+      nixos.desktop-uxplay
+      nixos.desktop-uxplay-gnome
+      nixos.desktop-kanidm
       nixos.homelab-service-apphost
       nixos.opencode
 

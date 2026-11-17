@@ -13,9 +13,9 @@ in
       inputs.catppuccin.homeModules.catppuccin
       inputs.nixvim.homeModules.nixvim
 
-      hm.git
+      hm.desktop-git
       hm.nixvim-complete
-      hm.zsh
+      hm.shell-zsh
 
       ({ inputs, lib, config, pkgs, pkgs-unstable, ... }: {
         nixpkgs = {

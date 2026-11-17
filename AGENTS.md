@@ -41,21 +41,22 @@ nix-config/
 ├── lib/                        # Shared Nix helpers (shell.nix)
 ├── checks/                     # Flake checks (shellcheck.nix)
 ├── modules/
-│   ├── system-base.nix         # Merged base: darwin-base + nix-settings + system-base
-│   ├── desktop/                # Desktop modules (GNOME, firefox, uxplay, complete set)
+│   ├── desktop/                # Desktop modules (GNOME, nvidia, firefox, uxplay, git,
+│   │                           #   restic, kanidm client, virtualization, homebrew)
+│   ├── editors/                # Editors (editors-nixvim/, editors-vscode.nix)
 │   ├── games/                  # Gaming modules (steam, mangohud, complete set)
 │   ├── shell/                  # Shell modules (zsh, starship, ssh, complete set)
-│   ├── system/                 # System modules (boot, networking, audio, fonts, podman)
+│   ├── system/                 # System modules (system-base, boot, networking, audio,
+│   │                           #   fonts, podman, security, locale)
 │   ├── themes/                 # Themes (themes-catppuccin.nix)
-│   ├── programs/               # User programs (program-zsh, program-git, program-vscode,
-│   │                           #   program-nixvim/, program-opencode/, etc.)
+│   ├── programs/               # Remaining programs (program-cifs, program-opencode/)
 │   └── services/               # System services (service-caddy, service-step-ca,
 │                               #   service-homelab-api/, service-kanidm/, etc.)
 ├── home-configs/               # Home-manager configs per user/host
 │   ├── jacob-nixos.nix
 │   ├── jacob-augustus.nix
 │   ├── jacob-cicero.nix
-│   └── rae/                    # default.nix + complete.nix, sops.nix
+│   └── rae/                    # default.nix + complete/git/shell/sops.nix
 ├── system-configs/             # Per-host entry points (aedilis, augustus, cicero, mini,
 │                               #   nixos, praeconinus)
 │   └── <host>/                 # default.nix + hardware/filesystems/security/users/

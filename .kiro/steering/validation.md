@@ -105,7 +105,7 @@ engines:
   routes through conform first, so editor output matches the CLI.
 
 The pinned `nixfmt` is defined once as `packages.<system>.nixfmt = pkgs.nixfmt` in `flake.nix`; the
-devshell, the hook (`.#nixfmt`), and the nixvim config (`nix-config/modules/programs/program-nixvim/plugins/conform.nix`) all
+devshell, the hook (`.#nixfmt`), and the nixvim config (`nix-config/modules/editors/editors-nixvim/plugins/conform.nix`) all
 resolve to that same version so formatting is deterministic everywhere.
 
 ### Lint

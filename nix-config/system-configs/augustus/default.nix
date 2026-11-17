@@ -25,12 +25,12 @@ in
       nixos.homelab-service-oidc-host
       nixos.acme
       nixos.postgres
-      nixos.restic
+      nixos.desktop-restic
       nixos.kanidm
       nixos.kanidm-posix
       nixos.home-assistant
       nixos.minecraft
-      nixos.podman-quadlet
+      nixos.desktop-virtualization
       nixos.radius
       nixos.openwebui
       nixos.planka

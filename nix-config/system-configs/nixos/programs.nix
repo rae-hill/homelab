@@ -68,7 +68,6 @@
   services.udev.packages = with pkgs; [
     via # done
     qmk-udev-rules # done
-    gnome-settings-daemon # done
   ];
 
   # done
@@ -84,39 +83,11 @@
     via # done
     quickemu # done
     adwaita-icon-theme
-    gnomeExtensions.appindicator # done
-    gnomeExtensions.uxplay-control # done
-    uxplay # done
     openssl # done
     cifs-utils # done
     restic # done
     step-cli # done
     podman-compose # done
-    nvidia-vaapi-driver # done
-  ];
-
-  # done
-  environment.variables = {
-    LIBVA_DRIVER_NAME = "nvidia";
-    NVD_BACKEND = "direct";
-  };
-
-  # done
-  environment.gnome.excludePackages = with pkgs; [
-    orca
-    geary
-    gnome-backgrounds
-    gnome-tour
-    gnome-user-docs
-    epiphany
-    gnome-text-editor
-    gnome-calculator
-    gnome-contacts
-    gnome-maps
-    gnome-music
-    simple-scan
-    totem
-    yelp
   ];
 
   # done

@@ -14,7 +14,7 @@ in
       inputs.nixvim.homeModules.nixvim
 
       hm.nixvim-complete
-      hm.zsh
+      hm.shell-zsh
 
       ({ inputs, lib, config, pkgs, pkgs-unstable, ... }: {
         nixpkgs = {

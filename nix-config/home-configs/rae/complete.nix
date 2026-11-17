@@ -4,8 +4,11 @@
     imports = with inputs.self.modules.homeManager; [
       desktop-complete
       desktop-gnome-complete
+      desktop-git
       games-complete
       shell-complete
+      rae-git
+      rae-shell
       rae-sops
     ];
 

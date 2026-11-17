@@ -20,11 +20,11 @@ in
       inputs.nixvim.homeModules.nixvim
       inputs.sops-nix.homeManagerModules.sops
 
-      hm.git
+      hm.desktop-git
       hm.nixvim-complete
       hm.vscode
-      hm.zsh
-      hm.desktop-theming
+      hm.shell-zsh
+      hm.themes-catppuccin
       hm.opencode
 
       (

@@ -2,7 +2,7 @@
 {
   # NixOS
   flake.modules.nixos.system-podman = { pkgs, ... }: {
-    environment.system-packages = with pkgs; [
+    environment.systemPackages = with pkgs; [
       podman-compose
     ];
   };

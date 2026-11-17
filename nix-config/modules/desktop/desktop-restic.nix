@@ -1,6 +1,11 @@
 {
-  flake.modules.nixos.restic =
-    { config, lib, pkgs, ... }:
+  flake.modules.nixos.desktop-restic =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       security.wrappers.restic = {
         program = "restic";

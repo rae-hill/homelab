@@ -25,7 +25,7 @@ in
 
       darwin.darwin-base
       darwin.nixvim-complete
-      darwin.homebrew
+      darwin.desktop-homebrew
       darwin.homelab-service-apphost
       darwin.mini-jellyfin
       darwin.openclaw

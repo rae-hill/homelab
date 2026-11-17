@@ -91,14 +91,6 @@
           withCuDNN = true;
         };
       })
-
-      (final: prev: {
-        gnome-keyring = prev.gnome-keyring.overrideAttrs (oldAttrs: {
-          configureFlags = (builtins.filter (flag: flag != "--Dssh-agent=true") oldAttrs.mesonFlags) ++ [
-            "--Dssh-agent=false"
-          ];
-        });
-      })
     ];
 
     config = {

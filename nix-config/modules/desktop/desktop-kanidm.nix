@@ -18,7 +18,7 @@ in
   # AuthorizedKeysCommand for no benefit. Audit after deploy with:
   #   sshd -T | grep -iE 'authorizedkeys|trustedusercakeys'
   # (expect: NO kanidm AuthorizedKeysCommand, TrustedUserCAKeys intact.)
-  flake.modules.nixos.kanidm-client =
+  flake.modules.nixos.desktop-kanidm =
     {
       config,
       lib,

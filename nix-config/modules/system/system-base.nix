@@ -1,9 +1,12 @@
 # Base system configuration, shared by every host.
 #
-# - flake.modules.nixos.nix-settings  — nix daemon settings, registry, gc (NixOS)
-# - flake.modules.nixos.system-base   — the aggregate every linux host imports
-#                                       (nix-settings + openssh + ssh-cert-renewer)
-# - flake.modules.darwin.darwin-base  — nix-darwin counterpart of nix-settings
+# - flake.modules.nixos.nix-settings      — nix daemon settings, registry, gc (NixOS)
+# - flake.modules.nixos.system-base       — the aggregate every linux host imports
+#                                           (nix-settings + openssh + ssh-cert-renewer)
+# - flake.modules.darwin.darwin-base      — nix-darwin counterpart of nix-settings
+# - flake.modules.nixos.system-nix-base   — minimal nixpkgs base for any NixOS host
+# - flake.modules.homeManager.system-nix-base — home-manager base (merged from the
+#                                           old system/system-nix-base.nix)
 { inputs, ... }:
 {
   flake.modules.darwin.darwin-base =
@@ -87,5 +90,23 @@
       openssh
       ssh-cert-renewer
     ];
+  };
+
+  flake.modules.nixos.system-nix-base = {
+    nixpkgs.config.allowUnfree = true;
+  };
+
+  flake.modules.homeManager.system-nix-base = {
+    programs.home-manager.enable = true;
+
+    systemd.user.startServices = "sd-switch";
+
+    nixpkgs = {
+      overlays = [ ];
+      config = {
+        allowUnfree = true;
+        allowUnfreePredicate = _: true;
+      };
+    };
   };
 }
