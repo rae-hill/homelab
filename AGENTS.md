@@ -140,6 +140,7 @@ the pinned tag's source before trusting them.
 | OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)               | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)                                |
 | OpenCode behavior (client/server split, `service` mode, registration, HTTP API)         | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                                      |
 | sops-nix behavior (`sopsFile` per secret, templates/placeholders, eval-time validation) | `./repos/sops-nix/` (Mic92/sops-nix, rev = the `sops-nix` pin in `flake.lock`)                                  |
+| SecretSpec behavior (providers, extends/scopes, export, generation, sops/1Password)     | `./repos/secretspec/` (cachix/secretspec, tag `v0.21.1` = pkgs-unstable pin)                                    |
 | open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, pinned at `main`; parser in `src/app/lib/parse-resume-from-pdf/`) |
 
 If a needed upstream is not vendored yet, add it as a submodule (see the `effect-services` skill →
