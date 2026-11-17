@@ -18,6 +18,12 @@ in
       inputs.sops-nix.nixosModules.sops
 
       nixos.system-base
+      nixos.system-nix-base
+      nixos.system-locale
+      nixos.system-boot-generic
+      nixos.system-networking
+      nixos.system-networking-forwarding
+      nixos.system-security-base
       nixos.caddy
       nixos.homelab-api-service
       nixos.homelab-secret-provisioner

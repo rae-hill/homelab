@@ -5,15 +5,9 @@
   ...
 }:
 {
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  # Bound boot entries kept on the small FAT32 ESP (/boot). Without this,
-  # systemd-boot copies every generation's kernel + initrd to the ESP and
-  # eventually fills it ("No space left on device" at the bootloader step).
-  # Especially important here because linuxPackages_latest rolls kernels often.
-  boot.loader.systemd-boot.configurationLimit = 10;
-
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  # Boot (system-boot-systemd), networking/DNS (system-networking), locale
+  # (system-locale), and allowUnfree (system-nix-base) come from modules/system
+  # — wired in default.nix. Only cicero-specific settings live here.
 
   hardware.bluetooth = {
     enable = false;
@@ -27,53 +21,17 @@
     ];
   };
 
-  networking.networkmanager.enable = true;
-
   environment.sessionVariables = {
     CA_URL = "https://ca.plato-splunk.media";
     CA_FINGERPRINT = "56c220018d0c65d5283d46d7c769eb471c18b2e903b205a9457261b2c52f2392";
   };
 
-  services.resolved = {
-    enable = true;
-    settings.Resolve = {
-      DNS = [
-        "15.204.95.40#dns.plato-splunk.media"
-        "2604:2dc0:222::64d#dns.plato-splunk.media"
-      ];
-      FallbackDNS = [ ];
-      Domains = [ "~." ];
-      DNSSEC = "true";
-      DNSOverTLS = "yes";
-    };
-  };
-
-  time.timeZone = "America/Denver";
-
-  i18n.defaultLocale = "en_US.UTF-8";
-
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "en_US.UTF-8";
-    LC_IDENTIFICATION = "en_US.UTF-8";
-    LC_MEASUREMENT = "en_US.UTF-8";
-    LC_MONETARY = "en_US.UTF-8";
-    LC_NAME = "en_US.UTF-8";
-    LC_NUMERIC = "en_US.UTF-8";
-    LC_PAPER = "en_US.UTF-8";
-    LC_TELEPHONE = "en_US.UTF-8";
-    LC_TIME = "en_US.UTF-8";
-  };
   services.getty.autologinUser = "jacob";
-
-  services.tailscale.enable = true;
-  services.tailscale.extraSetFlags = [ "--webclient" ];
 
   services.xserver.xkb = {
     layout = "us";
     variant = "";
   };
-
-  nixpkgs.config.allowUnfree = true;
 
   system.stateVersion = "25.11";
 }

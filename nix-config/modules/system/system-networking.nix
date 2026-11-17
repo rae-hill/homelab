@@ -27,26 +27,27 @@
     };
   };
 
-  flake.modules.nixos.system-networking-dns-host = {
-    imports = with inputs.self.modules.nixos; [
-      system-networking
-    ];
+  flake.modules.nixos.system-networking-dns-host =
+    { lib, ... }:
+    {
+      imports = with inputs.self.modules.nixos; [
+        system-networking
+      ];
 
-    networking.hosts = {
-      "127.0.0.1" = [ "dns.plato-splunk.media" ];
-    };
+      networking.hosts = {
+        "127.0.0.1" = [ "dns.plato-splunk.media" ];
+      };
 
-    services.resolved = {
-      enable = true;
-      settings.Resolve = {
-        DNS = [
-          "127.0.0.1#dns.plato-splunk.media"
-        ];
-        FallbackDNS = [ ];
-        Domains = [ "~." ];
-        DNSSEC = "true";
-        DNSOverTLS = "yes";
+      services.resolved = {
+        enable = true;
+        settings.Resolve = {
+          # Override (rather than append to) the fleet-wide upstreams from
+          # system-networking: the DNS host resolves through its own local
+          # Technitium instance. The remaining Resolve settings (FallbackDNS,
+          # Domains, DNSSEC, DNSOverTLS) are inherited from system-networking —
+          # do not re-set list-valued options here or they concatenate.
+          DNS = lib.mkForce [ "127.0.0.1#dns.plato-splunk.media" ];
+        };
       };
     };
-  };
 }

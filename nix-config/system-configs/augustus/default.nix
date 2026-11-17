@@ -21,6 +21,12 @@ in
       { nixpkgs.overlays = [ inputs.nix-minecraft.overlay ]; }
 
       nixos.system-base
+      nixos.system-nix-base
+      nixos.system-locale
+      nixos.system-boot-systemd
+      nixos.system-networking
+      nixos.system-networking-forwarding
+      nixos.system-security-base
       nixos.caddy
       nixos.homelab-service-oidc-host
       nixos.acme

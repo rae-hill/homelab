@@ -6,6 +6,14 @@
   ...
 }:
 {
+  # Networking/DNS (system-networking), locale (system-locale), allowUnfree
+  # (system-nix-base), ssh client/server hardening (shell-ssh-*), and the
+  # security baseline (system-security-*) come from modules/ — wired in
+  # default.nix. Only nixos-specific settings live here.
+
+  # NOTE: deliberately NOT system-boot-systemd: that module also sets
+  # boot.kernelPackages = linuxPackages_latest, while this host stays on the
+  # stable kernel. Kept inline until the kernel choice is decided.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   # Bound the number of boot entries kept on the 511 MB ESP (/boot). Without this,
@@ -28,24 +36,6 @@
     allowReboot = false;
   };
 
-  networking.networkmanager.enable = true;
-
-  time.timeZone = "America/Denver";
-
-  i18n.defaultLocale = "en_US.UTF-8";
-
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "en_US.UTF-8";
-    LC_IDENTIFICATION = "en_US.UTF-8";
-    LC_MEASUREMENT = "en_US.UTF-8";
-    LC_MONETARY = "en_US.UTF-8";
-    LC_NAME = "en_US.UTF-8";
-    LC_NUMERIC = "en_US.UTF-8";
-    LC_PAPER = "en_US.UTF-8";
-    LC_TELEPHONE = "en_US.UTF-8";
-    LC_TIME = "en_US.UTF-8";
-  };
-
   hardware.keyboard.qmk.enable = true; # done
 
   # done
@@ -66,23 +56,6 @@
     };
   };
 
-  services.resolved = {
-    enable = true;
-    settings.Resolve = {
-      DNS = [
-        "15.204.95.40#dns.plato-splunk.media"
-        "2604:2dc0:222::64d#dns.plato-splunk.media"
-      ];
-      FallbackDNS = [ ];
-      Domains = [ "~." ];
-      DNSSEC = "true";
-      DNSOverTLS = "yes";
-    };
-  };
-
-  services.tailscale.enable = true;
-  services.tailscale.extraSetFlags = [ "--webclient" ];
-
   nixpkgs = {
     overlays = [
       (self: super: {
@@ -94,8 +67,6 @@
     ];
 
     config = {
-      allowUnfree = true;
-
       allowUnfreePredicate =
         pkg:
         builtins.elem (lib.getName pkg) [

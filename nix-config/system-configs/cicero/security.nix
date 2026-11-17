@@ -1,8 +1,15 @@
-{ inputs, lib, config, pkgs, ... }:
 {
-  security.sudo.execWheelOnly = true;
-
-  security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];
+  inputs,
+  lib,
+  config,
+  pkgs,
+  ...
+}:
+{
+  # execWheelOnly + the internal root CA + firewall.enable come from
+  # system-security-base — wired in default.nix. pcscd stays inline for now:
+  # the system-security-smartcard module would also add the opensc pkcs11
+  # config, which cicero doesn't use yet.
 
   services.pcscd.enable = true;
 
@@ -21,8 +28,6 @@
   '';
 
   networking.firewall = {
-    enable = true;
-
     interfaces = {
       tailscale0 = {
         allowedTCPPorts = [

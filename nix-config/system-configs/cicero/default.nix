@@ -18,6 +18,11 @@ in
       inputs.sops-nix.nixosModules.sops
 
       nixos.system-base
+      nixos.system-nix-base
+      nixos.system-locale
+      nixos.system-boot-systemd
+      nixos.system-networking
+      nixos.system-security-base
       nixos.step-ca
       nixos.homelab-service-apphost
       nixos.cicero-observability

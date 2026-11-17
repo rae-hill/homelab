@@ -6,21 +6,14 @@
   ...
 }:
 {
-  # done
-  security.sudo.execWheelOnly = true;
+  # execWheelOnly + root CA + firewall.enable (system-security-base), pcscd +
+  # opensc pkcs11 (system-security-smartcard), openssh hardening
+  # (shell-ssh-server), and the ssh agent (shell-ssh-client) are wired in
+  # default.nix. Host-specific rules and the cert renewer stay here.
 
-  # done
   security.rtkit.enable = true;
 
-  # done
-  security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];
-
-  # done
-  services.pcscd.enable = true;
-
   networking.firewall = {
-    enable = true;
-
     # TODO: Move to modules/system/system-security.nix
     allowedTCPPorts = [
       10300 # Remove
@@ -53,21 +46,6 @@
         allowedUDPPorts = [ 5252 ];
       };
     };
-  };
-
-  # done
-  services.openssh = {
-    openFirewall = false;
-    settings = {
-      PermitRootLogin = "no";
-      X11Forwarding = false;
-    };
-  };
-
-  # done
-  programs.ssh = {
-    startAgent = true;
-    enableAskPassword = true;
   };
 
   # TODO: add to modules/system/system-ssh-certs.nix

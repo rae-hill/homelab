@@ -20,6 +20,13 @@ in
       inputs.quadlet-nix.nixosModules.quadlet
 
       nixos.system-base
+      nixos.system-nix-base
+      nixos.system-locale
+      nixos.system-networking
+      nixos.system-security-base
+      nixos.system-security-smartcard
+      nixos.shell-ssh-server
+      nixos.shell-ssh-client
       nixos.desktop-gnome
       nixos.desktop-nvidia
       nixos.desktop-virtualization

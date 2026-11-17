@@ -6,13 +6,11 @@
   ...
 }:
 {
-  security.sudo.execWheelOnly = true;
-
-  security.pki.certificateFiles = [ (inputs.self + "/certs/alford-root.crt") ];
+  # execWheelOnly + the internal root CA + firewall.enable come from
+  # system-security-base — wired in default.nix. Host-specific firewall rules
+  # and the cert renewer stay here.
 
   networking.firewall = {
-    enable = true;
-
     interfaces = {
       tailscale0 = {
         allowedTCPPorts = [

@@ -18,6 +18,12 @@ in
       inputs.sops-nix.nixosModules.sops
 
       nixos.system-base
+      nixos.system-nix-base
+      nixos.system-locale
+      nixos.system-boot-base
+      nixos.system-boot-grub
+      nixos.system-networking-dns-host
+      nixos.system-security-base
       nixos.homelab-service-dns-host
       nixos.technitium-aedilis
 
