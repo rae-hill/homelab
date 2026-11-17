@@ -120,7 +120,7 @@ nix-config/
   revision = "1.0"
 
   [providers]
-  sops_kanidm = "sops://kanidm-secrets.yaml" # interim; see §4.2 for file location
+  sops_kanidm = "sops://secrets/augustus.yaml" # interim; module-local file, see §4.2
 
   [profiles.default]
   KANIDM_ADMIN_PASSPHRASE = { description = "kanidm admin passphrase", providers = ["host_op", "sops_kanidm"] }
@@ -172,21 +172,43 @@ nix-config/
 
 ### 4.2 Where the interim SOPS yamls live
 
-Two options were considered:
+**Decision: module-local.** The encrypted yaml moves next to the module that
+consumes it, under a uniform `secrets/<host>.yaml` name:
 
-- **(A) Keep them at `secrets/<host>/<service>.yaml`** (recommended). The
-  module spec's sops alias points at them relatively
-  (`sops://../../../secrets/augustus/kanidm.yaml`). sops-nix keeps reading the
-  exact same files — zero file moves, zero re-encryption, and the file simply
-  gets deleted when the service cuts over to 1Password. The yaml never moves
-  next to the module because it dies there anyway.
-- (B) Relocate yamls next to modules (`modules/identity/identity-kanidm/kanidm-secrets.yaml`).
-  Prettier end-state picture, but requires re-encryption (`.sops.yaml` regex +
-  recipients), touching every `sopsFile` again, for files that are transient.
-  Only worth it for services that will _stay_ on sops long-term (the lifeline
-  hosts — and those could move to plain `age` files later instead).
+| Case                                                               | Location                                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Single-host service (kanidm, planka, openwebui, …)                 | `modules/<cat>/<module>/secrets/<host>.yaml`                                                                 |
+| Multi-host service (homelab-api, ssh-cert-renewer)                 | same pattern, one file per host value set: `modules/homelab/homelab-api/secrets/{augustus,praeconinus}.yaml` |
+| Host-specific secrets (smb, pushover, serials, aedilis technitium) | `system-configs/<host>/secrets/<service>.yaml` — beside the `host-*` module that declares them               |
+| File-shaped modules (`homelab-ssh-cert-renewer.nix`)               | promote to a directory module, or park the file under `shared-secrets/` (decide in Phase 1)                  |
 
-Decision: **A**, revisited only if upstream sops-provider ergonomics improve.
+Rationale:
+
+- **Cohesion**: `secretspec.toml`, the Nix module, and the encrypted values
+  live together; deleting a service deletes everything. Same philosophy as
+  `users-system`.
+- **Clean sops URIs**: the sops provider resolves relative paths against the
+  manifest directory (`provider/sops/config.rs rebase_path`), so a co-located
+  file is `sops://secrets/augustus.yaml` rather than
+  `sops://../../../secrets/augustus/kanidm.yaml`.
+- **The lifeline class is permanent**: cicero/aedilis/step-jwk files never move
+  to 1Password — for them module-local _is_ the end state.
+- `nix-config/secrets/` disappears entirely; inventory moves to the
+  `secretspec.toml` declarations (names + descriptions + scopes), which is
+  better inventory than `ls`-ing encrypted blobs.
+
+The move is cheaper than it looks: **no re-encryption is required**. Sops
+recipients are embedded in each file's metadata — decryption is
+path-independent. Relocating = `git mv` + update the `sopsFile` paths in the
+declaring modules + widen the `.sops.yaml` `path_regex` so future sops edits
+match the new locations. The regex can match old and new layouts
+simultaneously (`(^|/)secrets/[^/]+\.yaml$`), so the relocation is
+**incremental — one service per commit** — not a big bang.
+
+Tradeoff accepted: a central `secrets/` tree made "all encrypted material in
+git" auditable at a glance; scattered files shift that job to the declaration
+layer. Secret scanners match `ENC[` content markers, not paths, so tooling is
+unaffected.
 
 ### 4.3 Delivery bridge (the self-built part)
 
@@ -325,12 +347,21 @@ stay in git history; nothing is deleted until its replacement is verified).
 - Add `pkgs-unstable.secretspec` to the devshell; record version assertion in
   the bridge module (`package` option + min-version check).
 
-### Phase 1 — Declaration layer (no runtime change)
+### Phase 1 — Declaration layer + module-local relocation
 
+- Widen the `.sops.yaml` `path_regex` to `(^|/)secrets/[^/]+\.yaml$` so it
+  matches both the current `nix-config/secrets/<host>/…` layout and the new
+  module-local `…/<module>/secrets/<host>.yaml` layout during the transition.
+- Relocate yamls incrementally (§4.2), one service per commit: `git mv` the
+  file into the module dir, update the declaring module's `sopsFile`, verify
+  (snapshot diff = sopsFile paths only + manifest build). No re-encryption
+  needed — recipients live in the file metadata; decryption is
+  path-independent. Decide the ssh-cert-renewer home (dir promotion vs
+  `shared-secrets/`) with the first multi-host move.
 - Write `shared-secrets/secretspec.toml` + one module `secretspec.toml` per
-  service (§4.1), sops aliases pointing at the existing
-  `secrets/<host>/<service>.yaml` files (option A), scopes per service, host
-  child specs extending exactly their enabled modules.
+  service (§4.1), sops aliases pointing at the module-local
+  `secrets/<host>.yaml` files, scopes per service, host child specs extending
+  exactly their enabled modules.
 - Verify key-name/case behavior of the sops provider against our lowercase
   yaml keys; document the finding; adjust spec keys or yaml keys accordingly.
 - Add `secretspec check` per host profile to the validation routine (devshell
