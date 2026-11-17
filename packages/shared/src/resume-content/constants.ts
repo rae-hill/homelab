@@ -140,12 +140,14 @@ const projects = [
     // Short title on purpose: resume parsers (open-resume's description-line heuristic
     // fires on any single ≥8-word line) misread an 8+-word title as a description and
     // lose the project name entirely. Detail lives in the description instead.
-    title: "NixOS Homelab",
-    description:
-      "NixOS infrastructure and TypeScript full stack applications powering my homelab servers, Grafana/OpenTelemetry/Prometheus observability stack, certificate authority, and SSO with OIDC.",
+    title: "NixOS Homelab and AI Agents",
+    description: "Declarative IaC with Nix, cloud provisioning, custom AI agents, full observability and CI stack.",
     githubLink: "https://github.com/rae-hill",
     tags: [
-      "Nix",
+      "Agents",
+      "AI",
+      "MCP",
+      "Custom Harness",
       "NixOS",
       "System Administration",
       "TypeScript",
