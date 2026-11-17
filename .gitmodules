@@ -86,3 +86,7 @@
 	path = repos/sops-nix
 	url = https://github.com/mic92/sops-nix.git
 	shallow = true
+[submodule "repos/secretspec"]
+	path = repos/secretspec
+	url = https://github.com/cachix/secretspec.git
+	shallow = true
