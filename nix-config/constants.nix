@@ -27,7 +27,7 @@
   # `homelab.catalog` NixOS option (which only exists on the host that imports the service
   # module), this is a FLAKE-LEVEL option merged across ALL modules regardless of host — so the
   # aedilis `homelab-service-dns` generator can emit records for services running on every host.
-  # Each service's modules/services/service-<svc>/catalog.nix contributes one entry at the flake-parts level,
+  # Each service's modules/<category>/<name>/catalog.nix contributes one entry at the flake-parts level,
   # alongside its per-host `homelab.catalog.<name>` entry. Value shape:
   #   { subdomain; zone; host; record = { tailnet = {}; } | { cname = { target; }; }
   #                                    | { public = { v4; v6; }; }; }

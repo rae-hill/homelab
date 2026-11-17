@@ -3,6 +3,16 @@ let
   nixos = inputs.self.modules.nixos;
 in
 {
+  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
+  # cicero observability layer is imported explicitly here).
+  imports = [
+    ./observability/alloy.nix
+    ./observability/caddy-host.nix
+    ./observability/catalog.nix
+    ./observability/node-exporter.nix
+    ./observability/complete.nix
+  ];
+
   flake.nixosConfigurations.cicero = inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
     specialArgs = {

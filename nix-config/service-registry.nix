@@ -125,9 +125,9 @@ let
   # `homelab.catalog` entries are only visible on the host that imports them. So the service
   # DNS facts live here as ONE global, typed map the aedilis DNS generator folds (plus
   # dnsExtraRecords for non-service names). This replaces the old `tailnetRewrites` string map
-  # with the catalog's attrTag record shape. Each service's modules/services/service-<svc>/catalog.nix still
+  # with the catalog's attrTag record shape. Each service's modules/<category>/<name>/catalog.nix still
   # carries its own `dns`/`managedBy.dns` as declared intent; this aggregate is what the
-  # generator actually reads (see modules/services/service-homelab-service/dns.nix for why it cannot read the
+  # generator actually reads (see modules/homelab/homelab-catalog/dns.nix for why it cannot read the
   # per-host catalogs cross-host). subdomain/host match each service's catalog entry; `ldap`
   # and `apprise` are intentionally absent (operator-approved removals).
   mkCatalogDns = name: subdomain: host: {
@@ -208,7 +208,7 @@ in
     # allocate EXPLICIT numbers (rather than Kanidm's dynamic range) so UID/GID
     # are stable and documented. Range chosen in the recommended 65536–524287
     # band (leaves 1000–65535 for OS/local use). These are consumed by the
-    # augustus-side POSIX-enablement oneshot (modules/services/service-kanidm-posix) and must
+    # augustus-side POSIX-enablement oneshot (modules/identity/identity-kanidm-posix) and must
     # stay consistent with any client-side `map_group` wiring.
     unix = {
       # POSIX login groups (gate + local-group extension targets).

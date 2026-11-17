@@ -3,6 +3,10 @@ let
   nixos = inputs.self.modules.nixos;
 in
 {
+  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
+  # aedilis Technitium layer is imported explicitly here).
+  imports = [ ./technitium.nix ];
+
   flake.nixosConfigurations.aedilis = inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
     specialArgs = {

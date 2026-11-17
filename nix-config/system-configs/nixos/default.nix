@@ -30,11 +30,11 @@ in
       nixos.desktop-gnome
       nixos.desktop-nvidia
       nixos.desktop-virtualization
-      nixos.cifs
+      nixos.system-cifs
       nixos.desktop-restic
       nixos.desktop-uxplay
       nixos.desktop-uxplay-gnome
-      nixos.desktop-kanidm
+      nixos.identity-kanidm-client
       nixos.homelab-service-apphost
       nixos.opencode
 

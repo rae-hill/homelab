@@ -17,7 +17,7 @@
   ];
 
   # The Caddyfile global block + launchd daemon + the Jellyfin/metrics site blocks now live in
-  # modules/services/service-mini-jellyfin/ (catalog entries rendered by the darwin caddy generator). mini imports
+  # modules/apps/apps-jellyfin/ (catalog entries rendered by the darwin caddy generator). mini imports
   # darwin.homelab-service-apphost + darwin.mini-jellyfin from system-configs/mini/default.nix.
 
   system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
