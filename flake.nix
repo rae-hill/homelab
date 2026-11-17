@@ -216,6 +216,16 @@
                   command = "${pkgs.dprint}/bin/dprint fmt --plugins ${pluginArgs} --";
                 }
                 {
+                  name = "secrets-check";
+                  help = "Verify secretspec resolution: secrets-check <host-profile> [--scope <svc>] (agents must pass --reason)";
+                  # Manifest lives at nix-config/secretspec.toml (root manifest,
+                  # profile = host). See docs/secretspec-migration-plan.md.
+                  command = ''
+                    profile=$1; shift
+                    cd "$PRJ_ROOT/nix-config" && exec secretspec check --profile "$profile" "$@"
+                  '';
+                }
+                {
                   name = "update-missing-hashes";
                   help = "Regenerate missing-hashes.json for Nix yarn-berry builds";
                   command = "${pkgs.yarn-berry_4-fetcher.yarn-berry-fetcher}/bin/yarn-berry-fetcher missing-hashes yarn.lock 2>/dev/null | grep -v '^CacheKey\\|^Success\\|^$' > missing-hashes.json";

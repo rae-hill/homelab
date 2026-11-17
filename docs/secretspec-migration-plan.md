@@ -1,8 +1,10 @@
 # SecretSpec Migration Plan
 
-> Status: PLAN — not yet implemented. Vendor research done against
-> `repos/secretspec` @ v0.21.1 (= nixpkgs-unstable pin; nixpkgs-26.05 carries a
-> stale 0.10.1). Successor to the per-service sops split (commit `24d6d41179`).
+> Status: **Phase 1 COMPLETE** — declaration layer live; all sops files are
+> module-local; `secretspec check` resolves 60/60 secrets across the 6 host
+> profiles. Phases 2–6 pending. Vendor research against `repos/secretspec`
+> @ v0.21.1 (= nixpkgs-unstable pin; nixpkgs-26.05 carries a stale 0.10.1).
+> Predecessor work: per-service sops split (commit `24d6d41179`).
 
 ## 1. Goals
 
@@ -97,78 +99,99 @@ templates → `/run/secrets/rendered/<name>`. 23 files under
 
 ## 4. Target architecture
 
-### 4.1 Declaration layout
+### 4.1 Declaration layout (as implemented in Phase 1)
 
 ```
 nix-config/
-├── shared-secrets/
-│   └── secretspec.toml            # cross-cutting parent: ssh-cert-renewer, etc.
-├── modules/<category>/<module>/
-│   └── secretspec.toml            # PARENT spec per service module:
-│                                  #   declarations, descriptions, generate types,
-│                                  #   interim sops alias, per-service scope
-└── system-configs/<host>/
-    └── secretspec.toml            # CHILD spec: extends the module specs of the
-                                   #   services this host runs; binds host aliases
+├── secretspec.toml                  # ROOT manifest: extends all module parents,
+│                                    #   binds every provider alias (forward paths),
+│                                    #   declares host-specific secrets in host
+│                                    #   profiles, defines host scopes
+└── modules/<category>/<module>/
+    └── secretspec.toml              # PARENT spec per service module: declares the
+                                     #   module's secrets in [profiles.<host>] for
+                                     #   each host that runs it + [scopes.<module>]
 ```
 
-- Module spec example (`modules/identity/identity-kanidm/secretspec.toml`):
+**One root manifest, profile = host.** The originally sketched per-host child
+specs under `system-configs/<host>/` do NOT work, for two verified reasons:
 
-  ```toml
-  [project]
-  name = "kanidm"
-  revision = "1.0"
+1. Relative `sops://` URIs resolve against the **root manifest's** directory
+   (`provider.with_base_dir(&config_dir)`), not the defining parent's — so
+   module parents must not define them.
+2. URL parsing breaks multi-level relative paths: in `sops://../../x` the
+   first `..` becomes the URL _host_ and dot-segment normalization clamps the
+   rest (empirically: one-level `../` works, two-level `../../` fails in every
+   URI form). From `system-configs/<host>/`, every module path needs `../../`.
+   From `nix-config/`, every path is **forward-relative** (`modules/...`,
+   `system-configs/...`) — which parses cleanly.
 
-  [providers]
-  sops_kanidm = "sops://secrets/augustus.yaml" # interim; module-local file, see §4.2
+Consequences (all verified against secretspec 0.21.1 with `secretspec check`):
 
-  [profiles.default]
-  KANIDM_ADMIN_PASSPHRASE = { description = "kanidm admin passphrase", providers = ["host_op", "sops_kanidm"] }
-  KANIDM_IDM_ADMIN_PASSPHRASE = { description = "kanidm idm admin passphrase", providers = ["host_op", "sops_kanidm"] }
-  KANIDM_RESTIC_BACKUP_PASSPHRASE = { description = "restic repo passphrase", providers = ["host_op", "sops_kanidm"] }
+- Module parent specs declare secrets in `[profiles.<host>]` blocks (one per
+  host that runs the service) — NOT `[profiles.default]`, so a profile resolves
+  exactly the secrets of the services its host runs. Profiles merge across
+  `extends` independently; scopes merge too (child scope of the same name
+  replaces; names are module-unique).
+- The root manifest binds all aliases: `sops_<module>[_<host>]` for
+  module-local files, `sops_<name>_<host>` for host-local files, and
+  `host_op_<host>` for the (future) 1Password SA of each host.
+- `host_op_<host>` = `"null://"` until Phase 4 — a null provider mid-chain
+  returns "missing" and the chain falls through to the sops alias (verified).
+  Phase 4 flips it to `onepassword+token://homelab-<host>`.
+- **Names are lowercase, matching the sops yaml keys verbatim**: the sops
+  provider's lookup is `[project, profile, key] → [profile, key] → [key]`,
+  case-sensitive; lowercase names hit the flat `[key]` path with **no `ref`
+  mapping needed** (verified). The earlier uppercase plan is dropped —
+  `composed` secrets' `${UPPERCASE}` restriction only affects composed
+  _references_, which the bridge renderer replaces anyway (§4.3).
+- `nix-config/shared-secrets/` is deferred: secretspec validation requires
+  every document to declare ≥1 profile with ≥1 secret, so an empty anchor
+  parent cannot parse. Cross-cutting conventions (`require_reason = "agents"`,
+  naming, alias rules) live in the root manifest's comments until a real
+  cross-cutting secret exists.
+- Storage address convention: `secretspec/homelab/<host>/<key>` (project name
+  "homelab" from the root; profile = host).
 
-  [scopes.kanidm]
-  secrets = [
-    "KANIDM_ADMIN_PASSPHRASE",
-    "KANIDM_IDM_ADMIN_PASSPHRASE",
-    "KANIDM_RESTIC_BACKUP_PASSPHRASE",
-  ]
-  ```
+Root manifest sketch (full file: `nix-config/secretspec.toml`):
 
-- Host child spec example (`system-configs/augustus/secretspec.toml`):
+```toml
+[project]
+name = "homelab"
+revision = "1.0"
+require_reason = "agents"
+extends = ["modules/identity/identity-kanidm", "..."] # all module parents
 
-  ```toml
-  [project]
-  name = "homelab" # one storage namespace; profile separates hosts
-  revision = "1.0"
-  extends = [
-    "../../shared-secrets",
-    "../../modules/identity/identity-kanidm",
-    "../../modules/ai/ai-openwebui",
-    # … exactly the services augustus runs (mirrors default.nix module list)
-  ]
+[providers]
+host_op_augustus = "null://" # Phase 4: "onepassword+token://homelab-augustus"
+sops_kanidm = "sops://modules/identity/identity-kanidm/secrets/augustus.yaml"
+sops_smb_augustus = "sops://system-configs/augustus/secrets/smb.yaml"
+# ...
 
-  [providers]
-  host_op = "onepassword+token://homelab-augustus" # SA token via bootstrap (§4.4)
+[profiles.augustus] # host-specific secrets only; service secrets come via extends
+smb_passphrase = { description = "...", providers = ["sops_smb_augustus"] }
+```
 
-  [profiles.augustus.defaults]
-  providers = ["host_op"]
-  ```
+Module parent sketch (`modules/identity/identity-kanidm/secretspec.toml`):
 
-- `host_op` is referenced by module specs but **bound by each host child** —
-  verified-safe because `[providers]` merges across `extends` with the child
-  winning. During the SOPS interim, module specs list `["host_op", "sops_<svc>"]`
-  so resolution falls back to the yaml until values are imported (§7 Phase 4).
-- Profile = host name. Secret storage address becomes
-  `secretspec/homelab/<host>/<KEY>` — one convention everywhere.
-- Multi-host modules (homelab-api, ssh-cert-renewer): declarations live in the
-  module/shared parent once; host children may add profile-scoped provider
-  overrides where interim sops files differ per host.
-- Naming: keys are the existing secret names uppercased (SOPS yaml keys are
-  lowercase; the `sops` provider maps by convention — verify exact key lookup
-  (case sensitivity) in Phase 1 and record the answer here. If the sops provider
-  is case-sensitive against yaml keys, keep yaml key names as the `ref.item`
-  or rename yaml keys to uppercase during the move.)
+```toml
+[project]
+name = "kanidm"
+revision = "1.0"
+
+[profiles.augustus]
+kanidm_admin_passphrase = { description = "...", providers = ["host_op_augustus", "sops_kanidm"] }
+
+[scopes.kanidm]
+secrets = ["kanidm_admin_passphrase", "..."]
+```
+
+**Phase 1 acceptance (verified):** `secretspec check` resolves **60/60
+secrets across the 6 host profiles** (augustus 39, nixos 5, cicero 3, aedilis
+7, praeconinus 1, mini 5 — dead keys excluded) and all **17 scopes** return
+their exact expected sets, through the sops provider against the module-local
+yaml files, with `null://` standing in for 1Password. Run via the devshell:
+`secrets-check <host> [--scope <svc>]`.
 
 ### 4.2 Where the interim SOPS yamls live
 
@@ -347,28 +370,34 @@ stay in git history; nothing is deleted until its replacement is verified).
 - Add `pkgs-unstable.secretspec` to the devshell; record version assertion in
   the bridge module (`package` option + min-version check).
 
-### Phase 1 — Declaration layer + module-local relocation
+### Phase 1 — Declaration layer + module-local relocation ✅ DONE
 
-- Widen the `.sops.yaml` `path_regex` to `(^|/)secrets/[^/]+\.yaml$` so it
-  matches both the current `nix-config/secrets/<host>/…` layout and the new
-  module-local `…/<module>/secrets/<host>.yaml` layout during the transition.
-- Relocate yamls incrementally (§4.2), one service per commit: `git mv` the
-  file into the module dir, update the declaring module's `sopsFile`, verify
-  (snapshot diff = sopsFile paths only + manifest build). No re-encryption
-  needed — recipients live in the file metadata; decryption is
-  path-independent. Decide the ssh-cert-renewer home (dir promotion vs
-  `shared-secrets/`) with the first multi-host move.
-- Write `shared-secrets/secretspec.toml` + one module `secretspec.toml` per
-  service (§4.1), sops aliases pointing at the module-local
-  `secrets/<host>.yaml` files, scopes per service, host child specs extending
-  exactly their enabled modules.
-- Verify key-name/case behavior of the sops provider against our lowercase
-  yaml keys; document the finding; adjust spec keys or yaml keys accordingly.
-- Add `secretspec check` per host profile to the validation routine (devshell
-  helper `secrets-check <host>`); wire into the docs/skills.
+Outcome (commits `78ff646849` Phase 1a, `ca9770616e` Phase 1b, Phase 1c =
+this change):
+
+- `.sops.yaml` regex: **no change needed** — the existing
+  `secrets/([^/]+/)?[^/]+\.yaml$` substring-matches module-local
+  `…/<module>/secrets/<host>.yaml` paths.
+- Relocation: 16 single-consumer files moved as pure `git mv` (1a); the 7
+  multi-consumer files split into 11 module-local files via a user-run sops
+  script (1b); four file-shaped modules promoted to directories
+  (apps-minecraft, networking-unpoller, identity-step-ca,
+  homelab-ssh-cert-renewer); `nix-config/secrets/` retired entirely.
+  ssh-cert-renewer chose dir promotion (over shared-secrets).
+- Specs: 16 module parents + ONE root manifest `nix-config/secretspec.toml`
+  (§4.1 — per-host child specs were dropped after empirical testing showed
+  multi-level relative sops:// URIs break); `shared-secrets/` deferred
+  (empty parent documents fail secretspec validation).
+- Key-name behavior: **verified** — sops lookup is case-sensitive
+  (`[project,profile,key] → [profile,key] → [key]`); lowercase logical names
+  matching yaml keys resolve with no `ref` mapping.
+- Devshell helper: `secrets-check <host> [--scope <svc>]`.
+- Verified: `secretspec check` green for all 6 profiles (augustus 39, nixos 5,
+  cicero 3, aedilis 7, praeconinus 1, mini 5) and all 17 scopes, with
+  `null://` placeholders standing in for the Phase-4 1Password aliases.
 - **Deliverable value:** single machine-readable inventory of every secret
-  (name, description, owner-service, scope) — today that knowledge is spread
-  across 20 Nix files.
+  (name, description, owner-service, scope) — previously spread across
+  20 Nix files.
 
 ### Phase 2 — Dev/e2e secrets
 
