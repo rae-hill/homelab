@@ -1,6 +1,6 @@
 ---
 name: port-assignments
-description: Port assignment conventions and the requirement to keep docs/port-assignments.md up to date. Use when adding or changing service ports, service-registry.nix entries, firewall rules in _private/<host>/security.nix, container port mappings, or ACME challenge ports.
+description: Port assignment conventions and the requirement to keep docs/port-assignments.md up to date. Use when adding or changing service ports, service-registry.nix entries, firewall rules in system-configs/<host>/security.nix, container port mappings, or ACME challenge ports.
 ---
 
 # Port Assignments
@@ -15,19 +15,19 @@ Update `docs/port-assignments.md` when:
 
 - Adding a new service with a listening port
 - Changing a port in `service-registry.nix` or any service module
-- Adding or modifying firewall rules in `_private/<host>/security.nix`
+- Adding or modifying firewall rules in `system-configs/<host>/security.nix`
 - Adding a new container with port mappings
 - Adding a new ACME challenge port
 
 ## Where Ports Are Defined
 
-| Source                                              | Purpose                                                 |
-| --------------------------------------------------- | ------------------------------------------------------- |
-| `nix-config/modules/service-registry.nix`           | Centralized port constants (most services)              |
-| `nix-config/modules/services/*.nix`                 | Service-specific ports (exporters, internal gRPC, etc.) |
-| `nix-config/modules/_private/<host>/security.nix`   | Firewall rules (which ports are externally accessible)  |
-| `nix-config/modules/_private/<host>/programs.nix`   | Host-specific service configurations                    |
-| `nix-config/modules/features/cicero-observability/` | Cicero-specific metrics/observability ports             |
+| Source                                                      | Purpose                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| `nix-config/service-registry.nix`                           | Centralized port constants (most services)              |
+| `nix-config/modules/services/service-*`                     | Service-specific ports (exporters, internal gRPC, etc.) |
+| `nix-config/system-configs/<host>/security.nix`             | Firewall rules (which ports are externally accessible)  |
+| `nix-config/system-configs/<host>/programs.nix`             | Host-specific service configurations                    |
+| `nix-config/modules/services/service-cicero-observability/` | Cicero-specific metrics/observability ports             |
 
 ## Conventions
 
@@ -40,4 +40,4 @@ Update `docs/port-assignments.md` when:
 
 ## Host ↔ Service Mapping
 
-Which host runs which services is determined by the modules list in `nix-config/modules/hosts/<host>.nix`. Cross-reference that file with the port document when verifying assignments.
+Which host runs which services is determined by the modules list in `nix-config/system-configs/<host>/default.nix`. Cross-reference that file with the port document when verifying assignments.

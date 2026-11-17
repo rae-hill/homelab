@@ -53,7 +53,25 @@
       {
         imports = [
           inputs.devshell.flakeModule
+
+          ./nix-config/constants.nix
+          ./nix-config/service-registry.nix
+
           (inputs.import-tree ./nix-config/modules)
+          (inputs.import-tree ./nix-config/lib)
+          (inputs.import-tree ./nix-config/checks)
+          (inputs.import-tree ./nix-config/home-configs)
+
+          # System configs are imported explicitly per host: each directory mixes
+          # the flake-parts host definition (default.nix) with plain NixOS/darwin
+          # modules (hardware.nix, sops.nix, security.nix, ...) that import-tree
+          # would otherwise try to evaluate as flake-parts modules.
+          ./nix-config/system-configs/aedilis/default.nix
+          ./nix-config/system-configs/augustus/default.nix
+          ./nix-config/system-configs/cicero/default.nix
+          ./nix-config/system-configs/mini/default.nix
+          ./nix-config/system-configs/nixos/default.nix
+          ./nix-config/system-configs/praeconinus/default.nix
         ];
 
         # Lint repo shell scripts through the ShellCheck gate: `nix flake check` /

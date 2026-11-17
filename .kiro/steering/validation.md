@@ -52,7 +52,7 @@ nix build .#checks.x86_64-linux.shellcheck
 Shell scripts authored with `pkgs.writeShellApplication` are ShellCheck-linted in their build
 `checkPhase` — but that only fires when the derivation is **built**, and a bare `nix flake check`
 only _evaluates_ NixOS configs without building their scripts. The `checks.shellcheck` gate
-(`nix-config/modules/checks/shellcheck.nix`) depends on every registered script so `nix flake check`
+(`nix-config/checks/shellcheck.nix`) depends on every registered script so `nix flake check`
 actually builds them and runs ShellCheck. It is **Linux-only** (`x86_64-linux`) because ShellCheck's
 `checkPhase` is skipped where its compiler isn't bootstrappable (e.g. aarch64-darwin).
 
@@ -76,7 +76,7 @@ in {
 
 For raw script **text** that can't be a package (systemd `script = ''…''`, inline `ExecStart`
 shell), lint it with `config.constants.shell.checkScriptText pkgs { name; text; }` and add the
-resulting derivation to `flake.lintedShellScripts`. See `nix-config/modules/lib/shell.nix` for both
+resulting derivation to `flake.lintedShellScripts`. See `nix-config/lib/shell.nix` for both
 helpers and the registry option, and `docs/shellcheck-nix-test-plan.md` for the design.
 
 ### Format
@@ -105,7 +105,7 @@ engines:
   routes through conform first, so editor output matches the CLI.
 
 The pinned `nixfmt` is defined once as `packages.<system>.nixfmt = pkgs.nixfmt` in `flake.nix`; the
-devshell, the hook (`.#nixfmt`), and the nixvim config (`features/nixvim/plugins/conform.nix`) all
+devshell, the hook (`.#nixfmt`), and the nixvim config (`nix-config/modules/programs/program-nixvim/plugins/conform.nix`) all
 resolve to that same version so formatting is deterministic everywhere.
 
 ### Lint

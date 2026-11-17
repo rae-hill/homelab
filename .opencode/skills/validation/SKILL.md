@@ -58,7 +58,7 @@ nix build .#checks.x86_64-linux.shellcheck
 Shell scripts authored with `pkgs.writeShellApplication` are ShellCheck-linted in their build
 `checkPhase` — but that only fires when the derivation is **built**, and a bare `nix flake check`
 only _evaluates_ NixOS configs without building their scripts. The `checks.shellcheck` gate
-(`nix-config/modules/checks/shellcheck.nix`) depends on every registered script so `nix flake check`
+(`nix-config/checks/shellcheck.nix`) depends on every registered script so `nix flake check`
 actually builds them and runs ShellCheck. It is **Linux-only** (`x86_64-linux`) because ShellCheck's
 `checkPhase` is skipped where its compiler isn't bootstrappable (e.g. aarch64-darwin).
 
@@ -82,13 +82,13 @@ in {
 
 For raw script **text** that can't be a package (systemd `script = ''…''`, inline `ExecStart`
 shell), lint it with `config.constants.shell.checkScriptText pkgs { name; text; }` and add the
-resulting derivation to `flake.lintedShellScripts`. See `nix-config/modules/lib/shell.nix` for both
+resulting derivation to `flake.lintedShellScripts`. See `nix-config/lib/shell.nix` for both
 helpers and the registry option, and `docs/shellcheck-nix-test-plan.md` for the design.
 
 ### Format
 
 **Agents do not run formatters.** The opencode harness automatically formats every file it
-writes or edits, via the formatter configured in `nix-config/modules/home/jacob-nixos.nix` →
+writes or edits, via the formatter configured in `nix-config/home-configs/jacob-nixos.nix` →
 `programs.opencode.settings.formatter`:
 
 - **dprint** with store-pinned wasm plugins (same set/versions as the devshell `fmt` command and

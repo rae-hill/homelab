@@ -7,7 +7,7 @@ description: End-to-end workflow for adding a new step-ca client-certificate use
 
 Companion to `docs/step-client-certs-plan.md` (read its §4 for the authorization model).
 Provisioners in this repo are **always hand-coded** in
-`nix-config/modules/services/step-ca.nix` — never created dynamically via the step-ca admin
+`nix-config/modules/services/service-step-ca.nix` — never created dynamically via the step-ca admin
 API. This skill is the checklist that compensates.
 
 Two models:
@@ -101,9 +101,9 @@ step crypto jwk create client-<use>-pub.json client-<use>-priv.json \
 (ACME device-attest templates read the CSR via `.Insecure.CR`; keep the existing `eap`
 template's DN-SAN line if editing that provisioner.)
 
-### 2b. Model B: JWK provisioner block in `services/step-ca.nix`
+### 2b. Model B: JWK provisioner block in `services/service-step-ca.nix`
 
-Follow the existing host-JWK pattern (`services/step-ca.nix:169-232`):
+Follow the existing host-JWK pattern (`services/service-step-ca.nix:169-232`):
 
 ```nix
 {
@@ -132,14 +132,14 @@ Follow the existing host-JWK pattern (`services/step-ca.nix:169-232`):
   `challenges = [ "device-attest-01" ]`, `attestationFormats = [ "step" ]` (add `"apple"` only
   for the shared `eap` one), claims ≤ 729h, template from 2a with the devices-map variant.
 - Add the YubiKey serial to **both**:
-  - `x509PermittedCommonNames` in `nix-config/modules/constants.nix` (name policy), and
+  - `x509PermittedCommonNames` in `nix-config/constants.nix` (name policy), and
   - the shared `devices` map (`constants.nix`) consumed by the template (fail-closed gate).
 - Apple device serials belong in the same `devices` map.
 
 ### 2d. OID constant
 
 If not yet present: `ca.clientCertIdOid = "2.25.<namespace-uuid-decimal>";` in the `ca` attrset
-of `nix-config/modules/service-registry.nix`/`constants.nix` (wherever `ca.*` constants live).
+of `nix-config/service-registry.nix`/`constants.nix` (wherever `ca.*` constants live).
 
 ## Step 3 — sops secrets (consuming host's `secrets/<host>.yaml`)
 
@@ -152,8 +152,8 @@ of `nix-config/modules/service-registry.nix`/`constants.nix` (wherever `ca.*` co
 | `yk_client_pin` (A)      | PIV PIN                                             | `pin-source=` in yubikey URIs               |
 | `yk_client_mgmt_key` (A) | PIV management key (enrollment only)                | `management-key-source=`                    |
 
-Declare per host in `_private/<host>/sops.nix` (system services) and/or the `sops` block of
-`home/jacob-nixos.nix` (HM/user services → `/run/user/1000/secrets/<name>`). Encrypt with
+Declare per host in `system-configs/<host>/sops.nix` (system services) and/or the `sops` block of
+`home-configs/jacob-nixos.nix` (HM/user services → `/run/user/1000/secrets/<name>`). Encrypt with
 `sops nix-config/secrets/<host>.yaml` (recipients in `.sops.yaml`). **All passphrases live in
 sops** so they can be pulled up for iOS imports.
 
@@ -186,7 +186,7 @@ step ca certificate "<use>@plato-splunk.media" cert.crt key.pem \
   --token "$tok" --password-file <key-pw-file>       # key.pem written encrypted
 ```
 
-(Token flow mirrors `services/ssh-cert-renewer.nix:55-105`.)
+(Token flow mirrors `services/service-ssh-cert-renewer.nix:55-105`.)
 
 ### Model A (YubiKey; key plugged in)
 
@@ -236,7 +236,7 @@ step certificate verify --roots certs/alford-root.crt cert.crt
 - [ ] Model + use name + owner + durations decided
 - [ ] Provisioner UUID generated (and namespace OID exists in `constants.nix`)
 - [ ] (B) JWK keypair created; pub fields copied into provisioner block
-- [ ] Provisioner hand-coded in `services/step-ca.nix` with template (UUID ext + OU/owner,
+- [ ] Provisioner hand-coded in `services/service-step-ca.nix` with template (UUID ext + OU/owner,
       devices-map variant for serial identities) + claims
 - [ ] (A/serial) serial added to `x509PermittedCommonNames` + `devices` map
 - [ ] sops secrets added + declared on consuming host(s)
@@ -250,8 +250,8 @@ step certificate verify --roots certs/alford-root.crt cert.crt
 ## References
 
 - Plan + authorization model: `docs/step-client-certs-plan.md` (§2 Model A, §3 Model B, §4 lockdown)
-- CA config: `nix-config/modules/services/step-ca.nix` (provisioners `:106-233`, policy `:55-75`)
-- Token-flow precedent: `nix-config/modules/services/ssh-cert-renewer.nix:55-105`
+- CA config: `nix-config/modules/services/service-step-ca.nix` (provisioners `:106-233`, policy `:55-75`)
+- Token-flow precedent: `nix-config/modules/services/service-ssh-cert-renewer.nix:55-105`
 - Source of truth (vendored, pinned to deployed versions): `repos/step-ca/` (v0.29.0),
   `repos/step-cli/` (v0.30.2), `repos/crypto/` (v0.77.1) — prefer these over web docs
 - EAP-TLS/Apple serial precedent: `docs/eap-tls-prerequisites.md`,

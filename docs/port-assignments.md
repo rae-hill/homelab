@@ -155,6 +155,6 @@ by Caddy.
 ## Adding a New Port
 
 1. Choose a port not already in use on the target host(s)
-2. Add it to `nix-config/modules/service-registry.nix` if it's a shared constant
-3. Update the firewall rules in the host's `_private/<host>/security.nix` if the port should be externally accessible
+2. Add it to `nix-config/service-registry.nix` if it's a shared constant
+3. Update the firewall rules in the host's `system-configs/<host>/security.nix` if the port should be externally accessible
 4. Update this document with the new assignment

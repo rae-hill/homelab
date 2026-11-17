@@ -18,40 +18,42 @@ When the user refers to a package by name in a TypeScript/frontend/backend/test 
 
 ## Nix Packages & Config
 
-When the user says "the Nix package for X," resolve to the appropriate feature module:
+When the user says "the Nix package for X," resolve to the appropriate service module:
 
-| User says                   | Resolves to                                                     |
-| --------------------------- | --------------------------------------------------------------- |
-| Nix package for homelab-api | `./nix-config/modules/features/homelab-api/package.nix`         |
-| Nix package for homelab-ui  | `./nix-config/modules/features/homelab-ui/package.nix`          |
-| homelab-api systemd service | `./nix-config/modules/features/homelab-api/systemd-service.nix` |
-| homelab-api kanidm config   | `./nix-config/modules/features/homelab-api/kanidm.nix`          |
-| homelab-api caddy config    | `./nix-config/modules/features/homelab-api/caddy.nix`           |
-| homelab-ui caddy config     | `./nix-config/modules/features/homelab-ui/caddy.nix`            |
+| User says                   | Resolves to                                                             |
+| --------------------------- | ----------------------------------------------------------------------- |
+| Nix package for homelab-api | `./nix-config/modules/services/service-homelab-api/package.nix`         |
+| Nix package for homelab-ui  | `./nix-config/modules/services/service-homelab-ui/package.nix`          |
+| homelab-api systemd service | `./nix-config/modules/services/service-homelab-api/systemd-service.nix` |
 
 ## Nix Config Quick Reference
 
 ```
 nix-config/
+├── constants.nix               # Shared constants (ports, URLs, etc.)
+├── service-registry.nix        # Service registry
+├── lib/                        # Shared Nix helpers (shell.nix)
+├── checks/                     # Flake checks (shellcheck.nix)
 ├── modules/
-│   ├── features/
-│   │   ├── homelab-api/        # API package, systemd, caddy, kanidm, secret-provisioner
-│   │   ├── homelab-ui/         # UI package, caddy
-│   │   └── nixvim/             # Neovim config (keymaps, plugins, colorscheme)
-│   ├── services/               # System services (caddy, kanidm, postgres, step-ca, etc.)
-│   ├── programs/               # User programs (zsh, git, vscode, nvidia, etc.)
-│   ├── hosts/                  # Host entry points (praeconinus, augustus, cicero, nixos, mini)
-│   ├── home/                   # Home-manager configs per user/host
-│   ├── _private/               # Per-host private config (hardware, users, sops, security)
-│   │   ├── praeconinus/
-│   │   ├── augustus/
-│   │   ├── cicero/
-│   │   ├── nixos/
-│   │   └── mini/
-│   ├── constants.nix           # Shared constants (ports, URLs, etc.)
-│   ├── service-registry.nix    # Service registry
-│   ├── nix-settings.nix        # Nix daemon settings
-│   └── darwin-base.nix         # macOS base config
+│   ├── system-base.nix         # Merged base: darwin-base + nix-settings + system-base
+│   ├── desktop/                # Desktop modules (GNOME, firefox, uxplay, complete set)
+│   ├── games/                  # Gaming modules (steam, mangohud, complete set)
+│   ├── shell/                  # Shell modules (zsh, starship, ssh, complete set)
+│   ├── system/                 # System modules (boot, networking, audio, fonts, podman)
+│   ├── themes/                 # Themes (themes-catppuccin.nix)
+│   ├── programs/               # User programs (program-zsh, program-git, program-vscode,
+│   │                           #   program-nixvim/, program-opencode/, etc.)
+│   └── services/               # System services (service-caddy, service-step-ca,
+│                               #   service-homelab-api/, service-kanidm/, etc.)
+├── home-configs/               # Home-manager configs per user/host
+│   ├── jacob-nixos.nix
+│   ├── jacob-augustus.nix
+│   ├── jacob-cicero.nix
+│   └── rae/                    # default.nix + complete.nix, sops.nix
+├── system-configs/             # Per-host entry points (aedilis, augustus, cicero, mini,
+│                               #   nixos, praeconinus)
+│   └── <host>/                 # default.nix + hardware/filesystems/security/users/
+│                               #   sops/system/programs.nix
 └── secrets/                    # SOPS-encrypted secrets per host
 ```
 
