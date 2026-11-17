@@ -84,7 +84,7 @@ in
 
           sops = {
             # opencode's provider modules declare their own secrets (explicit
-            # sopsFile → secrets/nixos/opencode.yaml); only the age identity
+            # sopsFile → modules/ai/ai-opencode/secrets/nixos.yaml); only the age identity
             # stays here.
             age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
           };

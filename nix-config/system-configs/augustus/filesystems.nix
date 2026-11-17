@@ -11,7 +11,7 @@
       # CIFS credentials for the /mnt/backups automount below, from the smb
       # per-service sops file (moved from the former augustus/sops.nix).
       sops.secrets.smb_passphrase = {
-        sopsFile = inputs.self + "/nix-config/secrets/augustus/smb.yaml";
+        sopsFile = ./secrets/smb.yaml;
         owner = "root";
       };
       sops.templates."smb-creds" = {

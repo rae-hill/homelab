@@ -25,10 +25,10 @@ in
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/habitsync.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
-      # Per-service sops file (secrets/<host>/habitsync.yaml); db_pass and
+      # Per-service sops file (module-local secrets/<host>.yaml); db_pass and
       # jwt_secret feed the habitsync-env template below, the restic passphrase
       # belongs to the backup job.
       sops.secrets = {

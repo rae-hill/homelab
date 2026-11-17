@@ -51,10 +51,10 @@ in
       };
 
       configFile = pkgs.writeText "patched_unpoller.json" (lib.generators.toJSON { } cfg);
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/unpoller.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
-      # Per-service sops file (secrets/<host>/unpoller.yaml); consumed via the
+      # Per-service sops file (module-local secrets/<host>.yaml); consumed via the
       # file:// reference in the unifi.defaults config above.
       sops.secrets.unpoller_password = {
         inherit sopsFile;

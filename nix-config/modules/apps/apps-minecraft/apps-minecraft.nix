@@ -8,10 +8,10 @@
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/minecraft.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
-      # Per-service sops file (secrets/<host>/minecraft.yaml); restic-owned
+      # Per-service sops file (module-local secrets/<host>.yaml); restic-owned
       # passphrase for the backup job below.
       sops.secrets.minecraft_backup_passphrase = {
         inherit sopsFile;

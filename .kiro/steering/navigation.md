@@ -77,10 +77,12 @@ nix-config/
 │                               #   imported by default.nix) + sops.nix (plain module;
 │                               #   users live in modules/users/). aedilis also has
 │                               #   technitium.nix; cicero also has observability/
-└── secrets/                    # SOPS-encrypted secrets per host/service
-                               #   (secrets/<host>/<service>.yaml; declared via
+└── secrets/                    # SOPS-encrypted secrets — transitional home of
+                               #   multi-consumer files (secrets/<host>/<service>.yaml);
+                               #   single-consumer files live module-local in
+                               #   modules/**/secrets/<host>.yaml. All declared via
                                #   sops.secrets.<name>.sopsFile in the consuming
-                               #   service/host module)
+                               #   module (docs/secretspec-migration-plan.md)
 ```
 
 ## NixOS Package & Module Reference

@@ -8,7 +8,7 @@
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/nixos/smb.yaml";
+      sopsFile = ./secrets/smb.yaml;
     in
     # TODO: Move to modules/system/system-filesystems.nix
     {

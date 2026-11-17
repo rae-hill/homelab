@@ -1,10 +1,10 @@
 {
-  # Secret declarations live in the modules that consume them, each pointing at
-  # its per-service file under secrets/nixos/:
-  #   smb.yaml      — host-nixos-filesystems (smb_passphrase,
-  #                   jacob_smb_passphrase + the creds templates)
-  #   step-ca.yaml  — homelab-ssh-cert-renewer (step_jwk_provisioner_password)
-  #   opencode.yaml — home-manager (rae-sops / jacob-nixos → opencode providers)
+  # Secret declarations live in the modules that consume them:
+  #   system-configs/nixos/secrets/smb.yaml    — host-nixos-filesystems
+  #   modules/ai/ai-opencode/secrets/nixos.yaml — opencode providers (HM)
+  # Transitional (multi-consumer, pending Phase 1b of
+  # docs/secretspec-migration-plan.md):
+  #   secrets/nixos/step-ca.yaml — homelab-ssh-cert-renewer
   # Only the age identity stays host-local.
   sops.age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
 }

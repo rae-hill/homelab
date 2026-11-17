@@ -14,12 +14,12 @@ in
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/home-assistant.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
       imports = [ inputs.self.modules.nixos.users-hass ];
 
-      # Per-service sops file (secrets/<host>/home-assistant.yaml). The OIDC
+      # Per-service sops file (module-local secrets/<host>.yaml). The OIDC
       # home_assistant_client_secret (kanidm-owned) is declared in catalog.nix
       # from the same file; all three feed the secrets.yaml template below.
       sops.secrets = {

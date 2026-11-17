@@ -45,7 +45,7 @@
           group = "homelab-api";
         };
         postgres_restic_backup_passphrase = {
-          sopsFile = inputs.self + "/nix-config/secrets/augustus/postgres.yaml";
+          sopsFile = ./secrets/postgres.yaml;
           owner = "restic";
         };
       };

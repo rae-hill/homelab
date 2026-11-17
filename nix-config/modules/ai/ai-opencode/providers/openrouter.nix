@@ -5,13 +5,13 @@
   # preserves OpenRouter request/reasoning behavior and auto-lists the full
   # models.dev catalog; the explicit models below just pin the curated set.
   # The API key comes from the opencode per-service sops file
-  # (secrets/nixos/opencode.yaml) — insert it with:
-  #   sops nix-config/secrets/nixos/opencode.yaml   # add openrouter_api_key
+  # (modules/ai/ai-opencode/secrets/nixos.yaml) — insert it with:
+  #   sops nix-config/modules/ai/ai-opencode/secrets/nixos.yaml   # add openrouter_api_key
   flake.modules.homeManager.opencode-providers-openrouter =
     { config, ... }:
     {
       sops.secrets.openrouter_api_key = {
-        sopsFile = inputs.self + "/nix-config/secrets/nixos/opencode.yaml";
+        sopsFile = ../secrets/nixos.yaml;
       };
 
       programs.opencode.settings.providers.openrouter = {

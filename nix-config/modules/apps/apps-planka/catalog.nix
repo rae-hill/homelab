@@ -8,9 +8,9 @@ in
     { config, ... }:
     {
       # kanidm-owned OIDC client secret, from the per-service sops file
-      # (secrets/<host>/planka.yaml); consumed via oidc.client.basic.secretRef.
+      # (module-local secrets/<host>.yaml); consumed via oidc.client.basic.secretRef.
       sops.secrets.planka_client_secret = {
-        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/planka.yaml";
+        sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
         owner = "kanidm";
       };
 

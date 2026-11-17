@@ -144,20 +144,27 @@
 
             devshells.default = {
 
-              packages = with pkgs; [
-                # NixOS tooling
-                sops
-                age
-                nixfmt
-                # TypeScript/Node development
-                dprint
-                yarn-berry
-                nodejs_26
-                yarn-berry_4-fetcher.yarn-berry-fetcher
-                typescript
-                typescript-language-server
-                python3
-              ];
+              packages =
+                (with pkgs; [
+                  # NixOS tooling
+                  sops
+                  age
+                  nixfmt
+                  # TypeScript/Node development
+                  dprint
+                  yarn-berry
+                  nodejs_26
+                  yarn-berry_4-fetcher.yarn-berry-fetcher
+                  typescript
+                  typescript-language-server
+                  python3
+                ])
+                ++ [
+                  # SecretSpec from unstable — 26.05 carries a stale 0.10.1;
+                  # repos/secretspec is vendored at the unstable tag (v0.21.1).
+                  # See docs/secretspec-migration-plan.md.
+                  inputs.nixpkgs-unstable.legacyPackages.${system}.secretspec
+                ];
               env = [
                 {
                   name = "EDITOR";

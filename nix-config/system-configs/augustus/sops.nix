@@ -1,21 +1,19 @@
 {
-  # Secret declarations live in the service/host modules that consume them,
-  # each pointing at its per-service file under secrets/augustus/:
-  #   kanidm.yaml          — identity-kanidm/service.nix
-  #   openwebui.yaml       — ai-openwebui (service + catalog)
-  #   home-assistant.yaml  — apps-home-assistant (service + catalog)
-  #   radius.yaml          — networking-radius/service.nix
-  #   planka.yaml          — apps-planka (service + catalog)
-  #   habitsync.yaml       — apps-habitsync/service.nix
-  #   minecraft.yaml       — apps-minecraft.nix
-  #   homelab-api.yaml     — homelab-api/systemd-service.nix + host-augustus-programs
-  #   postgres.yaml        — host-augustus-programs (restic backup job)
-  #   step-ca.yaml         — host-augustus-programs + homelab-ssh-cert-renewer
-  #   failure-notifs.yaml  — host-augustus-system (pushover)
-  #   grafana.yaml         — observability-grafana (service + catalog)
-  #   unpoller.yaml        — networking-unpoller.nix
-  #   technitium.yaml      — networking-technitium/kanidm.nix + observability-prometheus
-  #   smb.yaml             — host-augustus-filesystems
+  # Secret declarations live in the service/host modules that consume them.
+  # Single-consumer files are module-local (moved out of secrets/augustus/):
+  #   modules/identity/identity-kanidm/secrets/augustus.yaml
+  #   modules/ai/ai-openwebui/secrets/augustus.yaml
+  #   modules/apps/apps-home-assistant/secrets/augustus.yaml
+  #   modules/apps/apps-planka/secrets/augustus.yaml
+  #   modules/apps/apps-habitsync/secrets/augustus.yaml
+  #   modules/apps/apps-minecraft/secrets/augustus.yaml
+  #   modules/networking/networking-radius/secrets/augustus.yaml
+  #   modules/networking/networking-unpoller/secrets/augustus.yaml
+  #   modules/observability/observability-grafana/secrets/augustus.yaml
+  #   system-configs/augustus/secrets/{failure-notifs,smb,postgres}.yaml
+  # Still transitional under secrets/augustus/ — multi-consumer files pending
+  # the split in docs/secretspec-migration-plan.md Phase 1b:
+  #   homelab-api.yaml, step-ca.yaml, technitium.yaml
   # Only the age identity stays host-local.
   sops.age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
 }

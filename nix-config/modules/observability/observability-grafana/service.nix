@@ -16,10 +16,10 @@ in
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/grafana.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
-      # Per-service sops file (secrets/<host>/grafana.yaml). The OIDC
+      # Per-service sops file (module-local secrets/<host>.yaml). The OIDC
       # grafana_client_secret (kanidm-owned) is declared in catalog.nix from
       # the same file and rendered into the grafana-client-secret template.
       sops.secrets = {

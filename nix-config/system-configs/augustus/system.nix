@@ -57,11 +57,11 @@
       # failure-notifs per-service sops file (moved from augustus/sops.nix).
       sops.secrets = {
         pushover_user_key = {
-          sopsFile = inputs.self + "/nix-config/secrets/augustus/failure-notifs.yaml";
+          sopsFile = ./secrets/failure-notifs.yaml;
           owner = "root";
         };
         pushover_token = {
-          sopsFile = inputs.self + "/nix-config/secrets/augustus/failure-notifs.yaml";
+          sopsFile = ./secrets/failure-notifs.yaml;
           owner = "root";
         };
       };

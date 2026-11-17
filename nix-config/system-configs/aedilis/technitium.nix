@@ -19,7 +19,7 @@ let
       metricsCertDir = config.security.acme.certs."${dnsMetrics.domain}".directory;
       adminCertDir = config.security.acme.certs."${tech.adminDomain}".directory;
       publicCertDir = config.security.acme.certs."${tech.domain}".directory;
-      sopsFile = inputs.self + "/nix-config/secrets/aedilis/technitium.yaml";
+      sopsFile = ./secrets/technitium.yaml;
     in
     {
       # Technitium credentials from the per-service sops file (moved from the

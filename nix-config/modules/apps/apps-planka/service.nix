@@ -36,12 +36,12 @@ in
     }:
     let
       caCert = config.environment.etc."ssl/certs/ca-certificates.crt".source;
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/planka.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
       imports = [ inputs.self.modules.nixos.users-planka ];
 
-      # Per-service sops file (secrets/<host>/planka.yaml). The OIDC
+      # Per-service sops file (module-local secrets/<host>.yaml). The OIDC
       # planka_client_secret (kanidm-owned) is declared in catalog.nix from the
       # same file and rendered into the planka-client-secret template consumed
       # by the start script below.

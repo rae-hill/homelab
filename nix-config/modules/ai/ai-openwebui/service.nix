@@ -13,12 +13,12 @@ in
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/openwebui.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
       imports = [ inputs.self.modules.nixos.users-openwebui ];
 
-      # Per-service sops file (secrets/<host>/openwebui.yaml). The OIDC
+      # Per-service sops file (module-local secrets/<host>.yaml). The OIDC
       # openwebui_client_secret (kanidm-owned) is declared in catalog.nix from
       # the same file; both feed the openwebui-env template below.
       sops.secrets = {

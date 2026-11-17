@@ -15,10 +15,10 @@ in
     }:
     let
       inherit (config.security.acme.certs."${svc.domain}") directory;
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/kanidm.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
-      # Per-service sops file (secrets/<host>/kanidm.yaml). The restic backup
+      # Per-service sops file (module-local secrets/<host>.yaml). The restic backup
       # passphrase is restic-owned and rendered into a template for the
       # services.restic.backups.kanidm job below.
       sops.secrets = {
