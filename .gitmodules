@@ -82,3 +82,7 @@
 	path = repos/monitorOS
 	url = https://github.com/eriskhan/monitorOS.git
 	shallow = true
+[submodule "repos/sops-nix"]
+	path = repos/sops-nix
+	url = https://github.com/mic92/sops-nix.git
+	shallow = true
