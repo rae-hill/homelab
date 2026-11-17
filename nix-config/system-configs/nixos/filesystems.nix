@@ -1,9 +1,44 @@
 { inputs, ... }:
 {
   flake.modules.nixos.host-nixos-filesystems =
-    { lib, config, ... }:
+    {
+      inputs,
+      lib,
+      config,
+      ...
+    }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/nixos/smb.yaml";
+    in
     # TODO: Move to modules/system/system-filesystems.nix
     {
+      # CIFS credentials for the two automounts below, from the smb per-service
+      # sops file (moved from the former system-configs/nixos/sops.nix).
+      sops.secrets = {
+        smb_passphrase = {
+          inherit sopsFile;
+          owner = "root";
+        };
+        jacob_smb_passphrase = {
+          inherit sopsFile;
+          owner = "root";
+        };
+      };
+      sops.templates."smb-creds" = {
+        content = ''
+          username=nixos
+          password=${config.sops.placeholder.smb_passphrase}
+        '';
+        owner = "root";
+      };
+      sops.templates."jacob-smb-creds" = {
+        content = ''
+          username=jacob-alford
+          password=${config.sops.placeholder.jacob_smb_passphrase}
+        '';
+        owner = "root";
+      };
+
       fileSystems."/mnt/backups" = {
         device = "//10.76.100.190/Personal-Drive";
         fsType = "cifs";

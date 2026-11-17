@@ -171,10 +171,13 @@
         }
       '';
 
+      # Per-service sops file (secrets/<host>/openclaw.yaml), consumed by the
+      # gateway wrapper's ${VAR} exports below.
       sops.secrets = builtins.listToAttrs (
         map (name: {
           inherit name;
           value = {
+            sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/openclaw.yaml";
             owner = "jacob";
             group = "staff";
             mode = "0400";

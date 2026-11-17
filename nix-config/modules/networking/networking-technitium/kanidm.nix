@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, inputs, ... }:
 let
   c = config.constants;
   tech = c.services.technitium;
@@ -10,11 +10,20 @@ in
   flake.modules.nixos.technitium-kanidm =
     {
       config,
+      inputs,
       lib,
       pkgs,
       ...
     }:
     {
+      # kanidm-owned OIDC client secret from the technitium per-service sops
+      # file (secrets/<host>/technitium.yaml — shared with the metrics-user
+      # credentials declared by observability-prometheus).
+      sops.secrets.technitium_client_secret = {
+        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/technitium.yaml";
+        owner = "kanidm";
+      };
+
       services.kanidm.provision.systems.oauth2."${tech.clientId}" = {
         # NOTE: confirm the exact redirect/callback path Technitium expects for its
         # OIDC sign-in flow against the running version (docs/aedilis-host-plan.md §7).

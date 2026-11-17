@@ -15,11 +15,30 @@ in
   flake.modules.nixos.prometheus-service =
     {
       config,
+      inputs,
       lib,
       pkgs,
       ...
     }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/technitium.yaml";
+    in
     {
+      # Credentials for the limited Technitium "prometheus" metrics user + its
+      # TOTP seed, from the technitium per-service sops file (shared with
+      # networking-technitium/kanidm.nix's client secret); consumed by the
+      # metrics-token oneshot below (see docs/aedilis-host-plan.md §6).
+      sops.secrets = {
+        technitium_metrics_user_password = {
+          inherit sopsFile;
+          owner = "prometheus";
+        };
+        technitium_metrics_totp_secret = {
+          inherit sopsFile;
+          owner = "prometheus";
+        };
+      };
+
       services.prometheus = {
         enable = true;
         checkConfig = "syntax-only";

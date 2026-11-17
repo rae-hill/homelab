@@ -8,14 +8,40 @@ in
   flake.modules.nixos.kanidm-service =
     {
       config,
+      inputs,
       lib,
       pkgs,
       ...
     }:
     let
       inherit (config.security.acme.certs."${svc.domain}") directory;
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/kanidm.yaml";
     in
     {
+      # Per-service sops file (secrets/<host>/kanidm.yaml). The restic backup
+      # passphrase is restic-owned and rendered into a template for the
+      # services.restic.backups.kanidm job below.
+      sops.secrets = {
+        kanidm_admin_passphrase = {
+          inherit sopsFile;
+          owner = "kanidm";
+          group = "kanidm";
+        };
+        kanidm_idm_admin_passphrase = {
+          inherit sopsFile;
+          owner = "kanidm";
+          group = "kanidm";
+        };
+        kanidm_restic_backup_passphrase = {
+          inherit sopsFile;
+          owner = "restic";
+        };
+      };
+      sops.templates."kanidm-backup-passphrase" = {
+        content = config.sops.placeholder.kanidm_restic_backup_passphrase;
+        owner = "restic";
+      };
+
       services.kanidm = {
         package = pkgs.kanidmWithSecretProvisioning_1_11;
 

@@ -12,8 +12,25 @@ in
       inputs,
       ...
     }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/openwebui.yaml";
+    in
     {
       imports = [ inputs.self.modules.nixos.users-openwebui ];
+
+      # Per-service sops file (secrets/<host>/openwebui.yaml). The OIDC
+      # openwebui_client_secret (kanidm-owned) is declared in catalog.nix from
+      # the same file; both feed the openwebui-env template below.
+      sops.secrets = {
+        openwebui_app_secret_key = {
+          inherit sopsFile;
+          owner = "openwebui";
+        };
+        openwebui_restic_backup_passphrase = {
+          inherit sopsFile;
+          owner = "openwebui";
+        };
+      };
 
       sops.templates."openwebui-env" = {
         owner = "openwebui";

@@ -2,6 +2,7 @@
 {
   flake.modules.nixos.host-augustus-system =
     {
+      inputs,
       lib,
       config,
       pkgs,
@@ -50,6 +51,19 @@
           "homelab-secret-provisioner"
           "tailscaled"
         ];
+      };
+
+      # Host-level Pushover credentials for failure-notifs above, from the
+      # failure-notifs per-service sops file (moved from augustus/sops.nix).
+      sops.secrets = {
+        pushover_user_key = {
+          sopsFile = inputs.self + "/nix-config/secrets/augustus/failure-notifs.yaml";
+          owner = "root";
+        };
+        pushover_token = {
+          sopsFile = inputs.self + "/nix-config/secrets/augustus/failure-notifs.yaml";
+          owner = "root";
+        };
       };
 
       system.stateVersion = "25.05";

@@ -1,12 +1,19 @@
 # openwebui — catalog entry (vhost + OIDC basic client).
-{ config, ... }:
+{ config, inputs, ... }:
 let
   svc = config.constants.services.openwebui; # subdomain "openwebui", port 19553, clientId "openwebui"
 in
 {
   flake.modules.nixos.openwebui-catalog =
-    { ... }:
+    { config, ... }:
     {
+      # kanidm-owned OIDC client secret, from the per-service sops file
+      # (secrets/<host>/openwebui.yaml); consumed via oidc.client.basic.secretRef.
+      sops.secrets.openwebui_client_secret = {
+        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/openwebui.yaml";
+        owner = "kanidm";
+      };
+
       homelab.catalog.openwebui = {
         subdomain = svc.subdomain;
         host = "augustus";

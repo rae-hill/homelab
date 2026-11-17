@@ -1,10 +1,6 @@
-{ inputs, config, ... }:
 {
-  sops.defaultSopsFile = inputs.self + "/nix-config/secrets/praeconinus.yaml";
+  # Secret declarations live in the modules that consume them:
+  #   secrets/praeconinus/homelab-api.yaml — homelab-api/systemd-service.nix
+  # Only the age identity stays host-local.
   sops.age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
-
-  sops.secrets.homelab_api_jwk_password = {
-    owner = "homelab-api";
-    group = "homelab-api";
-  };
 }

@@ -1,12 +1,20 @@
 # grafana — catalog entry (vhost + OIDC basic client).
-{ config, ... }:
+{ config, inputs, ... }:
 let
   svc = config.constants.services.grafana; # subdomain "grafana", port 3000, clientId "grafana"
 in
 {
   flake.modules.nixos.grafana-catalog =
-    { ... }:
+    { config, ... }:
     {
+      # kanidm-owned OIDC client secret, from the per-service sops file
+      # (secrets/<host>/grafana.yaml); consumed via oidc.client.basic.secretRef
+      # and the grafana-client-secret template in service.nix.
+      sops.secrets.grafana_client_secret = {
+        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/grafana.yaml";
+        owner = "kanidm";
+      };
+
       homelab.catalog.grafana = {
         subdomain = svc.subdomain;
         host = "augustus";

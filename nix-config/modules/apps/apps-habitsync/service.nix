@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, inputs, ... }:
 let
   c = config.constants;
   svc = c.services.habitsync;
@@ -21,9 +21,34 @@ in
       config,
       lib,
       pkgs,
+      inputs,
       ...
     }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/habitsync.yaml";
+    in
     {
+      # Per-service sops file (secrets/<host>/habitsync.yaml); db_pass and
+      # jwt_secret feed the habitsync-env template below, the restic passphrase
+      # belongs to the backup job.
+      sops.secrets = {
+        habitsync_db_pass = {
+          inherit sopsFile;
+          owner = "habitsync";
+          group = "habitsync-db-pass";
+          mode = "0440";
+        };
+        habitsync_jwt_secret = {
+          inherit sopsFile;
+          owner = "habitsync";
+          group = "habitsync";
+        };
+        habitsync_restic_backup_passphrase = {
+          inherit sopsFile;
+          owner = "restic";
+        };
+      };
+
       # PostgreSQL database and user
       services.postgresql.ensureDatabases = [
         habitsyncDbName

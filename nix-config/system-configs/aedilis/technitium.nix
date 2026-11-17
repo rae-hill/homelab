@@ -19,8 +19,48 @@ let
       metricsCertDir = config.security.acme.certs."${dnsMetrics.domain}".directory;
       adminCertDir = config.security.acme.certs."${tech.adminDomain}".directory;
       publicCertDir = config.security.acme.certs."${tech.domain}".directory;
+      sopsFile = inputs.self + "/nix-config/secrets/aedilis/technitium.yaml";
     in
     {
+      # Technitium credentials from the per-service sops file (moved from the
+      # former aedilis/sops.nix). All owner-only (mode 0400 default); only the
+      # technitium service user reads these. NOTE: technitium_metrics_totp_secret
+      # also lives in the file but is intentionally NOT declared here (the TOTP
+      # seed is captured out-of-band when enabling 2FA on the metrics user;
+      # augustus's prometheus declares its own copy — see the deployment
+      # runbook §7). The step_jwk_provisioner_password (ssh-cert-renewer) comes
+      # from secrets/aedilis/step-ca.yaml via homelab-ssh-cert-renewer.
+      sops.secrets = {
+        # Web console admin password (bootstrap on first start).
+        technitium_admin_password = {
+          inherit sopsFile;
+          owner = "technitium";
+        };
+        # OIDC/SSO client secret for the Kanidm-registered "technitium" client.
+        technitium_sso_client_secret = {
+          inherit sopsFile;
+          owner = "technitium";
+        };
+        # Password for the PKCS#12 bundle used by the DoT/DoQ/DoH listener.
+        technitium_pkcs12_password = {
+          inherit sopsFile;
+          owner = "technitium";
+        };
+        # Credentials for the limited "prometheus" metrics user, created
+        # MANUALLY against the admin account (see runbook §7).
+        technitium_metrics_user_password = {
+          inherit sopsFile;
+          owner = "technitium";
+        };
+        # Password for the dedicated, least-privilege "provisioner" API user
+        # that the token broker logs in as (Settings:Modify + Zones:Modify
+        # only — NOT admin). Created MANUALLY; see the runbook.
+        technitium_provisioner_password = {
+          inherit sopsFile;
+          owner = "technitium";
+        };
+      };
+
       services.technitium-server-complete = {
         enable = true;
         domain = tech.domain;

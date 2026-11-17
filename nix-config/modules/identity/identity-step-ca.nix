@@ -10,11 +10,38 @@ in
   flake.modules.nixos.step-ca =
     {
       config,
+      inputs,
       lib,
       pkgs,
       ...
     }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/step-ca.yaml";
+    in
     {
+      # Per-service sops file (secrets/<host>/step-ca.yaml): the YubiKey PIN
+      # (rendered into the pin-source template for the step-ca KMS) and the
+      # intermediate cert password. The host's step_jwk_provisioner_password
+      # (ssh-cert-renewer) also lives in this file, declared by
+      # modules/homelab/homelab-ssh-cert-renewer.nix.
+      sops.secrets = {
+        yk_pin = {
+          inherit sopsFile;
+          owner = "step-ca";
+          group = "step-ca";
+        };
+        intermediate_crt_password = {
+          inherit sopsFile;
+          owner = "step-ca";
+          group = "step-ca";
+        };
+      };
+      sops.templates."yk-pin.txt" = {
+        content = config.sops.placeholder.yk_pin;
+        owner = "step-ca";
+        group = "step-ca";
+      };
+
       services.step-ca = {
         enable = true;
         address = "0.0.0.0";

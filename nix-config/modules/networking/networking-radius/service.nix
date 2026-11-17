@@ -22,9 +22,25 @@ in
         ${pkgs.openssl}/bin/openssl rehash $out
       '';
       inherit (config.security.acme.certs."${svc.domain}") directory;
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/radius.yaml";
     in
     {
       imports = [ inputs.self.modules.nixos.users-radiusd ];
+
+      # Per-service sops file (secrets/<host>/radius.yaml); both feed the
+      # radius_config template below.
+      sops.secrets = {
+        unifi_radius_secret = {
+          inherit sopsFile;
+          owner = "radiusd";
+          group = "radiusd";
+        };
+        ui_radius_auth_token = {
+          inherit sopsFile;
+          owner = "radiusd";
+          group = "radiusd";
+        };
+      };
 
       virtualisation.oci-containers.containers."${containerName}" = {
         user = "root";

@@ -1,25 +1,9 @@
-{ inputs, lib, config, pkgs, ... }:
 {
-  sops.defaultSopsFile = inputs.self + "/nix-config/secrets/cicero.yaml";
+  # Secret declarations live in the service modules that consume them, each
+  # pointing at its per-service file under secrets/cicero/:
+  #   step-ca.yaml — identity-step-ca.nix (yk_pin, intermediate_crt_password +
+  #                  yk-pin.txt template) and homelab-ssh-cert-renewer.nix
+  #                  (step_jwk_provisioner_password).
+  # Only the age identity stays host-local.
   sops.age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
-
-  sops.secrets.intermediate_crt_password = {
-    owner = "step-ca";
-    group = "step-ca";
-  };
-
-  sops.secrets.yk_pin = {
-    owner = "step-ca";
-    group = "step-ca";
-  };
-
-  sops.templates."yk-pin.txt" = {
-    content = config.sops.placeholder.yk_pin;
-    owner = "step-ca";
-    group = "step-ca";
-  };
-
-  sops.secrets.step_jwk_provisioner_password = {
-    owner = "root";
-  };
 }

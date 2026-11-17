@@ -83,10 +83,10 @@ in
           };
 
           sops = {
-            defaultSopsFile = inputs.self + "/nix-config/secrets/nixos.yaml";
+            # opencode's provider modules declare their own secrets (explicit
+            # sopsFile → secrets/nixos/opencode.yaml); only the age identity
+            # stays here.
             age.keyFile = "/home/jacob/.config/sops/age/keys.txt";
-
-            secrets.qwen_openai_key = { };
           };
 
           home.packages = with pkgs; [

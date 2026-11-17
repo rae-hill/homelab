@@ -1,8 +1,27 @@
 { inputs, ... }:
 {
   flake.modules.nixos.host-augustus-filesystems =
-    { lib, config, ... }:
     {
+      inputs,
+      lib,
+      config,
+      ...
+    }:
+    {
+      # CIFS credentials for the /mnt/backups automount below, from the smb
+      # per-service sops file (moved from the former augustus/sops.nix).
+      sops.secrets.smb_passphrase = {
+        sopsFile = inputs.self + "/nix-config/secrets/augustus/smb.yaml";
+        owner = "root";
+      };
+      sops.templates."smb-creds" = {
+        content = ''
+          username=augustus
+          password=${config.sops.placeholder.smb_passphrase}
+        '';
+        owner = "root";
+      };
+
       fileSystems."/mnt/backups" = {
         device = "//10.76.100.190/Personal-Drive";
         fsType = "cifs";

@@ -8,19 +8,20 @@ nixpkgs builds for app repos. Submodule contents are excluded from Nix's flake-s
 so `repos/` never bloats builds or deploy copies. After a fresh clone, run
 `git submodule update --init` to populate them.
 
-| Directory                     | Source                                              | Purpose                                        |
-| ----------------------------- | --------------------------------------------------- | ---------------------------------------------- |
-| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform                      |
-| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library                   |
-| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                                |
-| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management                    |
-| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05)        |
-| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)            |
-| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source                 |
-| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool           |
-| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | step-ca / smallstep crypto library             |
-| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                   |
-| `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`) |
+| Directory                     | Source                                              | Purpose                                                         |
+| ----------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| `repos/effect/`               | https://github.com/Effect-TS/effect.git             | Effect runtime & platform                                       |
+| `repos/kobalte/`              | https://github.com/kobaltedev/kobalte.git           | SolidJS UI component library                                    |
+| `repos/astro/`                | https://github.com/withastro/astro.git              | Astro framework                                                 |
+| `repos/nanostores/`           | https://github.com/nanostores/nanostores.git        | Nanostores state management                                     |
+| `repos/nixpkgs-26.05/`        | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (stable 26.05)                         |
+| `repos/nixpkgs-unstable/`     | https://github.com/NixOS/nixpkgs.git                | NixOS packages & modules (unstable)                             |
+| `repos/kanidm/`               | https://github.com/kanidm/kanidm.git                | Kanidm IDM server + CLI source                                  |
+| `repos/kanidm-provision/`     | https://github.com/oddlama/kanidm-provision.git     | Declarative Kanidm provisioning tool                            |
+| `repos/crypto/`               | https://github.com/smallstep/crypto.git             | step-ca / smallstep crypto library                              |
+| `repos/technitium-dnsserver/` | https://github.com/TechnitiumSoftware/DnsServer.git | Technitium DNS Server source                                    |
+| `repos/nix-darwin/`           | https://github.com/nix-darwin/nix-darwin.git        | nix-darwin modules (macOS, `nix-darwin-26.05`)                  |
+| `repos/sops-nix/`             | https://github.com/Mic92/sops-nix.git               | sops-nix modules (pinned to the `sops-nix` rev in `flake.lock`) |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`

@@ -10,11 +10,37 @@ in
   flake.modules.nixos.grafana-service =
     {
       config,
+      inputs,
       lib,
       pkgs,
       ...
     }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/grafana.yaml";
+    in
     {
+      # Per-service sops file (secrets/<host>/grafana.yaml). The OIDC
+      # grafana_client_secret (kanidm-owned) is declared in catalog.nix from
+      # the same file and rendered into the grafana-client-secret template.
+      sops.secrets = {
+        grafana_secret = {
+          inherit sopsFile;
+          owner = "grafana";
+        };
+        grafana_pushover_user_key = {
+          inherit sopsFile;
+          owner = "grafana";
+        };
+        grafana_pushover_token = {
+          inherit sopsFile;
+          owner = "grafana";
+        };
+      };
+      sops.templates."grafana-client-secret" = {
+        content = config.sops.placeholder.grafana_client_secret;
+        owner = "grafana";
+      };
+
       services.grafana = {
         enable = true;
 

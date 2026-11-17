@@ -6,7 +6,9 @@ keys:
   - &jacob_praeconius age14wpn3v4639t4tvgw0l54paquxd5gyzse8nm8pvkha3m2r3j94q2q2vz4nt
   - &admin_aedilis age16rnevpzh322shv47krfx3e6da0h88t0yx8ellwpqwe6s6qh6pd8qj2fnwn
 creation_rules:
-  - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
+  # Per-service secret files: secrets/<host>/<service>.yaml (matches the old
+  # flat secrets/<host>.yaml layout too, for the migration period).
+  - path_regex: secrets/([^/]+/)?[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
           - *jacob_nixos

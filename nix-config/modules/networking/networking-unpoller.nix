@@ -8,6 +8,7 @@ in
   flake.modules.nixos.unpoller =
     {
       config,
+      inputs,
       lib,
       pkgs,
       pkgs-unstable,
@@ -50,8 +51,18 @@ in
       };
 
       configFile = pkgs.writeText "patched_unpoller.json" (lib.generators.toJSON { } cfg);
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/unpoller.yaml";
     in
     {
+      # Per-service sops file (secrets/<host>/unpoller.yaml); consumed via the
+      # file:// reference in the unifi.defaults config above.
+      sops.secrets.unpoller_password = {
+        inherit sopsFile;
+        owner = "unifi-poller";
+        group = "unifi-poller";
+        mode = "0400";
+      };
+
       systemd.services.unifi-poller = {
         serviceConfig = {
           ExecStart = lib.mkForce "${pkgs-unstable.unpoller}/bin/unpoller --config ${configFile}";

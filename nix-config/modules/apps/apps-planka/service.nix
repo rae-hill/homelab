@@ -36,9 +36,39 @@ in
     }:
     let
       caCert = config.environment.etc."ssl/certs/ca-certificates.crt".source;
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/planka.yaml";
     in
     {
       imports = [ inputs.self.modules.nixos.users-planka ];
+
+      # Per-service sops file (secrets/<host>/planka.yaml). The OIDC
+      # planka_client_secret (kanidm-owned) is declared in catalog.nix from the
+      # same file and rendered into the planka-client-secret template consumed
+      # by the start script below.
+      sops.secrets = {
+        planka_secret_key = {
+          inherit sopsFile;
+          owner = "planka";
+        };
+        planka_db_pass = {
+          inherit sopsFile;
+          owner = "planka";
+          group = "planka-db-pass";
+          mode = "0440";
+        };
+        planka_default_admin_pass = {
+          inherit sopsFile;
+          owner = "planka";
+        };
+        planka_restic_backup_passphrase = {
+          inherit sopsFile;
+          owner = "restic";
+        };
+      };
+      sops.templates."planka-client-secret" = {
+        content = config.sops.placeholder.planka_client_secret;
+        owner = "planka";
+      };
 
       services.postgresql.ensureDatabases = [
         plankaDbName

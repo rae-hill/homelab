@@ -1,12 +1,19 @@
 # planka — catalog entry (vhost + OIDC basic client with insecure-pkce + role claims).
-{ config, ... }:
+{ config, inputs, ... }:
 let
   svc = config.constants.services.planka; # subdomain "planka", port 1337, clientId "planka"
 in
 {
   flake.modules.nixos.planka-catalog =
-    { ... }:
+    { config, ... }:
     {
+      # kanidm-owned OIDC client secret, from the per-service sops file
+      # (secrets/<host>/planka.yaml); consumed via oidc.client.basic.secretRef.
+      sops.secrets.planka_client_secret = {
+        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/planka.yaml";
+        owner = "kanidm";
+      };
+
       homelab.catalog.planka = {
         subdomain = svc.subdomain;
         host = "augustus";

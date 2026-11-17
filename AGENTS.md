@@ -83,7 +83,10 @@ nix-config/
 │                               #   imported by default.nix) + sops.nix (plain module;
 │                               #   users live in modules/users/). aedilis also has
 │                               #   technitium.nix; cicero also has observability/
-└── secrets/                    # SOPS-encrypted secrets per host
+└── secrets/                    # SOPS-encrypted secrets per host/service
+                               #   (secrets/<host>/<service>.yaml; declared via
+                               #   sops.secrets.<name>.sopsFile in the consuming
+                               #   service/host module)
 ```
 
 ### NixOS Package & Module Reference
@@ -136,6 +139,7 @@ the pinned tag's source before trusting them.
 | Technitium DNS behavior                                                                 | `./repos/technitium-dnsserver/`                                                                                 |
 | OpenClaw behavior (gateway, Control UI, MCP, config schema, build stamps)               | `./repos/openclaw/` (openclaw/openclaw, tag `v2026.10.5` = nixpkgs-unstable pin)                                |
 | OpenCode behavior (client/server split, `service` mode, registration, HTTP API)         | `./repos/opencode/` (anomalyco/opencode, tag `v2.1.4` = pkgs-unstable pin)                                      |
+| sops-nix behavior (`sopsFile` per secret, templates/placeholders, eval-time validation) | `./repos/sops-nix/` (Mic92/sops-nix, rev = the `sops-nix` pin in `flake.lock`)                                  |
 | open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, pinned at `main`; parser in `src/app/lib/parse-resume-from-pdf/`) |
 
 If a needed upstream is not vendored yet, add it as a submodule (see the `effect-services` skill →

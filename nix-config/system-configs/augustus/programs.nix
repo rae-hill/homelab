@@ -2,6 +2,7 @@
 {
   flake.modules.nixos.host-augustus-programs =
     {
+      inputs,
       lib,
       config,
       pkgs,
@@ -9,8 +10,62 @@
     }:
     let
       stepCaClientId = "step-ca";
+      homelabApiSecrets = inputs.self + "/nix-config/secrets/augustus/homelab-api.yaml";
     in
     {
+      # Host-specific sops declarations, each pointing at its per-service file
+      # (moved from the former augustus/sops.nix):
+      #   step-ca.yaml      — the kanidm-issued OIDC client secret for step-ca
+      #   homelab-api.yaml  — augustus-only API extras (jacob's API key, the
+      #                       resume-tailor OpenRouter key, device serials)
+      #   postgres.yaml     — the restic passphrase for the postgres backup job
+      sops.secrets = {
+        step_ca_oidc_client_secret = {
+          sopsFile = inputs.self + "/nix-config/secrets/augustus/step-ca.yaml";
+          owner = "kanidm";
+        };
+        homelab_api_key_jacob = {
+          sopsFile = homelabApiSecrets;
+          owner = "homelab-api";
+          group = "homelab-api";
+        };
+        homelab_api_openrouter_key = {
+          sopsFile = homelabApiSecrets;
+          owner = "homelab-api";
+          group = "homelab-api";
+        };
+        ipad_serial_number = {
+          sopsFile = homelabApiSecrets;
+          owner = "homelab-api";
+          group = "homelab-api";
+        };
+        iphone_serial_number = {
+          sopsFile = homelabApiSecrets;
+          owner = "homelab-api";
+          group = "homelab-api";
+        };
+        postgres_restic_backup_passphrase = {
+          sopsFile = inputs.self + "/nix-config/secrets/augustus/postgres.yaml";
+          owner = "restic";
+        };
+      };
+
+      sops.templates."serial-numbers-file" = {
+        owner = "homelab-api";
+        group = "homelab-api";
+        content = builtins.toJSON {
+          "100.104.220.114" = config.sops.placeholder.ipad_serial_number;
+          "fd7a:115c:a1e0::6f01:dc8c" = config.sops.placeholder.ipad_serial_number;
+          "100.69.89.38" = config.sops.placeholder.iphone_serial_number;
+          "fd7a:115c:a1e0::601:5927" = config.sops.placeholder.iphone_serial_number;
+        };
+      };
+
+      sops.templates."postgres-backup-passphrase" = {
+        content = config.sops.placeholder.postgres_restic_backup_passphrase;
+        owner = "restic";
+      };
+
       programs.git.enable = true;
 
       programs.zsh.enable = true;

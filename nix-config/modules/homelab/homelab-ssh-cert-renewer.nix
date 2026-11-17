@@ -4,7 +4,13 @@ let
 in
 {
   flake.modules.nixos.ssh-cert-renewer =
-    { inputs, config, lib, pkgs, ... }:
+    {
+      inputs,
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       cfg = config.services.ssh-cert-renewer;
     in
@@ -41,6 +47,15 @@ in
       };
 
       config = lib.mkIf cfg.enable {
+        # The step-ca JWK provisioner password used to mint this host's SSH
+        # certificate lives in the host's step-ca per-service sops file
+        # (secrets/<host>/step-ca.yaml — shared with identity-step-ca on
+        # cicero); hosts wire it via services.ssh-cert-renewer.passwordFile.
+        sops.secrets.step_jwk_provisioner_password = {
+          sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/step-ca.yaml";
+          owner = "root";
+        };
+
         systemd.services.ssh-cert-renewer = {
           description = "SSH Certificate Renewal Service";
           after = [ "network-online.target" ];

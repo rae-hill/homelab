@@ -206,6 +206,16 @@ in
           home = cfg.userHomeDir;
         };
 
+        # The JWK private-key passphrase, from the host's homelab-api
+        # per-service sops file (secrets/<host>/homelab-api.yaml — exists on
+        # every host that enables the API, e.g. augustus + praeconinus).
+        # Consumed via services.homelab-api.privateKeySecretPath (host config).
+        sops.secrets.homelab_api_jwk_password = {
+          sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/homelab-api.yaml";
+          owner = cfg.userName;
+          group = cfg.userName;
+        };
+
         sops.templates."homelab-api-env" = {
           owner = cfg.userName;
           group = cfg.userName;

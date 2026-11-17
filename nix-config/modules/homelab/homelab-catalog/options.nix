@@ -421,8 +421,8 @@ let
               type = types.str;
               description = ''
                 sops secret NAME providing basicSecretFile. The generator references
-                config.sops.secrets.<secretRef>.path; the secret is declared in the host
-                sops config.
+                config.sops.secrets.<secretRef>.path; the secret is declared by the
+                service's catalog module (sopsFile = secrets/<host>/<service>.yaml).
               '';
             };
           };

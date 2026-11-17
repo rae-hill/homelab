@@ -1,12 +1,19 @@
 # home-assistant — catalog entry (vhost + OIDC basic client; non-/ landing + groups scope).
-{ config, ... }:
+{ config, inputs, ... }:
 let
   svc = config.constants.services.home-assistant; # subdomain "home-assistant", port 8123
 in
 {
   flake.modules.nixos.home-assistant-catalog =
-    { ... }:
+    { config, ... }:
     {
+      # kanidm-owned OIDC client secret, from the per-service sops file
+      # (secrets/<host>/home-assistant.yaml); consumed via oidc.client.basic.secretRef.
+      sops.secrets.home_assistant_client_secret = {
+        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/home-assistant.yaml";
+        owner = "kanidm";
+      };
+
       homelab.catalog.home-assistant = {
         subdomain = svc.subdomain;
         host = "augustus";

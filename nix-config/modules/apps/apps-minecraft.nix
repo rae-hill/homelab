@@ -1,7 +1,23 @@
 {
   flake.modules.nixos.minecraft =
-    { config, lib, pkgs, ... }:
     {
+      config,
+      inputs,
+      lib,
+      pkgs,
+      ...
+    }:
+    let
+      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/minecraft.yaml";
+    in
+    {
+      # Per-service sops file (secrets/<host>/minecraft.yaml); restic-owned
+      # passphrase for the backup job below.
+      sops.secrets.minecraft_backup_passphrase = {
+        inherit sopsFile;
+        owner = "restic";
+      };
+
       services.minecraft-servers = {
         enable = true;
         eula = true;

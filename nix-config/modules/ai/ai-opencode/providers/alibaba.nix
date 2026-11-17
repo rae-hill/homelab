@@ -8,6 +8,13 @@
       ...
     }:
     {
+      # QwenCloud token-plan key from the opencode per-service sops file
+      # (secrets/nixos/opencode.yaml — declared here, decrypted with the HM
+      # sops age keyFile of whichever home config wires opencode).
+      sops.secrets.qwen_openai_key = {
+        sopsFile = inputs.self + "/nix-config/secrets/nixos/opencode.yaml";
+      };
+
       programs.opencode.settings.providers = {
         "qwencloud-token-plan-personal" = {
           name = "QwenCloud";
