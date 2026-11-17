@@ -3,6 +3,13 @@ let
   darwin = inputs.self.modules.darwin;
 in
 {
+  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
+  # bespoke host file registers flake.modules.darwin.host-mini-programs via
+  # this import and is referenced below like any shared module).
+  imports = [
+    ./programs.nix
+  ];
+
   flake.darwinConfigurations.mini = inputs.nix-darwin.lib.darwinSystem {
     specialArgs = {
       inherit inputs;
@@ -30,8 +37,8 @@ in
       darwin.mini-jellyfin
       darwin.openclaw
 
+      darwin.host-mini-programs
       ./sops.nix
-      ./programs.nix
 
       { networking.hostName = "mini"; }
     ];

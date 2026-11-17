@@ -1,15 +1,19 @@
+{ inputs, ... }:
 {
-  lib,
-  config,
-  pkgs,
-  ...
-}:
-{
-  # Boot (system-boot-generic), networking/DNS (system-networking +
-  # system-networking-forwarding), locale (system-locale), and allowUnfree
-  # (system-nix-base) come from modules/system — wired in default.nix.
+  flake.modules.nixos.host-praeconinus-system =
+    {
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
+    {
+      # Boot (system-boot-generic), networking/DNS (system-networking +
+      # system-networking-forwarding), locale (system-locale), and allowUnfree
+      # (system-nix-base) come from modules/system — wired in default.nix.
 
-  services.getty.autologinUser = "jacob";
+      services.getty.autologinUser = "jacob";
 
-  system.stateVersion = "25.05";
+      system.stateVersion = "25.05";
+    };
 }

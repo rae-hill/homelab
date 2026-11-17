@@ -3,9 +3,16 @@ let
   nixos = inputs.self.modules.nixos;
 in
 {
-  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
-  # aedilis Technitium layer is imported explicitly here).
-  imports = [ ./technitium.nix ];
+  # Host-local flake-parts modules (system-configs isn't import-tree'd): the
+  # aedilis Technitium layer and the bespoke host files register
+  # flake.modules.nixos.{technitium-aedilis*,host-aedilis-*} via these imports.
+  imports = [
+    ./technitium.nix
+    ./hardware.nix
+    ./security.nix
+    ./system.nix
+    ./programs.nix
+  ];
 
   flake.nixosConfigurations.aedilis = inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
@@ -28,15 +35,15 @@ in
       nixos.system-boot-grub
       nixos.system-networking-dns-host
       nixos.system-security-base
+      nixos.users-human
       nixos.homelab-service-dns-host
       nixos.technitium-aedilis
 
-      ./hardware.nix
-      ./security.nix
-      ./users.nix
+      nixos.host-aedilis-hardware
+      nixos.host-aedilis-security
+      nixos.host-aedilis-system
+      nixos.host-aedilis-programs
       ./sops.nix
-      ./system.nix
-      ./programs.nix
 
       { networking.hostName = "aedilis"; }
     ];

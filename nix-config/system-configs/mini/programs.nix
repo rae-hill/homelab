@@ -1,36 +1,40 @@
+{ inputs, ... }:
 {
-  inputs,
-  lib,
-  config,
-  pkgs,
-  ...
-}:
-{
-  programs.zsh = {
-    enable = true;
-    enableCompletion = true;
-    enableSyntaxHighlighting = true;
-  };
+  flake.modules.darwin.host-mini-programs =
+    {
+      inputs,
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
+    {
+      programs.zsh = {
+        enable = true;
+        enableCompletion = true;
+        enableSyntaxHighlighting = true;
+      };
 
-  environment.systemPackages = [
-    pkgs.step-cli
-  ];
+      environment.systemPackages = [
+        pkgs.step-cli
+      ];
 
-  # The Caddyfile global block + launchd daemon + the Jellyfin/metrics site blocks now live in
-  # modules/apps/apps-jellyfin/ (catalog entries rendered by the darwin caddy generator). mini imports
-  # darwin.homelab-service-apphost + darwin.mini-jellyfin from system-configs/mini/default.nix.
+      # The Caddyfile global block + launchd daemon + the Jellyfin/metrics site blocks now live in
+      # modules/apps/apps-jellyfin/ (catalog entries rendered by the darwin caddy generator). mini imports
+      # darwin.homelab-service-apphost + darwin.mini-jellyfin from system-configs/mini/default.nix.
 
-  system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
+      system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
 
-  system.primaryUser = "jacob";
+      system.primaryUser = "jacob";
 
-  system.stateVersion = 6;
+      system.stateVersion = 6;
 
-  nixpkgs.hostPlatform = "aarch64-darwin";
+      nixpkgs.hostPlatform = "aarch64-darwin";
 
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.allowUnfreePredicate =
-    pkg:
-    builtins.elem (lib.getName pkg) [
-    ];
+      nixpkgs.config.allowUnfree = true;
+      nixpkgs.config.allowUnfreePredicate =
+        pkg:
+        builtins.elem (lib.getName pkg) [
+        ];
+    };
 }

@@ -6,6 +6,9 @@
   flake.modules.nixos.desktop-gnome = { pkgs, ... }: {
     services.desktopManager.gnome.enable = true;
 
+    # Required by the HM dconf module (home-configs' desktop-gnome).
+    programs.dconf.enable = true;
+
     services.displayManager.gdm.enable = true;
 
     services.gnome.gcr-ssh-agent.enable = false;

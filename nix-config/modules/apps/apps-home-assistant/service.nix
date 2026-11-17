@@ -1,4 +1,4 @@
-{ config, ... }:
+{ inputs, config, ... }:
 let
   c = config.constants;
   svc = c.services.home-assistant;
@@ -10,9 +10,12 @@ in
       lib,
       pkgs,
       pkgs-unstable,
+      inputs,
       ...
     }:
     {
+      imports = [ inputs.self.modules.nixos.users-hass ];
+
       sops.templates."home-assistant-secrets.yaml" = {
         owner = "hass";
         content = ''

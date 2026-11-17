@@ -31,12 +31,15 @@ in
       config,
       lib,
       pkgs,
+      inputs,
       ...
     }:
     let
       caCert = config.environment.etc."ssl/certs/ca-certificates.crt".source;
     in
     {
+      imports = [ inputs.self.modules.nixos.users-planka ];
+
       services.postgresql.ensureDatabases = [
         plankaDbName
       ];

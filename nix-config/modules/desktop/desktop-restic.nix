@@ -4,9 +4,12 @@
       config,
       lib,
       pkgs,
+      inputs,
       ...
     }:
     {
+      imports = [ inputs.self.modules.nixos.users-restic ];
+
       security.wrappers.restic = {
         program = "restic";
         source = "${pkgs.restic.out}/bin/restic";

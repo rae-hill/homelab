@@ -29,8 +29,8 @@
 
           user = {
             signingkey = "~/.ssh/id_ed25519_signing";
-            name = "Jacob Alford";
-            email = "github.scouting378@passmail.net";
+            name = "Rae Hill";
+            email = "engineer@rae-hill.dev";
           };
         };
       };

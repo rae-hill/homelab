@@ -3,6 +3,16 @@ let
   nixos = inputs.self.modules.nixos;
 in
 {
+  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
+  # bespoke host files register flake.modules.nixos.host-praeconinus-* via
+  # these imports and are referenced below like any shared module).
+  imports = [
+    ./hardware.nix
+    ./security.nix
+    ./system.nix
+    ./programs.nix
+  ];
+
   flake.nixosConfigurations.praeconinus = inputs.nixpkgs.lib.nixosSystem {
     system = "aarch64-linux";
     specialArgs = {
@@ -24,16 +34,16 @@ in
       nixos.system-networking
       nixos.system-networking-forwarding
       nixos.system-security-base
+      nixos.users-human
       nixos.caddy
       nixos.homelab-api-service
       nixos.homelab-secret-provisioner
 
-      ./hardware.nix
-      ./security.nix
-      ./users.nix
+      nixos.host-praeconinus-hardware
+      nixos.host-praeconinus-security
+      nixos.host-praeconinus-system
+      nixos.host-praeconinus-programs
       ./sops.nix
-      ./system.nix
-      ./programs.nix
 
       { networking.hostName = "praeconinus"; }
     ];

@@ -10,6 +10,7 @@ in
       config,
       lib,
       pkgs,
+      inputs,
       ...
     }:
     let
@@ -23,6 +24,8 @@ in
       inherit (config.security.acme.certs."${svc.domain}") directory;
     in
     {
+      imports = [ inputs.self.modules.nixos.users-radiusd ];
+
       virtualisation.oci-containers.containers."${containerName}" = {
         user = "root";
         image = "kanidm/radius:latest";

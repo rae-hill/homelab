@@ -1,55 +1,42 @@
+{ inputs, ... }:
 {
-  inputs,
-  lib,
-  config,
-  pkgs,
-  ...
-}:
-{
-  # execWheelOnly + the internal root CA + firewall.enable come from
-  # system-security-base — wired in default.nix. pcscd stays inline for now:
-  # the system-security-smartcard module would also add the opensc pkcs11
-  # config, which cicero doesn't use yet.
+  flake.modules.nixos.host-cicero-security =
+    {
+      inputs,
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
+    {
+      # execWheelOnly + the internal root CA + firewall.enable come from
+      # system-security-base; pcscd + the PC/SC polkit rules come from
+      # system-security-pcscd — both wired in default.nix.
 
-  services.pcscd.enable = true;
+      networking.firewall = {
+        interfaces = {
+          tailscale0 = {
+            allowedTCPPorts = [
+              22
+              80
+              443
+              5252
+              # NOTE: 8443 (Caddy https for the cicero-metrics / ca-monitoring mTLS vhosts) is
+              # now emitted by the homelab-service-firewall generator from those catalog entries
+              # (scope.tailnet, listenPort 8443). 443 here is step-ca's (not a Caddy vhost);
+              # 80 is the Caddy :80 challenge front — both stay baseline.
+            ];
+          };
+        };
+      };
 
-  security.polkit.extraConfig = ''
-    polkit.addRule(function(action, subject) {
-      if (action.id == "org.debian.pcsc-lite.access_card") {
-        return polkit.Result.YES;
-      }
-    });
+      services.openssh.openFirewall = true;
 
-    polkit.addRule(function(action, subject) {
-      if (action.id == "org.debian.pcsc-lite.access_pcsc") {
-        return polkit.Result.YES;
-      }
-    });
-  '';
-
-  networking.firewall = {
-    interfaces = {
-      tailscale0 = {
-        allowedTCPPorts = [
-          22
-          80
-          443
-          5252
-          # NOTE: 8443 (Caddy https for the cicero-metrics / ca-monitoring mTLS vhosts) is
-          # now emitted by the homelab-service-firewall generator from those catalog entries
-          # (scope.tailnet, listenPort 8443). 443 here is step-ca's (not a Caddy vhost);
-          # 80 is the Caddy :80 challenge front — both stay baseline.
-        ];
+      services.ssh-cert-renewer = {
+        sshKeyName = "ssh_host_ed25519_key";
+        enable = true;
+        serviceName = "cicero.plato-splunk.media";
+        passwordFile = config.sops.secrets.step_jwk_provisioner_password.path;
       };
     };
-  };
-
-  services.openssh.openFirewall = true;
-
-  services.ssh-cert-renewer = {
-    sshKeyName = "ssh_host_ed25519_key";
-    enable = true;
-    serviceName = "cicero.plato-splunk.media";
-    passwordFile = config.sops.secrets.step_jwk_provisioner_password.path;
-  };
 }

@@ -3,14 +3,19 @@ let
   nixos = inputs.self.modules.nixos;
 in
 {
-  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
-  # cicero observability layer is imported explicitly here).
+  # Host-local flake-parts modules (system-configs isn't import-tree'd): the
+  # cicero observability layer and the bespoke host files register
+  # flake.modules.nixos.{cicero-observability*,host-cicero-*} via these imports.
   imports = [
     ./observability/alloy.nix
     ./observability/caddy-host.nix
     ./observability/catalog.nix
     ./observability/node-exporter.nix
     ./observability/complete.nix
+    ./hardware.nix
+    ./security.nix
+    ./system.nix
+    ./programs.nix
   ];
 
   flake.nixosConfigurations.cicero = inputs.nixpkgs.lib.nixosSystem {
@@ -33,16 +38,17 @@ in
       nixos.system-boot-systemd
       nixos.system-networking
       nixos.system-security-base
+      nixos.system-security-pcscd
+      nixos.users-human
       nixos.step-ca
       nixos.homelab-service-apphost
       nixos.cicero-observability
 
-      ./hardware.nix
-      ./security.nix
-      ./users.nix
+      nixos.host-cicero-hardware
+      nixos.host-cicero-security
+      nixos.host-cicero-system
+      nixos.host-cicero-programs
       ./sops.nix
-      ./system.nix
-      ./programs.nix
 
       { networking.hostName = "cicero"; }
     ];

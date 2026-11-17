@@ -67,7 +67,10 @@ nix-config/
 │   ├── system/                 # System modules (system-base, boot, networking
 │   │                           #   (+forwarding/-dns-host), security, locale, fonts,
 │   │                           #   podman, programs, cifs, audio)
-│   └── themes/                 # Themes (themes-catppuccin.nix)
+│   ├── themes/                 # Themes (themes-catppuccin.nix)
+│   └── users/                  # User accounts (users-human.nix: jacob/rae/admin
+│                               #   aggregate; users-system.nix: service users,
+│                               #   imported by their service modules)
 ├── home-configs/               # Home-manager configs per user/host
 │   ├── jacob-nixos.nix
 │   ├── jacob-augustus.nix
@@ -75,9 +78,11 @@ nix-config/
 │   └── rae/                    # default.nix + complete/git/shell/sops.nix
 ├── system-configs/             # Per-host entry points (aedilis, augustus, cicero, mini,
 │                               #   nixos, praeconinus)
-│   └── <host>/                 # default.nix + hardware/filesystems/security/users/
-│                               #   sops/system/programs.nix (aedilis also has
-│                               #   technitium.nix; cicero also has observability/)
+│   └── <host>/                 # default.nix + hardware/filesystems/security/system/
+│                               #   programs.nix (flake-parts host-<host>-* modules,
+│                               #   imported by default.nix) + sops.nix (plain module;
+│                               #   users live in modules/users/). aedilis also has
+│                               #   technitium.nix; cicero also has observability/
 └── secrets/                    # SOPS-encrypted secrets per host
 ```
 

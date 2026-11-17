@@ -3,6 +3,17 @@ let
   nixos = inputs.self.modules.nixos;
 in
 {
+  # Host-local flake-parts modules (system-configs isn't import-tree'd, so the
+  # bespoke host files register flake.modules.nixos.host-augustus-* via these
+  # imports and are referenced below like any shared module).
+  imports = [
+    ./hardware.nix
+    ./filesystems.nix
+    ./security.nix
+    ./system.nix
+    ./programs.nix
+  ];
+
   flake.nixosConfigurations.augustus = inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
     specialArgs = {
@@ -27,6 +38,7 @@ in
       nixos.system-networking
       nixos.system-networking-forwarding
       nixos.system-security-base
+      nixos.users-human
       nixos.caddy
       nixos.homelab-service-oidc-host
       nixos.acme
@@ -54,13 +66,12 @@ in
       nixos.resume-site
       nixos.technitium-kanidm
 
-      ./hardware.nix
-      ./filesystems.nix
-      ./security.nix
-      ./users.nix
+      nixos.host-augustus-hardware
+      nixos.host-augustus-filesystems
+      nixos.host-augustus-security
+      nixos.host-augustus-system
+      nixos.host-augustus-programs
       ./sops.nix
-      ./system.nix
-      ./programs.nix
 
       { networking.hostName = "augustus"; }
     ];

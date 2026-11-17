@@ -9,7 +9,7 @@
       qmk-udev-rules
     ];
 
-    environment.systemPacakges = with pkgs; [
+    environment.systemPackages = with pkgs; [
       via
     ];
   };

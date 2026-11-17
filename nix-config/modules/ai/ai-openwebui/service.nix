@@ -1,4 +1,4 @@
-{ config, ... }:
+{ inputs, config, ... }:
 let
   c = config.constants;
   svc = c.services.openwebui;
@@ -9,9 +9,12 @@ in
       config,
       lib,
       pkgs,
+      inputs,
       ...
     }:
     {
+      imports = [ inputs.self.modules.nixos.users-openwebui ];
+
       sops.templates."openwebui-env" = {
         owner = "openwebui";
         group = "openwebui";
