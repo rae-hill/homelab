@@ -10,18 +10,19 @@
     }:
     let
       stepCaClientId = "step-ca";
-      homelabApiSecrets = inputs.self + "/nix-config/secrets/augustus/homelab-api.yaml";
+      homelabApiSecrets = ./secrets/homelab-api.yaml;
     in
     {
       # Host-specific sops declarations, each pointing at its per-service file
-      # (moved from the former augustus/sops.nix):
+      # Host-specific sops declarations from ./secrets/ (moved out of the
+      # former augustus/sops.nix and secrets/augustus/):
       #   step-ca.yaml      — the kanidm-issued OIDC client secret for step-ca
       #   homelab-api.yaml  — augustus-only API extras (jacob's API key, the
       #                       resume-tailor OpenRouter key, device serials)
       #   postgres.yaml     — the restic passphrase for the postgres backup job
       sops.secrets = {
         step_ca_oidc_client_secret = {
-          sopsFile = inputs.self + "/nix-config/secrets/augustus/step-ca.yaml";
+          sopsFile = ./secrets/step-ca.yaml;
           owner = "kanidm";
         };
         homelab_api_key_jacob = {

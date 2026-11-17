@@ -34,7 +34,11 @@ nix-config/
 ├── service-registry.nix        # Service registry
 ├── lib/                        # Shared Nix helpers (shell.nix)
 ├── checks/                     # Flake checks (shellcheck.nix)
-├── modules/
+├── modules/                    # Reusable flake-parts modules by category; module
+│                               #   dirs hold their SOPS-encrypted secrets
+│                               #   (secrets/<host>.yaml, declared via
+│                               #   sops.secrets.<name>.sopsFile — see
+│                               #   docs/secretspec-migration-plan.md)
 │   ├── ai/                     # AI modules (ai-opencode/, ai-openclaw/, ai-openwebui/,
 │   │                           #   ai-ollama, ai-wyoming)
 │   ├── apps/                   # App modules (apps-habitsync/, apps-home-assistant/,
@@ -70,19 +74,14 @@ nix-config/
 │   ├── jacob-augustus.nix
 │   ├── jacob-cicero.nix
 │   └── rae/                    # default.nix + complete/git/shell/sops.nix
-├── system-configs/             # Per-host entry points (aedilis, augustus, cicero, mini,
-│                               #   nixos, praeconinus)
-│   └── <host>/                 # default.nix + hardware/filesystems/security/system/
-│                               #   programs.nix (flake-parts host-<host>-* modules,
-│                               #   imported by default.nix) + sops.nix (plain module;
-│                               #   users live in modules/users/). aedilis also has
-│                               #   technitium.nix; cicero also has observability/
-└── secrets/                    # SOPS-encrypted secrets — transitional home of
-                               #   multi-consumer files (secrets/<host>/<service>.yaml);
-                               #   single-consumer files live module-local in
-                               #   modules/**/secrets/<host>.yaml. All declared via
-                               #   sops.secrets.<name>.sopsFile in the consuming
-                               #   module (docs/secretspec-migration-plan.md)
+└── system-configs/             # Per-host entry points (aedilis, augustus, cicero, mini,
+                                #   nixos, praeconinus)
+    └── <host>/                 # default.nix + hardware/filesystems/security/system/
+                                #   programs.nix (flake-parts host-<host>-* modules,
+                                #   imported by default.nix) + sops.nix (plain module;
+                                #   users live in modules/users/; host-specific
+                                #   secrets in secrets/). aedilis also has
+                                #   technitium.nix; cicero also has observability/
 ```
 
 ## NixOS Package & Module Reference

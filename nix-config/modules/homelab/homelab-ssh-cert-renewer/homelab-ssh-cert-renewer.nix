@@ -48,11 +48,12 @@ in
 
       config = lib.mkIf cfg.enable {
         # The step-ca JWK provisioner password used to mint this host's SSH
-        # certificate lives in the host's step-ca per-service sops file
-        # (secrets/<host>/step-ca.yaml — shared with identity-step-ca on
-        # cicero); hosts wire it via services.ssh-cert-renewer.passwordFile.
+        # certificate, from this module's own secrets/<host>.yaml (one file per
+        # host that enables the renewer). On cicero, the step-ca service's own
+        # secrets (yk_pin, intermediate cert password) live separately in
+        # identity-step-ca/secrets/. Hosts wire passwordFile below.
         sops.secrets.step_jwk_provisioner_password = {
-          sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/step-ca.yaml";
+          sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
           owner = "root";
         };
 

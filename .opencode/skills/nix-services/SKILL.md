@@ -15,7 +15,7 @@ Systemd service failures on **augustus** are reported **directly to Pushover**. 
 2. When a monitored service fails, systemd invokes `failure-notifs.service` with `MONITOR_UNIT`, `MONITOR_SERVICE_RESULT`, and `MONITOR_EXIT_STATUS` environment variables (metadata is only propagated when a single unit triggers the handler)
 3. The service `POST`s directly to the Pushover Messages API (`https://api.pushover.net/1/messages.json`) with `token` + `user` + `message` (mirroring how Grafana talks to Pushover). There is no intermediary — the former Apprise container was removed because it was unreliable.
 
-The Pushover credentials come from the `pushover_user_key` and `pushover_token` secrets in `nix-config/secrets/augustus/failure-notifs.yaml` (owned by `root`, since `failure-notifs` runs as root). They are wired via `services.failure-notifs.userKeyFile` / `tokenFile` in `nix-config/system-configs/augustus/system.nix`. The `pushover_token` is currently shared with Grafana's Pushover app token.
+The Pushover credentials come from the `pushover_user_key` and `pushover_token` secrets in `nix-config/system-configs/augustus/secrets/failure-notifs.yaml` (owned by `root`, since `failure-notifs` runs as root). They are wired via `services.failure-notifs.userKeyFile` / `tokenFile` in `nix-config/system-configs/augustus/system.nix`. The `pushover_token` is currently shared with Grafana's Pushover app token.
 
 ### Attaching Services to Failure Notifications
 

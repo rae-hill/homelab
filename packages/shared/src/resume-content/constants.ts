@@ -25,6 +25,7 @@ const experience = [
     description:
       "Spearheaded a production support-tool microfrontend and deployed synchronization infrastructure and services that bridged internal and partner data sources via async pipelines. Provided L3 support and database analytics for production ERPs and connected systems.",
     bulletPoints: bullets("nutrien", [
+      "Constructed agents, MCP servers, guardrails, and OAuth authentication for LLM-based agronomic agents.",
       "Architected an async pipeline for high-precision PostGIS geospatial boundaries, enabling expanded operations for third-party autonomous vehicles, using MSK (Kafka), SQS, Lambda, and AWS CDK IaC.",
       "Spearheaded a support tool and framework for internal L3 support ticket resolution, using React, CloudFront, Apollo, and SSO (OIDC), significantly reducing time to resolution.",
       "Authored schemas for a federated Apollo Graph (GraphQL) used by other internal teams to power data operations, ETLs, and application interfaces.",

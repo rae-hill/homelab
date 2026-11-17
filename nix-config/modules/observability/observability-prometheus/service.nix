@@ -21,12 +21,13 @@ in
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/technitium.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
       # Credentials for the limited Technitium "prometheus" metrics user + its
-      # TOTP seed, from the technitium per-service sops file (shared with
-      # networking-technitium/kanidm.nix's client secret); consumed by the
+      # TOTP seed, from this module's own sops file (secrets/<host>.yaml; the
+      # technitium OIDC client secret lives separately in
+      # networking-technitium/secrets/); consumed by the
       # metrics-token oneshot below (see docs/aedilis-host-plan.md §6).
       sops.secrets = {
         technitium_metrics_user_password = {

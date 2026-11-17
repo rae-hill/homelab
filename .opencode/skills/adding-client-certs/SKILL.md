@@ -141,7 +141,7 @@ Follow the existing host-JWK pattern (`identity/identity-step-ca.nix:169-232`):
 If not yet present: `ca.clientCertIdOid = "2.25.<namespace-uuid-decimal>";` in the `ca` attrset
 of `nix-config/service-registry.nix`/`constants.nix` (wherever `ca.*` constants live).
 
-## Step 3 — sops secrets (consuming host's `secrets/<host>/<service>.yaml`)
+## Step 3 — sops secrets (consuming module's `secrets/<host>.yaml`)
 
 | Secret                   | Contents                                            | Used by                                     |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------- |
@@ -152,11 +152,13 @@ of `nix-config/service-registry.nix`/`constants.nix` (wherever `ca.*` constants 
 | `yk_client_pin` (A)      | PIV PIN                                             | `pin-source=` in yubikey URIs               |
 | `yk_client_mgmt_key` (A) | PIV management key (enrollment only)                | `management-key-source=`                    |
 
-Declare in the consuming module with an explicit `sopsFile`: service modules declare their own
-secrets (`sops.secrets.<name>.sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/<service>.yaml"`),
-host-specific ones live in the `host-<host>-*` modules, and HM/user-service secrets (→
-`/run/user/1000/secrets/<name>`) in the consuming HM module (e.g. the opencode providers) or the
-home config's `sops` block. Encrypt with `sops nix-config/secrets/<host>/<service>.yaml`
+Declare in the consuming module with a module-local `sopsFile`: service modules keep the
+encrypted value in their own `secrets/` dir
+(`sops.secrets.<name>.sopsFile = ./secrets + "/${config.networking.hostName}.yaml"`),
+host-specific ones live under `system-configs/<host>/secrets/` in the `host-<host>-*`
+modules, and HM/user-service secrets (→ `/run/user/1000/secrets/<name>`) in the consuming
+HM module (e.g. the opencode providers). Encrypt with
+`sops <module-dir>/secrets/<host>.yaml`
 (recipients in `.sops.yaml`; create the file first — every declared `sopsFile` must exist at eval
 time, sops-nix validates it with `builtins.pathExists`). **All passphrases live in
 sops** so they can be pulled up for iOS imports.

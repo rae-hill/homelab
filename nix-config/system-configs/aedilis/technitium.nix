@@ -29,7 +29,7 @@ let
       # seed is captured out-of-band when enabling 2FA on the metrics user;
       # augustus's prometheus declares its own copy — see the deployment
       # runbook §7). The step_jwk_provisioner_password (ssh-cert-renewer) comes
-      # from secrets/aedilis/step-ca.yaml via homelab-ssh-cert-renewer.
+      # from modules/homelab/homelab-ssh-cert-renewer/secrets/aedilis.yaml.
       sops.secrets = {
         # Web console admin password (bootstrap on first start).
         technitium_admin_password = {

@@ -16,14 +16,14 @@ in
       ...
     }:
     let
-      sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/step-ca.yaml";
+      sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
     in
     {
-      # Per-service sops file (secrets/<host>/step-ca.yaml): the YubiKey PIN
+      # Module-local sops file (secrets/<host>.yaml): the YubiKey PIN
       # (rendered into the pin-source template for the step-ca KMS) and the
       # intermediate cert password. The host's step_jwk_provisioner_password
-      # (ssh-cert-renewer) also lives in this file, declared by
-      # modules/homelab/homelab-ssh-cert-renewer.nix.
+      # (ssh-cert-renewer) lives separately, declared by
+      # homelab-ssh-cert-renewer from its own secrets/<host>.yaml.
       sops.secrets = {
         yk_pin = {
           inherit sopsFile;

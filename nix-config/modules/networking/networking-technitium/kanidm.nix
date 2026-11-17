@@ -17,10 +17,10 @@ in
     }:
     {
       # kanidm-owned OIDC client secret from the technitium per-service sops
-      # file (secrets/<host>/technitium.yaml — shared with the metrics-user
-      # credentials declared by observability-prometheus).
+      # file (module-local secrets/<host>.yaml — the metrics-user
+      # credentials live in observability-prometheus/secrets/).
       sops.secrets.technitium_client_secret = {
-        sopsFile = inputs.self + "/nix-config/secrets/${config.networking.hostName}/technitium.yaml";
+        sopsFile = ./secrets + "/${config.networking.hostName}.yaml";
         owner = "kanidm";
       };
 
