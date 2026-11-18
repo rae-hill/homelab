@@ -499,6 +499,10 @@ generation**, no storage:
 
 ### Phase 3 — Exec-wrapper delivery (SCOPED; waves gated per §4.3)
 
+> Progress: 3a ✅ (`nix-config/lib/secretspec.nix` →
+> `constants.secretspec.mkWrapper`); 3b ✅ built — failure-notifs@augustus is
+> cut over to the wrapper, awaiting deploy + soak. 3c–3f pending.
+
 Design = §4.3 (wrapper + as_path/env glue; NO renderer, NO /run/secrets
 rewrite). Storage stays the sops yamls throughout — this phase changes
 _delivery_ only. One service per commit; each ends with

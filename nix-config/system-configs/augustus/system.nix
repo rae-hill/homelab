@@ -39,11 +39,15 @@
         variant = "";
       };
 
-      # Failure notification service (direct to Pushover)
+      # Failure notification service (direct to Pushover). The credentials
+      # are resolved at service start by the module's SecretSpec exec wrapper
+      # (scope failure-notifs-augustus; both secrets declared as_path = true
+      # in ./secretspec.toml) — no sops.secrets declarations and no
+      # /run/secrets files for this service. ./secrets/failure-notifs.yaml
+      # remains the interim encrypted STORAGE the wrapper's sops provider
+      # reads (Phase 4 flips the chain to the service's 1Password SA).
       services.failure-notifs = {
         enable = true;
-        userKeyFile = config.sops.secrets.pushover_user_key.path;
-        tokenFile = config.sops.secrets.pushover_token.path;
         # Services not owned by a specific module, or shared across hosts
         attachServices = [
           "caddy"
@@ -51,19 +55,6 @@
           "homelab-secret-provisioner"
           "tailscaled"
         ];
-      };
-
-      # Host-level Pushover credentials for failure-notifs above, from the
-      # failure-notifs per-service sops file (moved from augustus/sops.nix).
-      sops.secrets = {
-        pushover_user_key = {
-          sopsFile = ./secrets/failure-notifs.yaml;
-          owner = "root";
-        };
-        pushover_token = {
-          sopsFile = ./secrets/failure-notifs.yaml;
-          owner = "root";
-        };
       };
 
       system.stateVersion = "25.05";

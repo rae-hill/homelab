@@ -7,11 +7,17 @@
   # this now calls the Pushover Messages API directly
   # (https://api.pushover.net/1/messages.json), mirroring how Grafana already
   # talks to Pushover (userKey + apiToken). Apprise is no longer involved.
+  #
+  # Credentials are delivered by the SecretSpec exec wrapper (Phase 3b pilot
+  # of docs/secretspec-migration-plan.md §4.3/§7) — see wrappedNotifyScript
+  # below; there are no userKeyFile/tokenFile options and no /run/secrets
+  # files for this service anymore.
   flake.modules.nixos.failure-notifs =
     {
       config,
       lib,
       pkgs,
+      pkgs-unstable ? pkgs,
       ...
     }:
     let
@@ -65,20 +71,37 @@
           echo "failure-notifs: pushover notification sent for $SERVICE_NAME"
         '';
       };
+
+      # SecretSpec exec wrapper (migration plan §4.3 — the Phase 3b pilot,
+      # first service cut over from sops-nix delivery). Resolves
+      # pushover_user_key/pushover_token — declared as_path = true in
+      # system-configs/augustus/secretspec.toml — at service start into 0400
+      # temp files that die with the process; the glue maps them onto the
+      # script's PUSHOVER_*_FILE env contract, so the script is unchanged.
+      # Replaces the former sops.secrets.pushover_* declarations and their
+      # /run/secrets files. The sops yaml
+      # (system-configs/augustus/secrets/failure-notifs.yaml) remains the
+      # interim STORAGE read by the manifest's sops provider until Phase 4
+      # flips the chain to the service's 1Password SA. SOPS_AGE_KEY_FILE
+      # rides on sops-nix's keyFile option while sops-nix is still installed
+      # (Phase 5 replaces that bootstrap). Root-run service → the age key
+      # (root-readable) adds no privilege delta (§4.3 boundary 4).
+      wrappedNotifyScript = topLevel.config.constants.secretspec.mkWrapper pkgs {
+        name = "failure-notifs-pushover-wrapped";
+        profile = config.networking.hostName;
+        scope = "failure-notifs-${config.networking.hostName}";
+        ageKeyFile = config.sops.age.keyFile;
+        secretspec = pkgs-unstable.secretspec;
+        glueEnv = {
+          PUSHOVER_USER_KEY_FILE = "$pushover_user_key";
+          PUSHOVER_TOKEN_FILE = "$pushover_token";
+        };
+        target = notifyScript;
+      };
     in
     {
       options.services.failure-notifs = {
         enable = lib.mkEnableOption "systemd failure notifications sent directly to Pushover";
-
-        userKeyFile = lib.mkOption {
-          type = lib.types.path;
-          description = "Path to a file containing the Pushover user/group key.";
-        };
-
-        tokenFile = lib.mkOption {
-          type = lib.types.path;
-          description = "Path to a file containing the Pushover application API token.";
-        };
 
         priority = lib.mkOption {
           type = lib.types.ints.between (-2) 2;
@@ -112,11 +135,20 @@
           internal = true;
           description = "Internal: the Pushover notifier script, for the ShellCheck gate.";
         };
+
+        _lintWrapper = lib.mkOption {
+          type = lib.types.package;
+          internal = true;
+          description = "Internal: the SecretSpec exec wrapper (its glue script rides along in the build closure), for the ShellCheck gate.";
+        };
       };
 
       config = lib.mkIf cfg.enable {
-        # Register the notifier script with the ShellCheck gate.
+        # Register the notifier script + wrapper with the ShellCheck gate
+        # (building the wrapper also lints its glue — a build-closure
+        # dependency via getExe).
         services.failure-notifs._lintScript = notifyScript;
+        services.failure-notifs._lintWrapper = wrappedNotifyScript;
 
         systemd.services = {
           failure-notifs = {
@@ -132,11 +164,14 @@
             serviceConfig = {
               Type = "oneshot";
               User = "root";
-              ExecStart = lib.getExe notifyScript;
-              Environment = [
-                "PUSHOVER_USER_KEY_FILE=${cfg.userKeyFile}"
-                "PUSHOVER_TOKEN_FILE=${cfg.tokenFile}"
-              ];
+              # ExecStart is the SecretSpec wrapper: it resolves the Pushover
+              # credentials (scope failure-notifs-<host>, as_path → 0400
+              # child-lifetime temp files) and its glue exports
+              # PUSHOVER_USER_KEY_FILE / PUSHOVER_TOKEN_FILE before exec'ing
+              # the notifier script. systemd's MONITOR_* metadata still
+              # reaches the script through env inheritance (`secretspec run`
+              # passes the parent environment through).
+              ExecStart = lib.getExe wrappedNotifyScript;
             };
           };
         }
@@ -159,6 +194,11 @@
       augustus = topLevel.config.flake.nixosConfigurations.augustus or null;
       script =
         if augustus == null then null else augustus.config.services.failure-notifs._lintScript or null;
+      wrapper =
+        if augustus == null then null else augustus.config.services.failure-notifs._lintWrapper or null;
     in
-    lib.optionals (script != null) [ (_pkgs: script) ];
+    lib.optionals (script != null) [ (_pkgs: script) ]
+    ++ lib.optionals (wrapper != null) [
+      (_pkgs: wrapper)
+    ];
 }
