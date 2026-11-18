@@ -412,22 +412,58 @@ this change):
   (name, description, owner-service, scope) — previously spread across
   20 Nix files.
 
-### Phase 2 — Dev/e2e secrets
+### Phase 2 — Dev/e2e secrets ✅ DONE
 
-- Root (or `packages/homelab-server/`) `secretspec.toml` with profiles:
-  - `development`: keyring/1Password-desktop provider for human tooling.
-  - `e2e`: `dotenv://.secretspec-e2e.env` (gitignored) + `generate = true`
-    types — first run mints and stores, later runs reuse (preserves the
-    current never-overwrite behavior):
-    `HMAC_SECRET` (hex 32), `JWK_PASSPHRASE` (password),
-    `OPENROUTER_API_KEY` (default = dummy), serial numbers (hex), API keys
-    (defaults = the fixed test contract values).
-- Refactor `scripts/stage-e2e-secrets.mjs` to pull values via
-  `secretspec export --profile e2e --format json` and keep only the fixture
-  _assembly_ it uniquely does (JWK/JWE via `jose`, `api-keys.json` contract
-  shape). SecretSpec can't produce JWE-wrapped JWKs — that logic stays.
-- `require_reason` left at default (`"agents"`) → agent secret access is
-  audit-logged with reasons.
+Outcome (this change): repo-root `secretspec.toml` (project `homelab-dev`;
+manifest discovery walks up from CWD, so `nix-config/` still finds the fleet
+manifest first) with `development` + `e2e` profiles — **pure ephemeral
+generation**, no storage:
+
+- `JWK_PASSPHRASE` (password 43, alphanumeric) and `HMAC_SECRET` (hex,
+  `bytes = 32` → the same 64-hex-char shape the server contract expects),
+  both `providers = ["ephemeral"]` (`null://`) + `generate`. Verified
+  semantics: one generation event per materializing resolution — children of
+  a single `secretspec run` share values, the next run gets fresh ones,
+  nothing is written anywhere ("generated for this resolution without
+  provider storage").
+- The earlier dotenv-persistence sketch is DROPPED (decision: generate on the
+  fly; no dev/e2e secret needs a stable identity beyond one run).
+  `OPENROUTER_API_KEY`, the API-key contract and the serial numbers stay
+  script constants — non-secret fixtures with fixed e2e-contract values;
+  generating them would add nothing.
+- Injection point = the staging script, not the server: `scripts/e2e.sh`
+  runs `secretspec run --profile e2e -- node scripts/stage-e2e-secrets.mjs`
+  when secretspec is on PATH (devshell), else bare `node` (CI deliberately
+  has no Nix — the script's fallback path is the legacy behavior, unchanged).
+  The script consumes the injected env and keeps the assembly it uniquely
+  does (ES256 keygen + PBES2 JWE wrap via `jose`).
+- Consistency rule: the JWK JWE is only decryptable with the matching
+  passphrase, so in injected mode the derived fixtures (JWE, public JWK,
+  passphrase file, hmac-secret) are ALWAYS regenerated from the same
+  generation event — at the paths the effective `.env-serve-test` references
+  (parsed from the file; hand-tuned setups may point
+  `TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH` somewhere other than the stock
+  `private/jwk-secret`, and regenerating a mismatched pair fails the server
+  boot with JWEDecryptionFailed — learned empirically). Secret files are
+  pinned 0600. Static contract files (api-keys.json, serial-numbers.json,
+  openrouter dummy, .env-serve-test itself) keep never-overwrite semantics
+  in BOTH modes, so hand-tuned dev setups survive.
+- The server itself is NOT wrapped: its env contract is file paths
+  (HOMELAB_SECRET_FILE, TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH, …) fed from
+  `.env-serve-test` via dotenvx, and the unit-test layer hardcodes `private/`
+  paths — the files must exist regardless, so `as_path` injection would be
+  redundant here and would mask hand-tuned env files (process env beats
+  dotenvx). `as_path` gets its prove-out in Phase 3 instead.
+- `require_reason = false` in the dev manifest (throwaway values; keeps
+  e2e.sh / seed-secrets / CI frictionless). The fleet manifest keeps
+  `"agents"`.
+- Devshell: new `seed-secrets` command = staging under the `development`
+  profile; watch commands (`yarn workspace homelab-server dev`) then read the
+  staged files as before.
+- Verified: `secretspec check` green for both profiles + the `server` scope;
+  `run` injects correctly-shaped values (lengths/patterns asserted, values
+  never printed); staging smoke-tested in both modes; full e2e suite green
+  via the devshell `e2e` command.
 
 ### Phase 3 — Bridge module + pilot (augustus/failure-notifs)
 

@@ -7,10 +7,14 @@
 #
 # - All arguments are passed through to `vitest run` (test-file path filters,
 #   flags). No arguments = the full suite.
-# - Bootstraps the machine-local server fixtures when missing (all freshly
-#   generated, non-secret; see scripts/stage-e2e-secrets.mjs) so fresh
-#   worktrees and CI runners work out of the box:
+# - Bootstraps the machine-local server fixtures (all freshly generated,
+#   non-secret; see scripts/stage-e2e-secrets.mjs) so fresh worktrees and CI
+#   runners work out of the box:
 #   packages/homelab-server/.env-serve-test + private/{api-keys.json,jwk*,hmac-secret}
+#   With secretspec on PATH (devshell) the fixture secret values are GENERATED
+#   per run and injected as env (repo-root secretspec.toml, profile e2e; null
+#   provider — nothing is stored); without it (CI has no Nix) the staging
+#   script self-generates and never overwrites existing files.
 # - The bundled server's logs land in .e2e-log-dump.txt at the repo root
 #   (gitignored) — read it when a test fails.
 # - CHROME_EXECUTABLE (provided by the devshell) enables the live resume-print
@@ -47,8 +51,16 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# Bootstrap generated test fixtures (idempotent; never overwrites existing files).
-node scripts/stage-e2e-secrets.mjs || exit 1
+# Bootstrap generated test fixtures. Under secretspec (devshell) the e2e
+# profile's ephemeral generated secrets are injected and the secret-derived
+# fixtures are regenerated per run; without it (e.g. GitHub Actions, which
+# deliberately has no Nix) the script self-generates and is idempotent
+# (never overwrites existing files).
+if command -v secretspec >/dev/null 2>&1; then
+  secretspec run --profile e2e -- node scripts/stage-e2e-secrets.mjs || exit 1
+else
+  node scripts/stage-e2e-secrets.mjs || exit 1
+fi
 
 export HOMELAB_ORIGIN_URL="${origin}"
 export PORT="${port}"
