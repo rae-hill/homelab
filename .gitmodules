@@ -90,3 +90,7 @@
 	path = repos/secretspec
 	url = https://github.com/cachix/secretspec.git
 	shallow = true
+[submodule "repos/oidc-client-ts"]
+	path = repos/oidc-client-ts
+	url = https://github.com/authts/oidc-client-ts.git
+	shallow = true

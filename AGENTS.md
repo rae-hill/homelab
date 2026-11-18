@@ -143,6 +143,7 @@ the pinned tag's source before trusting them.
 | sops-nix behavior (`sopsFile` per secret, templates/placeholders, eval-time validation) | `./repos/sops-nix/` (Mic92/sops-nix, rev = the `sops-nix` pin in `flake.lock`)                                  |
 | SecretSpec behavior (providers, extends/scopes, export, generation, sops/1Password)     | `./repos/secretspec/` (cachix/secretspec, tag `v0.21.1` = pkgs-unstable pin)                                    |
 | open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, pinned at `main`; parser in `src/app/lib/parse-resume-from-pdf/`) |
+| oidc-client-ts behavior (signinSilent/refresh-token rotation, UserManager events, storage) | `./repos/oidc-client-ts/` (authts/oidc-client-ts, tag `v3.5.0` = the npm pin in shared)                           |
 
 If a needed upstream is not vendored yet, add it as a submodule (see the `effect-services` skill →
 "Adding a New Vendored Submodule") pinned to the tag nixpkgs builds, rather than relying on web
