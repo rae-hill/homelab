@@ -22,6 +22,15 @@ export const OidcClientConfig = Schema.Struct({
   scope: Schema.String,
   /** Optional post-logout landing URI (must also be registered with the IdP). */
   postLogoutRedirectUri: Schema.String.pipe(Schema.optionalKey),
+  /**
+   * Where the OIDC session (access + rotating refresh token) persists. `"local"`
+   * (default) survives new tabs and browser restarts — the refresh-token flow needs this
+   * to keep users signed in; `"session"` confines the session to a single tab.
+   */
+  storage: Schema.Union([
+    Schema.Literal("local"),
+    Schema.Literal("session"),
+  ]).pipe(Schema.optionalKey),
 })
 
 export type OidcClientConfig = typeof OidcClientConfig.Type

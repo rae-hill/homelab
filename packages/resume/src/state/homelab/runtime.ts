@@ -58,7 +58,8 @@ function toSignedInUser(user: OidcUser): SignedInUser {
 
 /**
  * One-shot app bootstrap: probe the tailscale-only API for reachability, then restore any
- * cached OIDC session from session storage. Never fails — errors become store state.
+ * cached OIDC session from local storage (silently renewing it via the refresh token when
+ * expired). Never fails — errors become store state.
  */
 export function bootstrap(dispatch: AppDispatch): Effect.Effect<void> {
   return Effect.gen(function*() {
