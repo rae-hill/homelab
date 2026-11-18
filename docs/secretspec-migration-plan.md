@@ -335,21 +335,18 @@ renderer-shaped problems we deliberately do not solve):
 - **Service accounts are created manually** (1Password web UI or
   `op service-account create`). SecretSpec cannot create them; a 1Password
   Terraform provider exists if we later want automation. One-time cost:
-  ~6 SAs (per-host) or ~20 (per-service — §9 Q1).
-- Vault layout — **reopened as §9 Q1 by the wrapper model (§4.3)**: the
-  original recommendation was one vault per host (`homelab-augustus`,
-  `homelab-nixos`, `homelab-mini`, … — plus `homelab-dev` for human/dev use),
-  each host SA read/write on **its** vault only (a compromised host cannot
-  drain the fleet). But a per-host SA token must be readable by every wrapped
-  service user on that host — re-exposing host-wide scope; per-service
-  vaults+SAs restore least privilege at the cost of ~14 extra vaults/SAs on
-  augustus alone. Secrets land as Secure Notes
-  `secretspec/homelab/<host>/<key>` (convention) — browseable and rotatable
-  in the 1Password UI.
+  ~20 SAs (one per service — §9 Q1 decided).
+- Vault layout — **DECIDED (§9 Q1): one vault + one SA per service** (plus
+  `homelab-dev` for human/dev use). The wrapper model (§4.3) has each wrapped
+  service user read its own SA token; per-service vaults keep least privilege
+  (a compromised grafana cannot drain kanidm's passphrase), where a per-host
+  token would re-expose every host secret to every service user. Secrets land
+  as Secure Notes `secretspec/homelab/<host>/<key>` (convention) — browseable
+  and rotatable in the 1Password UI.
 - **Token bootstrap (chicken-and-egg)**: the SA token itself must reach the host
   through a channel that doesn't need 1Password.
-  - Interim: sops-nix — one new secret `secretspec_sa_token` per host (or per
-    service — §9 Q1) in a tiny `secrets/<host>/secretspec.yaml`; the wrapped
+  - Interim: sops-nix — one new secret `secretspec_sa_token` per service in a
+    tiny `secrets/<host>/secretspec.yaml`; the wrapped
     service's unit gets it via `LoadCredential=` or a root-provisioned 0400
     `EnvironmentFile=` (never `Environment=` inline).
   - End state: `systemd-creds encrypt --name=secretspec-sa-token` (host-bound,
@@ -544,9 +541,12 @@ _delivery_ only. One service per commit; each ends with
 
 ### Phase 4 — 1Password cutover, service by service
 
-Prerequisite: §9 Q1 (vault/SA granularity) decided — the wrapper model leans
-per-SERVICE vaults+SAs for least privilege (a per-host SA readable by any
-wrapped service user re-creates the blast radius §4.3 boundary 4 avoids).
+Prerequisite: §9 Q1 DECIDED — **per-service vaults+SAs**. Consequence for
+the manifests: the root binds one `op_<svc>[_<host>]` alias per service
+(`onepassword+token://homelab-<svc>[-<host>]`, token via provider
+credentials / LoadCredential — never in the URI), replacing the single
+`host_op_<host>` placeholders in each migrated service's chain as it cuts
+over.
 
 Per service, in Phase 3 wave order (3b → 3c → 3d → 3e → 3f):
 
@@ -554,7 +554,7 @@ Per service, in Phase 3 wave order (3b → 3c → 3d → 3e → 3f):
    (`secrets/<host>/secretspec.yaml`, delivered 0400 to the service user).
 2. On the host: `secretspec import onepassword --profile <host> --scope <svc>`
    (copies missing values; never overwrites).
-3. Flip the service's chain to `["host_op_*"]` (drop the sops alias);
+3. Flip the service's chain to `["op_<svc>"]` (drop the sops alias);
    redeploy; verify `check --scope` + service health.
 4. `git rm` the service's sops yaml — its sops-nix declarations are already
    gone (Phase 3) or dual-reader leftovers removed here.
@@ -608,13 +608,11 @@ numbers) and the lifeline class skip this phase — their endgame is Phase 5.
 
 ## 9. Open questions
 
-1. **Vault/SA granularity (gates Phases 3f + 4):** per-host vault+SA
-   (simple, ~6 SAs, but any wrapped service user on the host can read every
-   host secret — blast radius) vs per-service vaults+SAs (~14 on augustus;
-   true least privilege; more manual creation + token bootstrap files).
-   Recommendation: per-service for non-root host daemons; per-host
-   acceptable for user-level (nixos/mini) where the user already owns the
-   storage credentials. DECIDE before 3f.
+1. **Vault/SA granularity (gates Phases 3f + 4):** ✅ DECIDED — **per-service
+   vaults + SAs** (least privilege: each wrapped service user reads only its
+   own SA token, so a compromised service can't drain the host's other
+   secrets; a per-host token would re-create exactly the blast radius §4.3
+   boundary 4 avoids). Cost: ~20 vaults+SAs created manually across Phase 4.
 2. Lifeline classification (§6) — cicero/aedilis/step-jwk/praeconinus stay
    on local encrypted files permanently. ✅ agreed ("sops files are fine").
 3. Pilot failure-notifs@augustus — still the right pilot under the wrapper
