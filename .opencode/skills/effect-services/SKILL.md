@@ -37,6 +37,7 @@ so `repos/` never bloats builds or deploy copies. After a fresh clone, run
 | `repos/open-resume/`          | https://github.com/xitanggg/open-resume.git         | OpenResume PDF resume-parser reference (`src/app/lib/parse-resume-from-pdf/`; pinned at `main`)                                     |
 | `repos/proton-mcp/`           | https://github.com/jorgenclaw/proton-mcp.git        | Proton MCP server — audited SUSPICIOUS, vendored as a reference foil only (see `docs/openclaw-mini-plan.md`)                        |
 | `repos/monitorOS/`            | https://github.com/eriskhan/monitorOS.git           | monitorOS source — turns an iMac18,3 into a 5K ThunderboltIP external display (tag `v0.1.1`; fork-candidate reference for iMac15,1) |
+| `repos/typst.ts/`             | https://github.com/Myriad-Dreamin/typst.ts.git      | typst.ts compiler/renderer — `NodeCompiler` napi binding reference (tag `v0.7.0` = the `@myriaddreamin/typst-ts-node-compiler` npm pin) |
 
 - Prefer examples and patterns from the vendored source over generated guesses or web search results
 - Do NOT edit files under `./repos/`

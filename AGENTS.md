@@ -143,6 +143,7 @@ the pinned tag's source before trusting them.
 | sops-nix behavior (`sopsFile` per secret, templates/placeholders, eval-time validation) | `./repos/sops-nix/` (Mic92/sops-nix, rev = the `sops-nix` pin in `flake.lock`)                                  |
 | SecretSpec behavior (providers, extends/scopes, export, generation, sops/1Password)     | `./repos/secretspec/` (cachix/secretspec, tag `v0.21.1` = pkgs-unstable pin)                                    |
 | open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, pinned at `main`; parser in `src/app/lib/parse-resume-from-pdf/`) |
+| typst.ts node compiler behavior (`NodeCompiler`, universe-package resolution, fonts, PDF export, diagnostics) | `./repos/typst.ts/` (Myriad-Dreamin/typst.ts, tag `v0.7.0` = the `@myriaddreamin/typst-ts-node-compiler` npm pin) |
 
 If a needed upstream is not vendored yet, add it as a submodule (see the `effect-services` skill →
 "Adding a New Vendored Submodule") pinned to the tag nixpkgs builds, rather than relying on web
