@@ -17,6 +17,16 @@ const Routes = ApiLive.pipe(
   Layer.merge(HttpApiSwagger.layer(Homelab.HomelabApi)),
 )
 
+// Quota + listing-cleanup cache are SINGLE INSTANCES process-wide: the tailor and
+// cover-letter aggregates must share one AI-spend budget (CL-D7) and one cache so the
+// tailor→cover-letter workflow hits the cached stage-1 cleanup (CL-D6). Providing the
+// shared infra once over the merged aggregates is what guarantees memoization — do NOT
+// let either aggregate provide these internally.
+const SharedAiInfra = Layer.mergeAll(
+  Layers.TailorQuotaService.TailorQuotaServiceLive,
+  Layers.ListingCleanupCacheService.ListingCleanupCacheServiceLive,
+)
+
 // Per-request server spans (OTel kind=server) that END with the response — Tempo traces
 // finally get a resolving root. Parenting comes only from an inbound `traceparent`
 // header, so request traces are self-contained roots otherwise. `serve` composes the
@@ -42,7 +52,7 @@ const Server = HttpRouter.serve(Routes, {
   Layer.provide(Shell.Authorization.Aggregate),
   Layer.provide(Shell.Crypto.Aggregate),
   Layer.provide(Shell.Printing.Aggregate),
-  Layer.provide(Shell.Tailor.Aggregate),
+  Layer.provide(Shell.Tailor.Aggregate.pipe(Layer.provide(SharedAiInfra))),
   Layer.provide(Shell.ProfilePayload.Aggregate),
   Layer.provide(Layers.CertificateService.CertificateServiceLive),
   Layer.provide(Layers.UuidService.UuidServiceLive),

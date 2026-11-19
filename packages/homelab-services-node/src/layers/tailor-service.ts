@@ -291,7 +291,10 @@ class TailorServiceImpl implements Services.TailorService.TailorServiceDef {
           stage1: stage1Meta,
           stage2: stage2Meta,
           degraded: false,
-          cacheHit: false,
+          // D9 seam activated (cover-letter-generator CL-D6): true when stage-1 cleanup
+          // was served from the shared ListingCleanupCacheService (semantic: stage-1 cache,
+          // NOT full-response caching — see schemas/resume-tailor.ts).
+          cacheHit: stage1Result.fromCache,
           contentHash,
           listingHash,
           promptVersion: this.promptConfigService.version,
