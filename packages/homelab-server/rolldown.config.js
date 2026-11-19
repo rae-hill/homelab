@@ -36,7 +36,13 @@ export default defineConfig({
   // the node_modules next to the bundle (repo root in dev; the nix derivation
   // copies the closure into $out/lib/bundle/node_modules — doc 08 T24).
   // If resolution fails the library degrades to native SVG embedding.
-  external: ["sharp", /^@img\//],
+  //
+  // `@myriaddreamin/typst-ts-node-compiler` is the same story for the cover-
+  // letter renderer (cover-letter-generator doc 02/05): a CJS wrapper around
+  // a napi `.node` binding shipped in platform-specific optional-dependency
+  // packages (`@myriaddreamin/typst-ts-node-compiler-<triple>`). Keep the
+  // whole scope external; the nix derivation copies + patchelfs the closure.
+  external: ["sharp", /^@img\//, "@myriaddreamin/typst-ts-node-compiler", /^@myriaddreamin\//],
   plugins: [
     stubOptionalNative,
     esmExternalRequirePlugin(),

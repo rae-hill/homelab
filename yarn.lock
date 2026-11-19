@@ -2402,6 +2402,125 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@myriaddreamin/typst-ts-node-compiler-android-arm-eabi@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-android-arm-eabi@npm:0.7.0"
+  conditions: os=android & cpu=arm
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-android-arm64@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-android-arm64@npm:0.7.0"
+  conditions: os=android & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-darwin-arm64@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-darwin-arm64@npm:0.7.0"
+  conditions: os=darwin & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-darwin-x64@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-darwin-x64@npm:0.7.0"
+  conditions: os=darwin & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-linux-arm-gnueabihf@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-linux-arm-gnueabihf@npm:0.7.0"
+  conditions: os=linux & cpu=arm
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-linux-arm64-gnu@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-linux-arm64-gnu@npm:0.7.0"
+  conditions: os=linux & cpu=arm64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-linux-arm64-musl@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-linux-arm64-musl@npm:0.7.0"
+  conditions: os=linux & cpu=arm64 & libc=musl
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu@npm:0.7.0"
+  conditions: os=linux & cpu=x64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-linux-x64-musl@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-linux-x64-musl@npm:0.7.0"
+  conditions: os=linux & cpu=x64 & libc=musl
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-win32-arm64-msvc@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-win32-arm64-msvc@npm:0.7.0"
+  conditions: os=win32 & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler-win32-x64-msvc@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler-win32-x64-msvc@npm:0.7.0"
+  conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@myriaddreamin/typst-ts-node-compiler@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@myriaddreamin/typst-ts-node-compiler@npm:0.7.0"
+  dependencies:
+    "@myriaddreamin/typst-ts-node-compiler-android-arm-eabi": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-android-arm64": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-darwin-arm64": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-darwin-x64": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-linux-arm-gnueabihf": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-linux-arm64-gnu": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-linux-arm64-musl": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-linux-x64-musl": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-win32-arm64-msvc": "npm:0.7.0"
+    "@myriaddreamin/typst-ts-node-compiler-win32-x64-msvc": "npm:0.7.0"
+  dependenciesMeta:
+    "@myriaddreamin/typst-ts-node-compiler-android-arm-eabi":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-android-arm64":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-darwin-arm64":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-darwin-x64":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-linux-arm-gnueabihf":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-linux-arm64-gnu":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-linux-arm64-musl":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-linux-x64-musl":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-win32-arm64-msvc":
+      optional: true
+    "@myriaddreamin/typst-ts-node-compiler-win32-x64-msvc":
+      optional: true
+  checksum: 10c0/2f175f0b72af929e68db30043996f65afa86d273bb94742ee65ce68647c06f78a04c39e5735a2ceb5bf1fa2d2d9148cfe79673b23872ece390679afd5acbfb30
+  languageName: node
+  linkType: hard
+
 "@nanostores/solid@npm:^1.1.1":
   version: 1.1.1
   resolution: "@nanostores/solid@npm:1.1.1"
@@ -8871,6 +8990,7 @@ __metadata:
   dependencies:
     "@effect/platform-node": "npm:^4.1.x"
     "@effect/vitest": "npm:^4.1.x"
+    "@myriaddreamin/typst-ts-node-compiler": "npm:0.7.0"
     "@turbodocx/html-to-docx": "npm:^1.23.3"
     "@types/node": "npm:^24"
     bufferutil: "npm:^4.1.0"
