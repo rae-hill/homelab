@@ -90,21 +90,32 @@ Follow the `homelab.resume.tailoring` precedent end-to-end (tailor-harness doc 0
 
 Frontend constant `RESUME_COVER_LETTER_ROLE` (doc 04) must match the claim string exactly.
 
-## D) Devshell + e2e bootstrap
+## D) Devshell + e2e bootstrap (as built — revised during CL-T8)
 
-- **Devshell** (`nix-config/lib/shell.nix` / flake devshell, wherever `e2e` and `CHROME_EXECUTABLE`
-  are exported — mirror that mechanism):
-  ```sh
-  export TYPST_ASSETS_DIR="$REPO_ROOT/packages/homelab-services-node/assets/typst"
-  export XDG_DATA_HOME="$TYPST_ASSETS_DIR"
-  ```
-  so `yarn test` live-render gates and local typst CLI previews both resolve letterloom offline.
-- **`scripts/e2e.sh` / `scripts/stage-e2e-secrets.mjs`**: stage the same two env vars into the e2e
-  server environment; `RUN_COVER_LETTER_LIVE=1` stays OPT-IN (spends real OpenRouter money,
-  `RUN_TAILOR_LIVE` precedent) and additionally requires `OPENROUTER_API_KEY_FILE` staged.
+- **Devshell (`flake.nix`)**: `TYPST_ASSETS_DIR`/`XDG_DATA_HOME` are deliberately **NOT
+  exported shell-wide**. The first attempt used `${self}/packages/...`, but `${self}`
+  freezes the assets into a read-only STORE snapshot (stale on template edits), and a
+  global `XDG_DATA_HOME` repoints every shell tool's data dir (a `nix profile install`
+  trap). Consumers resolve the live worktree assets themselves:
+  - `scripts/e2e.sh` exports BOTH unconditionally from `repo_root` (git rev-parse — the
+    script's existing root-resolution idiom), scoped to the bundled server's process tree.
+  - The gated vitest live-render test
+    (`homelab-services-node/test/document-rendering-service-typst-live.test.ts`) defaults
+    to the repo-relative assets dir via `import.meta.dirname` and sets `XDG_DATA_HOME`
+    in-process only when unset.
+  - Manual server runs: `TYPST_ASSETS_DIR=$PRJ_ROOT/packages/homelab-services-node/assets/typst
+    XDG_DATA_HOME=$TYPST_ASSETS_DIR yarn workspace homelab-server dev` (PRJ_ROOT is the
+    devshell's live project root).
+- **`scripts/stage-e2e-secrets.mjs`**: `.env-serve-test` gains `TYPST_ASSETS_DIR` +
+  `XDG_DATA_HOME` (relative `../../packages/...` — the same convention as `ROOT_CERT_DER`;
+  resolved against the server's cwd). dotenvx never overrides the absolute values e2e.sh
+  exports, so the file is a fallback for manual server runs only.
+- **`RUN_COVER_LETTER_LIVE=1`** stays OPT-IN (spends real OpenRouter money,
+  `RUN_TAILOR_LIVE` precedent) and additionally requires the staged
+  `OPENROUTER_API_KEY_FILE`. `COVER_LETTER_SAMPLE_PATH` writes the PDF artifact
+  (`DOCX_SAMPLE_PATH` idiom).
 - **Testing layers**: `TYPST_ASSETS_DIR` default `Option.none()` (dark) in both
-  `test-utils/testing-layer.ts` files; suites that exercise real rendering set it via env
-  (doc 02 §E gating).
+  `test-utils/testing-layer.ts` files; the live-render test provides its own env.
 
 ## E) Vendored-repo bookkeeping
 

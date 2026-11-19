@@ -2,8 +2,8 @@ import { assert, describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { HttpBody, HttpClient } from "effect/http"
 import { ApiErrors } from "homelab-services"
-import { ResumeContent } from "shared"
 import { writeFileSync } from "node:fs"
+import { ResumeContent } from "shared"
 import {
   BASE_URL,
   createToken,

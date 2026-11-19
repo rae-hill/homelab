@@ -132,6 +132,7 @@ in
                       "OAuth_ClaimCheck"
                       "Resume_Print"
                       "Resume_Tailor"
+                      "Resume_CoverLetter"
                     ]
                   );
                 };
@@ -153,6 +154,20 @@ in
           description = ''
             Absolute path to the chrome/chromium executable used by the resume PDF print
             service (POST /resume/print → puppeteer-core). Exported as CHROME_EXECUTABLE.
+            Leave null on deployments where the resume group stays dark (e.g. praeconinus).
+          '';
+          default = null;
+        };
+
+        typstAssetsDir = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          description = ''
+            Typst template/asset root (TYPST_ASSETS_DIR) for POST /resume/cover-letter
+            (cover-letter generator). Ships in the package at <pkg>/lib/typst-assets —
+            hosts opt in explicitly (chromeExecutable precedent); augustus points it at
+            the homelab-api package output. Also exported as XDG_DATA_HOME so the
+            typst.ts HttpRegistry resolves @preview/letterloom OFFLINE from
+            <dir>/typst/packages/preview/letterloom/3.0.0 (CL-D9).
             Leave null on deployments where the resume group stays dark (e.g. praeconinus).
           '';
           default = null;
@@ -261,6 +276,12 @@ in
             ${
               if cfg.openRouterApiKeyFile != null then
                 "OPENROUTER_API_KEY_FILE=${cfg.openRouterApiKeyFile}"
+              else
+                ""
+            }
+            ${
+              if cfg.typstAssetsDir != null then
+                "TYPST_ASSETS_DIR=${cfg.typstAssetsDir}\nXDG_DATA_HOME=${cfg.typstAssetsDir}"
               else
                 ""
             }

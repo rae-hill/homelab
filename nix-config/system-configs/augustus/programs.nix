@@ -133,6 +133,16 @@
         # best PDFs; the wrapper resolves its own runtime deps via absolute store paths.
         # resumeSiteUrl defaults to the tailnet resume-site vhost via modules/homelab/homelab-resume-site.
         chromeExecutable = "${pkgs.google-chrome}/bin/google-chrome-stable";
+        # Typst assets for POST /resume/cover-letter (cover-letter generator): the template,
+        # signature image, and vendored letterloom universe package, installed by the
+        # homelab-api package. Also exported as XDG_DATA_HOME for offline package resolution;
+        # null on praeconinus keeps cover-letter rendering dark there by design.
+        # NOTE: references the flake package directly (same source as the module's `pkg`
+        # let-binding) — the services.homelab-api.pkg OPTION declaration is a latent
+        # mkPackageOption misuse that throws when forced; don't read it until it's fixed.
+        typstAssetsDir = "${
+          inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.homelab-api
+        }/lib/typst-assets";
         apiKeys = {
           jacob = {
             apiKeyFile = config.sops.secrets.homelab_api_key_jacob.path;

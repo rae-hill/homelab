@@ -53,6 +53,11 @@ in
             "profile"
             "email"
           ];
+          "homelab.resume.coverletter" = [
+            "openid"
+            "profile"
+            "email"
+          ];
         };
 
         claimMaps.roles = {
@@ -78,6 +83,9 @@ in
             ];
             "homelab.resume.tailoring" = [
               "Resume_Tailor"
+            ];
+            "homelab.resume.coverletter" = [
+              "Resume_CoverLetter"
             ];
           };
         };

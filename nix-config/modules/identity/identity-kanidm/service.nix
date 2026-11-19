@@ -105,6 +105,7 @@ in
             "homelab.access" = { };
             "homelab.resume.printing" = { };
             "homelab.resume.tailoring" = { };
+            "homelab.resume.coverletter" = { };
 
             "habitsync.access" = { };
 
@@ -183,6 +184,7 @@ in
                 "homelab.admins"
                 "homelab.resume.printing"
                 "homelab.resume.tailoring"
+                "homelab.resume.coverletter"
 
                 "habitsync.access"
 
