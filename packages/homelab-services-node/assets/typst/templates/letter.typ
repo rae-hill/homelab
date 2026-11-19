@@ -6,7 +6,12 @@
 //   { toName: string, subject: string, paragraphs: [string] }
 // Strings joined into content are LITERAL text in Typst — model-generated `#`, `*`,
 // `$`, `@` etc. are inert (CL-D10). The signature image lives at "images/signature.PNG".
-#import "@preview/letterloom:3.0.0": *
+//
+// letterloom is imported BY PATH from the vendored copy (Unlicense) rather than via
+// `@preview/letterloom:3.0.0`: no package-registry resolution, no XDG_DATA_HOME,
+// identical behavior in devshell/tests/nix-store, and `typst watch templates/letter.typ`
+// works from this directory with zero env setup. Bump = replace vendor/letterloom-<ver>/.
+#import "../vendor/letterloom-3.0.0/src/lib.typ": *
 
 #let data = json("letter.json")
 

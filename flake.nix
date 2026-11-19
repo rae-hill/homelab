@@ -178,14 +178,13 @@
                   name = "CHROME_EXECUTABLE";
                   value = "${pkgs.google-chrome}/bin/google-chrome";
                 }
-                # NOTE: TYPST_ASSETS_DIR / XDG_DATA_HOME are deliberately NOT exported
-                # shell-wide. ${self} would freeze the typst assets into a read-only
-                # store snapshot (stale on template edits), and a global XDG_DATA_HOME
-                # repoints every shell tool's data dir. Consumers resolve the live
-                # worktree assets themselves: scripts/e2e.sh exports both from
-                # repo_root, the gated vitest live-render test defaults to the
-                # repo-relative assets dir, and production gets them from the
-                # homelab-api systemd unit (cover-letter-generator doc 05 §D).
+                # NOTE: TYPST_ASSETS_DIR is deliberately NOT exported shell-wide.
+                # ${self} would freeze the typst assets into a read-only store snapshot
+                # (stale on template edits). Consumers resolve the live worktree assets
+                # themselves: scripts/e2e.sh exports it from repo_root, the gated vitest
+                # live-render test defaults to the repo-relative assets dir, and
+                # production gets it from the homelab-api systemd unit
+                # (cover-letter-generator doc 05 §D).
                 {
                   # Same static print-font bundle the homelab-api unit exports for
                   # headless chrome (features/homelab-api/systemd-service.nix →

@@ -20,9 +20,9 @@ import * as path from "node:path"
  *   (empirically verified — relative shadow keys never match).
  * - `evictCache` is GLOBAL and the docs warn to evict periodically (memory leak) —
  *   evict(10) after every render (rehype-typst precedent).
- * - Universe packages (@preview/letterloom) resolve offline from
- *   `$XDG_DATA_HOME/typst/packages/...` — deployment points XDG_DATA_HOME at the assets
- *   dir (doc 05); this layer never touches the network.
+ * - Universe packages WOULD resolve via HttpRegistry (dirs::data_dir → download), but the
+ *   letter template imports the vendored letterloom BY PATH — no registry, no
+ *   XDG_DATA_HOME, no network, identical in devshell/tests/nix-store (doc 02 §B).
  */
 
 /** Minimal structural view of the compiler's NodeError (diagnostics carrier). */

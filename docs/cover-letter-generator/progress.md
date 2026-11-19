@@ -95,10 +95,61 @@ effect-services skill.
 - Bundle verified: rolldown build OK; `require("@myriaddreamin/typst-ts-node-compiler")`
   resolves from `dist/bundle` and compiles `%PDF` in the bundle context.
 
-## In flight
+## 2026-11-19 — CL-T7: frontend (commit `cef60885a`, delegated + reviewed)
 
-- CL-T7 (frontend Actions tab + download flow) — delegated, in progress.
-- CL-T8 (nix package/systemd/kanidm/devshell + e2e tests + hash refresh) — delegated,
-  in progress.
-- CL-T9 (live verification) — after CL-T7/T8 land: staged `RUN_COVER_LETTER_LIVE=1` e2e +
-  manual tailor→cover-letter run against a local server; full `e2e` suite LAST.
+- `RESUME_COVER_LETTER_ROLE` in shared; `state/homelab/cover-letter.ts`
+  (requestCoverLetter via typed HttpApiClient + Bearer id_token, downloadCoverLetter
+  blob→anchor with `cover-letter-<slug>-<date>.pdf`); `useCanCoverLetter`;
+  `useDownloadCoverLetter` (busy+elapsed timer, stale-baseVersion guard,
+  ContentPatchBase64 decode, reason-specific toasts).
+- `ActionsTab` (teal full-width button, `Working… Ns`, orange role hint, disabled unless
+  success|degraded with a contentPatch) wired as the third details-modal tab.
+- Review fixes: kanidm group name in the constant's JSDoc (`homelab.resume.coverletter`).
+
+## 2026-11-19 — CL-T8: nix + e2e (commit `3e62a1981` + follow-up, delegated + reviewed)
+
+- package.nix: sharp patchelf loop SCOPED (it stamped sharp's RPATH onto every `.node` —
+  latent hazard fixed), @myriaddreamin closure copy + glibc/libstdc++ RPATH + fail-closed
+  build-time typst smoke compile, assets → `$out/lib/typst-assets`; yarn hashes refreshed
+  (api + ui) via the nix-hashes procedure; `nix build .#homelab-api` green.
+- systemd `typstAssetsDir` option (null default = dark; augustus opts in — reading the
+  flake package directly because the pre-existing `services.homelab-api.pkg` option is a
+  latent `mkPackageOption` misuse that throws when forced); `Resume_CoverLetter` in both
+  permission enums; kanidm group + rae membership + oidc scope/claim maps; praeconinus
+  verified dark (no TYPST env, no flag).
+- e2e: cover-letter.test.ts (authz/guest/stale/raw-400 + `RUN_COVER_LETTER_LIVE`-gated
+  success, cache double-call, `COVER_LETTER_SAMPLE_PATH` artifact); staged TEST_API_KEY
+  gained `Resume_CoverLetter`.
+- **XDG_DATA_HOME removed from the design** (was CL-D9's mechanism): a vitest run with
+  XDG_DATA_HOME pointed at the git-tracked assets dir collected `vitest/` + `mimeapps.list`
+  pollution — the hazard is structural to pointing XDG at a shared tree. Since letterloom
+  is self-contained, the template now imports it **by path**
+  (`../vendor/letterloom-3.0.0/src/lib.typ`), assets moved `typst/packages/...` →
+  `vendor/letterloom-3.0.0/`, and NO XDG env exists anywhere (flake/e2e/systemd/tests).
+  Devshell also keeps TYPST_ASSETS_DIR out (`${self}` = stale read-only store snapshot;
+  e2e.sh + the live test resolve the live worktree path themselves).
+
+## 2026-11-19 — CL-T9: verification (full-stack, zero OpenRouter spend)
+
+- **Live-render unit test** (`document-rendering-service-typst-live.test.ts`): REAL native
+  compiler + committed assets → PDF with `%PDF` magic; real diagnostics surfaced for a
+  missing template. Runs everywhere (assets are committed).
+- **Stubbed full-stack e2e**: local stub OpenRouter (branches on
+  `response_format.json_schema.name`) + `OPENROUTER_BASE_URL` override +
+  `RUN_COVER_LETTER_LIVE=1`: handler → auth (DPoP) → quota → cached cleanup → generation →
+  validation → REAL typst render → `%PDF` through the typed client. 6/6 cover-letter e2e
+  pass; server log shows `Stage 1 (cleanup) cache hit` with trace_id + promptVersion
+  annotations; spans confirmed: `handleResumeCoverLetter`,
+  `CoverLetterService.generateCoverLetter`, `DocumentRenderingServiceTypst.renderPdf`.
+- **Rendered PDF visually verified** (twice — smoke + full pipeline): letterloom layout,
+  sender block, date, recipient from stage-1 extraction, bold "Regarding the …" subject,
+  signature image, footer; ALL markup probes (`#import`, `*bold*`, `$x^2$`, `@cite`)
+  render LITERAL (CL-D10 proven end-to-end).
+- **Production closure render**: the nix-built `$out` bundle + `$out/lib/typst-assets`
+  renders a PDF with zero env beyond the workspace (no XDG) — deployment-equivalent proof.
+- **Full e2e suite**: 118 passed, 3 skipped (money-gated live blocks only).
+- Full repo: lint 0 errors, typecheck clean, 837 services-node + 74 server unit tests,
+  shellcheck + nixfmt green.
+- Remaining before deploy: owner runs with a REAL OpenRouter key
+  (`RUN_COVER_LETTER_LIVE=1` against openrouter.ai) for model-quality review, kanidm
+  group deploy + re-login for the claim, and the manual tailor→Actions→download pass.

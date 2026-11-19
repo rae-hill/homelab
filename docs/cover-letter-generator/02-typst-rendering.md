@@ -14,7 +14,7 @@ APIs that do not exist; see caveats). Read-only repo: never edit, never import f
 | Package is **CJS-only**; the server workspace is ESM (`"type": "module"`). | `import { NodeCompiler } from "@myriaddreamin/typst-ts-node-compiler"` should lex as a named re-export (same pattern as `@swc/core`) — **smoke-test once in CL-T4**; fallback: default-import + destructure. |
 | **All compiler methods are SYNCHRONOUS.** `pdf(...)` returns a Node `Buffer` and **throws** on compile errors (message = diagnostics summary). The docs' `await $typst.pdf(...)` only works because awaiting a non-promise is a no-op. | Every call site must be `Effect.try`/`Effect.sync`-wrapped (owner rule: any function/constructor that may throw gets its own Effect). Rendering blocks the event loop ~100s of ms — acceptable at homelab single-user traffic; `worker_threads` is the documented escape hatch if that ever changes. |
 | Non-throwing path: `compile(opts): NodeTypstCompileResult` with `hasError()`, `result`, `takeWarnings()`, `takeDiagnostics(): NodeError \| null` (`shortDiagnostics`, `compilationStatus`), plus `compiler.fetchDiagnostics(err)` for full locations. `pdf()` silently DROPS warnings. | Use `compile()` → inspect diagnostics (log warnings) → `pdf(result.result!)`, so font-fallback warnings are visible in logs instead of lost. |
-| Universe packages: `NodeCompiler.create` hardwires `HttpRegistry`; resolution order is `dirs::data_dir()/typst/packages/<ns>/<name>/<ver>` → `dirs::cache_dir()/...` → download from `https://packages.typst.org` (preview only). **No create() option controls this.** `dirs` honors `XDG_DATA_HOME`/`XDG_CACHE_HOME`/`HOME`; unset ⇒ NotFound diagnostics. | Pre-populate a repo-committed package dir and point `XDG_DATA_HOME` at it (CL-D5/CL-D9) ⇒ deterministic, offline, no runtime network. |
+| Universe packages: `NodeCompiler.create` hardwires `HttpRegistry`; resolution order is `dirs::data_dir()/typst/packages/<ns>/<name>/<ver>` → `dirs::cache_dir()/...` → download from `https://packages.typst.org` (preview only). **No create() option controls this.** `dirs` honors `XDG_DATA_HOME`/`XDG_CACHE_HOME`/`HOME`; unset ⇒ NotFound diagnostics. | **AVOIDED ENTIRELY (implementation decision):** the template imports the vendored letterloom **by path** (`../vendor/letterloom-3.0.0/src/lib.typ`) — letterloom is self-contained (only relative imports of its own src files, verified). No registry, no XDG env, no network, identical behavior in devshell/tests/nix-store. The initial XDG_DATA_HOME approach was built and then REMOVED: a vitest run pointed XDG_DATA_HOME at the git-tracked assets dir and tools polluted it (`vitest/`, `mimeapps.list`) — the hazard class is gone with the mechanism. |
 | Embedded fonts: New Computer Modern (NewCM10, 4 styles + math), Libertinus Serif, DejaVu Sans Mono, Foxit PDF core fonts. Missing fonts ⇒ warnings + fallback, compile still succeeds. | Letterloom renders out of the box with NewCM; `fontArgs: [{ fontPaths }]` is the seam if the owner wants resume-matching fonts (README OQ2). |
 | `evictCache(maxAge)` is **global** (all instances); docs warn to evict periodically to avoid a memory leak; in-repo precedent: `projects/rehype-typst` evicts `10` after each compile. | Evict `10` after every render — traffic is a handful of letters/day. |
 | `mapShadow(path, Buffer)` / `addSource(path, string)` inject in-memory files; `create({ workspace, fontArgs, inputs })`; per-compile `inputs` REPLACE ctor inputs. | Signature PNG + generated letter data ride as shadows; no workspace dir needed at runtime. |
@@ -29,25 +29,28 @@ assets/typst/
 │   └── letter.typ                              # letterloom-based template (below)
 ├── images/
 │   └── signature.PNG                           # copy of ~/git/cover-letters/images/signature.PNG (96 KB)
-└── typst/                                      # XDG_DATA_HOME root at runtime
-    └── packages/preview/letterloom/3.0.0/      # unpacked universe tarball:
+└── vendor/
+    └── letterloom-3.0.0/                       # unpacked universe tarball (Unlicense — OQ1 resolved):
                                                 # curl -sL https://packages.typst.org/preview/letterloom-3.0.0.tar.gz | tar xz
-                                                # (verify LICENSE + typst.toml before committing — README OQ1)
+                                                # imported BY PATH from letter.typ — bump = replace the dir
 ```
 
-Runtime env (doc 05 owns wiring): `TYPST_ASSETS_DIR=<assets root>`, `XDG_DATA_HOME=$TYPST_ASSETS_DIR`
-⇒ `dirs::data_dir()/typst/packages/preview/letterloom/3.0.0` resolves to the committed tree.
-Devshell, e2e bootstrap, and both testing layers set the same pair pointing at the repo path.
+Runtime env (doc 05 owns wiring): `TYPST_ASSETS_DIR=<assets root>` only — NO XDG_DATA_HOME
+anywhere (the by-path letterloom import made the package registry irrelevant).
+Devshell, e2e bootstrap, and both testing layers resolve the same dir; production gets the
+package-installed `$out/lib/typst-assets`.
 
 ## B) `templates/letter.typ` — layout contract
 
 Direct adaptation of `~/git/cover-letters/sailpoint/cover-letters-2026-sailpoint.typ`
-(owner-confirmed layout reference), with the variable parts fed from `/letter.json` (CL-D10):
+(owner-confirmed layout reference), with the variable parts fed from the shadow-mapped
+`letter.json` (CL-D10):
 
 ```typst
-#import "@preview/letterloom:3.0.0": *
+#import "../vendor/letterloom-3.0.0/src/lib.typ": *
 
-#let data = json("/letter.json")   // { toName, subject, paragraphs: [string] }
+#let data = json("letter.json")   // shadow-mapped at <assets>/templates/letter.json
+                                  // { toName, subject, paragraphs: [string] }
 
 #show: letterloom.with(
   from-name: "Rae Hill (she/her)",
@@ -86,7 +89,8 @@ Design notes:
   NOT from the generation model (untrusted-text containment: it flows through `json()` + string
   join like the paragraphs).
 - The template stays a **real `.typ` file** so the owner can iterate on it with the actual typst
-  CLI/preview locally (`typst watch` with `XDG_DATA_HOME` pointed at the assets dir); it is read
+  CLI/preview locally (`typst watch templates/letter.typ` from the assets dir — the by-path
+  letterloom import needs zero env setup); it is read
   via `FileSystem` at service construction, not pasted into a TS string.
 - Compile-time date via `datetime.today()` — same as the SailPoint letter (no clock input needed).
 
@@ -174,7 +178,7 @@ Impl — `layers/cover-letter-template-service.ts` (`Layer.effect`, deps: `Confi
 - At construction: load `templates/letter.typ` and `images/signature.PNG` from `typstAssetsDir`
   via `FileSystem` (Effect-wrapped reads; missing files ⇒ typed failure at layer build = deploy
   catches it at boot, not at first request).
-- `buildLetter`: `shadows = { "/letter.json": utf8(JSON.stringify({ toName: company ?? "Hiring
+- `buildLetter`: `shadows = { "templates/letter.json": utf8(JSON.stringify({ toName: company ?? "Hiring
   Team", subject, paragraphs })), "/images/signature.PNG": signatureBytes }`;
   `mainFileContent` = the loaded template. `JSON.stringify` IS the escaping layer (CL-D10) —
   no hand-rolled Typst escaping anywhere.

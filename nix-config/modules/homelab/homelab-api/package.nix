@@ -142,9 +142,9 @@ let
           if(pdf.subarray(0,4).toString()!=='%PDF'){console.error('typst smoke: bad pdf');process.exit(1)};
           console.log('typst runtime closure OK')")
 
-        # --- typst assets (templates, signature, vendored letterloom package) ------
-        # The typst compiler resolves @preview/letterloom from $XDG_DATA_HOME/typst/packages/...
-        # (doc 05 B); copying to $out/lib/typst-assets keeps the closure self-contained.
+        # --- typst assets (templates, signature, vendored letterloom) ----------------
+        # The letter template imports the vendored letterloom BY PATH, so the copied
+        # tree is fully self-contained (no universe-package resolution, no XDG env).
         cp -r packages/homelab-services-node/assets/typst $out/lib/typst-assets
 
         cat > $out/bin/homelab-api <<EOF

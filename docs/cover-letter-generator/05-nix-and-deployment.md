@@ -55,27 +55,30 @@ New module options + `environment` entries (the `CHROME_EXECUTABLE` pattern, ~li
 ```nix
 typstAssetsDir = mkOption {
   type = types.nullOr types.str;
-  default = "${cfg.package}/lib/typst-assets";
-  description = "Typst template/asset root (TYPST_ASSETS_DIR). Also used as XDG_DATA_HOME so the
-    typst.ts HttpRegistry resolves @preview/letterloom OFFLINE from
-    <dir>/typst/packages/preview/letterloom/3.0.0 (CL-D9). null ⇒ cover-letter rendering dark.";
+  default = null;   # hosts opt in explicitly (chromeExecutable posture); augustus sets
+                    # "${inputs.self.packages.<system>.homelab-api}/lib/typst-assets"
+  description = "Typst template/asset root (TYPST_ASSETS_DIR): letter.typ template,
+    signature image, and vendor/letterloom-3.0.0 imported BY PATH (no universe-package
+    resolution, no XDG env). null ⇒ cover-letter rendering dark.";
 };
 ```
 
 ```
 TYPST_ASSETS_DIR=${cfg.typstAssetsDir}
-XDG_DATA_HOME=${cfg.typstAssetsDir}
 ```
 
-- **`XDG_DATA_HOME` is process-wide** for homelab-api: grep-verified at plan time that nothing else
-  in the server reads it (README OQ5). If that ever changes, fallback = set it in-process inside
-  `DocumentRenderingServiceTypstLive` construction before `NodeCompiler.create`.
+- The initial design also exported `XDG_DATA_HOME=${cfg.typstAssetsDir}` so the typst.ts
+  `HttpRegistry` would resolve `@preview/letterloom` offline; the SHIPPED design imports
+  letterloom by path, so no XDG env exists anywhere (a vitest run proved the hazard real:
+  XDG_DATA_HOME pointed at a writable dir gets polluted — `vitest/`, `mimeapps.list`).
 - `OPENROUTER_COVER_LETTER_MODEL`: code default ships (`anthropic/claude-sonnet-5.5`); add to the
   unit's environment only when the owner wants an override (same posture as `OPENROUTER_MODEL`).
 - Feature flag: augustus runs `FEATURE_FLAGS=*` ⇒ `Resume_CoverLetter.enabled` automatically.
   **praeconinus**: explicit flag list omits `Resume_*` — verify NO change adds it (stays dark).
-- Service user `homelab-api` has no `HOME` in the unit today — which is exactly why the explicit
-  `XDG_DATA_HOME` matters (without it `dirs::data_dir()` ⇒ `None` ⇒ letterloom NotFound).
+- NOTE (found during CL-T8): the module's pre-existing `services.homelab-api.pkg` option is a
+  latent `mkPackageOption` misuse that THROWS when forced ("type lambda") — nothing read it
+  before; augustus's `typstAssetsDir` therefore references the flake package directly. Fix the
+  declaration separately if anything else ever needs it.
 
 ## C) Identity — kanidm group + claim (CL-D4)
 
@@ -92,28 +95,29 @@ Frontend constant `RESUME_COVER_LETTER_ROLE` (doc 04) must match the claim strin
 
 ## D) Devshell + e2e bootstrap (as built — revised during CL-T8)
 
-- **Devshell (`flake.nix`)**: `TYPST_ASSETS_DIR`/`XDG_DATA_HOME` are deliberately **NOT
-  exported shell-wide**. The first attempt used `${self}/packages/...`, but `${self}`
-  freezes the assets into a read-only STORE snapshot (stale on template edits), and a
-  global `XDG_DATA_HOME` repoints every shell tool's data dir (a `nix profile install`
-  trap). Consumers resolve the live worktree assets themselves:
-  - `scripts/e2e.sh` exports BOTH unconditionally from `repo_root` (git rev-parse — the
-    script's existing root-resolution idiom), scoped to the bundled server's process tree.
+- **Devshell (`flake.nix`)**: `TYPST_ASSETS_DIR` is deliberately **NOT exported shell-wide**.
+  The first attempt used `${self}/packages/...`, but `${self}` freezes the assets into a
+  read-only STORE snapshot (stale on template edits), and a global `XDG_DATA_HOME` (since
+  removed entirely — path imports) repointed every shell tool's data dir. Consumers resolve
+  the live worktree assets themselves:
+  - `scripts/e2e.sh` exports `TYPST_ASSETS_DIR` unconditionally from `repo_root`
+    (git rev-parse — the script's existing root-resolution idiom).
   - The gated vitest live-render test
     (`homelab-services-node/test/document-rendering-service-typst-live.test.ts`) defaults
-    to the repo-relative assets dir via `import.meta.dirname` and sets `XDG_DATA_HOME`
-    in-process only when unset.
+    to the repo-relative assets dir via `import.meta.dirname`.
   - Manual server runs: `TYPST_ASSETS_DIR=$PRJ_ROOT/packages/homelab-services-node/assets/typst
-    XDG_DATA_HOME=$TYPST_ASSETS_DIR yarn workspace homelab-server dev` (PRJ_ROOT is the
-    devshell's live project root).
-- **`scripts/stage-e2e-secrets.mjs`**: `.env-serve-test` gains `TYPST_ASSETS_DIR` +
-  `XDG_DATA_HOME` (relative `../../packages/...` — the same convention as `ROOT_CERT_DER`;
-  resolved against the server's cwd). dotenvx never overrides the absolute values e2e.sh
-  exports, so the file is a fallback for manual server runs only.
+    yarn workspace homelab-server dev` (PRJ_ROOT is the devshell's live project root).
+- **`scripts/stage-e2e-secrets.mjs`**: `.env-serve-test` gains `TYPST_ASSETS_DIR`
+  (relative `../../packages/...` — the same convention as `ROOT_CERT_DER`; resolved against
+  the server's cwd) and the e2e `TEST_API_KEY` gains the `Resume_CoverLetter` permission.
+  dotenvx never overrides the absolute value e2e.sh exports, so the file is a fallback for
+  manual server runs only.
 - **`RUN_COVER_LETTER_LIVE=1`** stays OPT-IN (spends real OpenRouter money,
   `RUN_TAILOR_LIVE` precedent) and additionally requires the staged
   `OPENROUTER_API_KEY_FILE`. `COVER_LETTER_SAMPLE_PATH` writes the PDF artifact
-  (`DOCX_SAMPLE_PATH` idiom).
+  (`DOCX_SAMPLE_PATH` idiom). Zero-spend full-stack alternative (used for CL-T9
+  verification): point `OPENROUTER_BASE_URL` at a local stub that branches on
+  `response_format.json_schema.name` (`CleanupResponse` vs `CoverLetterGeneration`).
 - **Testing layers**: `TYPST_ASSETS_DIR` default `Option.none()` (dark) in both
   `test-utils/testing-layer.ts` files; the live-render test provides its own env.
 
@@ -131,7 +135,7 @@ row to BOTH vendored-repo tables — `AGENTS.md` ("Vendored App Source — Prefe
 
 1. `nix-hashes` updated; `nix build .#checks.x86_64-linux.shellcheck` + full validation green.
 2. kanidm group + claim deployed; owner account in the group; re-login refreshes the id_token claims.
-3. Deploy host config: unit has `TYPST_ASSETS_DIR` + `XDG_DATA_HOME`; smoke line in build log
+3. Deploy host config: unit has `TYPST_ASSETS_DIR`; smoke line in build log
    reads `typst runtime closure OK`.
 4. Manual: tailor a listing → Actions tab → download (expect cleanup `cache hit` in the
    journal/Tempo span on the cover-letter request) → open PDF: letterloom layout, signature

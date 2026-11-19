@@ -163,11 +163,11 @@ in
           type = lib.types.nullOr lib.types.str;
           description = ''
             Typst template/asset root (TYPST_ASSETS_DIR) for POST /resume/cover-letter
-            (cover-letter generator). Ships in the package at <pkg>/lib/typst-assets —
-            hosts opt in explicitly (chromeExecutable precedent); augustus points it at
-            the homelab-api package output. Also exported as XDG_DATA_HOME so the
-            typst.ts HttpRegistry resolves @preview/letterloom OFFLINE from
-            <dir>/typst/packages/preview/letterloom/3.0.0 (CL-D9).
+            (cover-letter generator): the letter.typ template, signature image, and the
+            vendored letterloom template it imports BY PATH (no universe-package
+            resolution, no XDG_DATA_HOME). Ships in the package at
+            <pkg>/lib/typst-assets — hosts opt in explicitly (chromeExecutable
+            precedent); augustus points it at the homelab-api package output.
             Leave null on deployments where the resume group stays dark (e.g. praeconinus).
           '';
           default = null;
@@ -279,12 +279,7 @@ in
               else
                 ""
             }
-            ${
-              if cfg.typstAssetsDir != null then
-                "TYPST_ASSETS_DIR=${cfg.typstAssetsDir}\nXDG_DATA_HOME=${cfg.typstAssetsDir}"
-              else
-                ""
-            }
+            ${if cfg.typstAssetsDir != null then "TYPST_ASSETS_DIR=${cfg.typstAssetsDir}" else ""}
             ${
               if config.services.tempo.enable then
                 "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}"

@@ -27,10 +27,11 @@ export interface DocumentRenderingServiceTypstDef {
   /**
    * Compile a Typst document to PDF bytes.
    *
-   * The compiler workspace is the Typst assets dir (`TYPST_ASSETS_DIR`), which also
-   * contains the vendored universe packages resolved offline via `XDG_DATA_HOME`.
-   * Returns platform-neutral `Uint8Array` bytes — never a Node `Buffer` instance.
-   * Unconfigured assets dir or compile errors are typed failures (feature dark, not a crash).
+   * The compiler workspace is the Typst assets dir (`TYPST_ASSETS_DIR`), which contains
+   * the templates, images, and by-path-vendored typst templates (e.g. letterloom) the
+   * main file imports. Returns platform-neutral `Uint8Array` bytes — never a Node
+   * `Buffer` instance. Unconfigured assets dir or compile errors are typed failures
+   * (feature dark, not a crash).
    */
   readonly renderPdf: (req: TypstRenderRequest) => Effect.Effect<Uint8Array, DocumentRenderingServiceTypstError>
 }

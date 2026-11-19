@@ -8,13 +8,12 @@ import { DocumentRenderingServiceTypstLive } from "../src/layers/document-render
 /**
  * LIVE render tests — exercise the REAL DocumentRenderingServiceTypstLive (typst.ts
  * native compiler) against the committed assets: template, signature image, and the
- * vendored letterloom universe package (gating idiom: CHROME_EXECUTABLE in the e2e
- * suites — here the gate is simply "do the committed assets exist").
+ * vendored letterloom template imported BY PATH (gating idiom: CHROME_EXECUTABLE in the
+ * e2e suites — here the gate is simply "do the committed assets exist").
  *
- * XDG_DATA_HOME must point at the assets root for the typst.ts HttpRegistry to resolve
- * @preview/letterloom OFFLINE from <dir>/typst/packages/ (doc 05 D). It is set
- * IN-PROCESS here (never shell-wide — flake.nix comment); dirs::data_dir() reads the
- * env lazily per resolution, and production/e2e set it scoped (systemd unit, e2e.sh).
+ * No XDG_DATA_HOME: letterloom resolves via a relative path import inside
+ * templates/letter.typ, so behavior is identical in devshell/tests/nix-store and the
+ * test process never pollutes the git-tracked assets dir with XDG data files.
  */
 const assetsDir = process.env["TYPST_ASSETS_DIR"] ??
   path.resolve(import.meta.dirname, "..", "assets", "typst")
@@ -22,10 +21,6 @@ const assetsDir = process.env["TYPST_ASSETS_DIR"] ??
 const describeLive = existsSync(path.join(assetsDir, "templates", "letter.typ"))
   ? describe
   : describe.skip
-
-if (process.env["XDG_DATA_HOME"] === undefined) {
-  process.env["XDG_DATA_HOME"] = assetsDir
-}
 
 describeLive("document rendering service (typst) — LIVE render", () => {
   const LiveLayer = DocumentRenderingServiceTypstLive.pipe(

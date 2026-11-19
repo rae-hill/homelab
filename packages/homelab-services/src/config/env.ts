@@ -93,10 +93,10 @@ export interface EnvDef {
   readonly openRouterBaseUrl: URL
 
   /**
-   * Filesystem path to the Typst assets root: `templates/letter.typ`, `images/signature.PNG`,
-   * and the vendored universe packages under `typst/packages/` (cover-letter rendering).
-   * Deployments also point `XDG_DATA_HOME` at this dir so typst.ts resolves
-   * `@preview/letterloom` offline. None = cover-letter rendering dark on this host.
+   * Filesystem path to the Typst assets root: `templates/letter.typ`,
+   * `images/signature.PNG`, and `vendor/letterloom-3.0.0/` (the letter template imports
+   * letterloom BY PATH — no universe-package resolution, no XDG env needed).
+   * None = cover-letter rendering dark on this host.
    */
   readonly typstAssetsDir: Option.Option<string>
 }

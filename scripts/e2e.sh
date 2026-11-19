@@ -66,11 +66,8 @@ fi
 # Typst assets for the cover-letter generator's typst.ts compiler (doc 05 D):
 # ALWAYS resolve from the live worktree (repo_root, not the devshell env — ${self}
 # there would be a stale store snapshot) so template edits take effect immediately.
-# XDG_DATA_HOME makes the typst.ts HttpRegistry resolve @preview/letterloom offline
-# from <dir>/typst/packages/preview/letterloom/3.0.0; it is scoped to this script's
-# process tree (the bundled server), never exported shell-wide.
+# letterloom is imported BY PATH inside the template, so no XDG_DATA_HOME is needed.
 export TYPST_ASSETS_DIR="${repo_root}/packages/homelab-services-node/assets/typst"
-export XDG_DATA_HOME="${TYPST_ASSETS_DIR}"
 
 echo "==> building homelab-server bundle"
 yarn workspace homelab-server build || exit 1
