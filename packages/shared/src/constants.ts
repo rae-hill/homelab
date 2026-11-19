@@ -15,6 +15,13 @@ export const RESUME_PRINT_ROLE = "Resume_Print"
  */
 export const RESUME_TAILOR_ROLE = "Resume_Tailor"
 
+/**
+ * The kanidm claim-map role (and homelab-server resource URI) required to generate cover
+ * letters via `POST /resume/cover-letter`. Granted by the `homelab.resume.coverletter`
+ * kanidm group's claim map (nix-config/modules/homelab/homelab-api/oidc.nix → claimMaps.roles).
+ */
+export const RESUME_COVER_LETTER_ROLE = "Resume_CoverLetter"
+
 export const JWT_ROLES_KEY = "roles"
 
 export const JWT_HOMELAB_API_AUD = `homelab`

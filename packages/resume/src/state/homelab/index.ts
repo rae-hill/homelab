@@ -1,4 +1,5 @@
 export {
+  useCanCoverLetter,
   useCanPrintResume,
   useHomelabAuth,
   useHomelabBootstrap,

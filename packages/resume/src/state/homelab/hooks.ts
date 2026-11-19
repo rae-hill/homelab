@@ -52,6 +52,22 @@ export function useCanTailorResume() {
   )
 }
 
+/**
+ * True only when the API is reachable, the user is signed in, and their kanidm `roles`
+ * claim carries `Resume_CoverLetter` — the gate for the Actions tab's Cover-letter button.
+ */
+export function useCanCoverLetter() {
+  const auth = useHomelabAuth()
+  const reachability = useHomelabReachability()
+  return useMemo(
+    () =>
+      reachability === "reachable" &&
+      auth.status === "signedIn" &&
+      auth.roles.includes(Constants.RESUME_COVER_LETTER_ROLE),
+    [reachability, auth],
+  )
+}
+
 /** App-mount bootstrap: reachability probe + cached-session restore. Idempotent. */
 export function useHomelabBootstrap() {
   const dispatch = useAppDispatch()
