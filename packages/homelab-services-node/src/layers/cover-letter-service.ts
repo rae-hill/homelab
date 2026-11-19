@@ -98,8 +98,7 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
       // 3. Stage 1: cleanup — usually a CACHE HIT right after tailoring the same listing.
       const stage1 = yield* this.extractionService.extract({ listing: hygienedListing }).pipe(
         Effect.catch((err) =>
-          Effect.flatMap(Effect.logError("Stage 1 (cleanup) failed"), () =>
-            this.fail("Stage 1 (cleanup) failed", err)),
+          Effect.flatMap(Effect.logError("Stage 1 (cleanup) failed"), () => this.fail("Stage 1 (cleanup) failed", err))
         ),
       )
       yield* Effect.logInfo("[cover-letter] stage 1 resolved", {
@@ -127,8 +126,10 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
         })
         .pipe(
           Effect.catch((err) =>
-            Effect.flatMap(Effect.logError("Stage 2 (generation) failed"), () =>
-              this.fail("Stage 2 (generation) failed", err)),
+            Effect.flatMap(
+              Effect.logError("Stage 2 (generation) failed"),
+              () => this.fail("Stage 2 (generation) failed", err),
+            )
           ),
         )
 
@@ -145,15 +146,14 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
         generation = firstDecode.success
       } else {
         yield* Effect.logInfo("[cover-letter] generation output failed decode; retrying once")
-        const retryMessages: Services.OpenRouterClientService.ChatMessage[] = [
+        const retryMessages: Array<Services.OpenRouterClientService.ChatMessage> = [
           ...messages,
           { role: "assistant", content: firstResponse.content },
           {
             role: "user",
-            content:
-              `Your previous response failed schema decoding: ${
-                JSON.stringify(Utils.errorToJson(firstDecode.failure))
-              }. Respond again with ONLY valid JSON matching the required schema.`,
+            content: `Your previous response failed schema decoding: ${
+              JSON.stringify(Utils.errorToJson(firstDecode.failure))
+            }. Respond again with ONLY valid JSON matching the required schema.`,
           },
         ]
         const retryResponse = yield* this.openRouterClient
@@ -166,8 +166,10 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
           })
           .pipe(
             Effect.catch((err) =>
-              Effect.flatMap(Effect.logError("Stage 2 (generation) retry failed"), () =>
-                this.fail("Stage 2 (generation) retry failed", err)),
+              Effect.flatMap(
+                Effect.logError("Stage 2 (generation) retry failed"),
+                () => this.fail("Stage 2 (generation) retry failed", err),
+              )
             ),
           )
         tokens = {
@@ -178,8 +180,10 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
           Schema.fromJsonString(CoverLetterGenerationWire),
         )(retryResponse.content).pipe(
           Effect.catch((error) =>
-            Effect.flatMap(Effect.logError("Stage 2 (generation) output undecodable after retry"), () =>
-              this.fail("Stage 2 (generation) output was not valid JSON after retry", error)),
+            Effect.flatMap(
+              Effect.logError("Stage 2 (generation) output undecodable after retry"),
+              () => this.fail("Stage 2 (generation) output was not valid JSON after retry", error),
+            )
           ),
         )
       }
@@ -201,15 +205,19 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
         })
         .pipe(
           Effect.catch((err) =>
-            Effect.flatMap(Effect.logError("Cover-letter template assembly failed"), () =>
-              this.fail("Cover-letter template assembly failed", err)),
+            Effect.flatMap(
+              Effect.logError("Cover-letter template assembly failed"),
+              () => this.fail("Cover-letter template assembly failed", err),
+            )
           ),
         )
 
       const pdf = yield* this.typstRenderer.renderPdf(doc).pipe(
         Effect.catch((err) =>
-          Effect.flatMap(Effect.logError("Cover-letter render failed"), () =>
-            this.fail("Cover-letter render failed", err)),
+          Effect.flatMap(
+            Effect.logError("Cover-letter render failed"),
+            () => this.fail("Cover-letter render failed", err),
+          )
         ),
       )
 
@@ -245,12 +253,16 @@ class CoverLetterServiceImpl implements Services.CoverLetterService.CoverLetterS
         ) {
           return Effect.fail(error)
         }
-        return Effect.flatMap(Effect.logError("Cover-letter pipeline failed"), () =>
-          this.fail("Cover-letter pipeline failed", error))
+        return Effect.flatMap(
+          Effect.logError("Cover-letter pipeline failed"),
+          () => this.fail("Cover-letter pipeline failed", error),
+        )
       }),
       Effect.catchDefect((defect) =>
-        Effect.flatMap(Effect.logError("Cover-letter pipeline failed"), () =>
-          this.fail("Cover-letter pipeline failed", defect)),
+        Effect.flatMap(
+          Effect.logError("Cover-letter pipeline failed"),
+          () => this.fail("Cover-letter pipeline failed", defect),
+        )
       ),
     )
   }

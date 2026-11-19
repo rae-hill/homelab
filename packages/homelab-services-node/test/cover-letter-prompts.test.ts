@@ -2,9 +2,9 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { Services } from "homelab-services"
 import { ResumeContent } from "shared"
+import { CoverLetterPromptConfigServiceLive } from "../src/layers/cover-letter-prompt-config-service.js"
 import { buildContentDigest } from "../src/layers/cover-letter/digest.js"
 import { COVER_LETTER_EXEMPLARS } from "../src/layers/cover-letter/exemplars.js"
-import { CoverLetterPromptConfigServiceLive } from "../src/layers/cover-letter-prompt-config-service.js"
 
 const fixtureContent: ResumeContent.ContentState = {
   ...ResumeContent.INITIAL_CONTENT_STATE,

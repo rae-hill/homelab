@@ -25,7 +25,7 @@ interface RecordedCall {
 
 /** Programmable OpenRouter stub: serves canned responses in order, records every call. */
 const makeStubOpenRouter = (responses: ReadonlyArray<string>) => {
-  const calls: RecordedCall[] = []
+  const calls: Array<RecordedCall> = []
   const queue = [...responses]
   const layer = Layer.succeed(Services.OpenRouterClientService.OpenRouterClientService, {
     chat: (req) =>
@@ -82,8 +82,7 @@ const StubQuota = Layer.succeed(Services.TailorQuotaService.TailorQuotaService, 
 })
 
 const ExhaustedQuota = Layer.succeed(Services.TailorQuotaService.TailorQuotaService, {
-  tryConsume: () =>
-    Effect.fail(new Services.TailorService.TailorQuotaExceeded({ retryAfterSeconds: 3600 })),
+  tryConsume: () => Effect.fail(new Services.TailorService.TailorQuotaExceeded({ retryAfterSeconds: 3600 })),
 })
 
 const StubTypst = Layer.succeed(Services.DocumentRenderingServiceTypst.DocumentRenderingServiceTypst, {

@@ -12,7 +12,7 @@ import { ResumePromptConfigServiceLive } from "../src/layers/resume-prompt-confi
  * of the same listing does NOT reach the provider.
  */
 const makeCountingOpenRouter = () => {
-  const calls: string[] = []
+  const calls: Array<string> = []
   const layer = Layer.succeed(Services.OpenRouterClientService.OpenRouterClientService, {
     chat: (req: any) =>
       Effect.as(
@@ -116,7 +116,7 @@ describe("cached resume listing extraction", () => {
   })
 
   it.effect("cache key is sha256(listing):promptVersion:schemaVersion:cleanupModel", () => {
-    const recordedKeys: string[] = []
+    const recordedKeys: Array<string> = []
     const spyCache = Layer.succeed(Services.ListingCleanupCacheService.ListingCleanupCacheService, {
       get: () => Effect.succeed(Option.none()),
       put: (key: string) => Effect.as(Effect.sync(() => void recordedKeys.push(key)), undefined),

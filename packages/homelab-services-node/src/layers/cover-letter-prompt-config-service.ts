@@ -3,7 +3,7 @@ import { Services } from "homelab-services"
 import type { ResumeContent as ResumeContentType } from "shared"
 import { CoverLetterGeneration } from "../schemas/CoverLetter.js"
 import { buildContentDigest } from "./cover-letter/digest.js"
-import { type CoverLetterExemplar, COVER_LETTER_EXEMPLARS } from "./cover-letter/exemplars.js"
+import { COVER_LETTER_EXEMPLARS, type CoverLetterExemplar } from "./cover-letter/exemplars.js"
 
 /**
  * Cover-letter prompt-config implementation — mirrors resume-prompt-config-service.ts
@@ -30,7 +30,8 @@ export const makeCoverLetterPromptConfigService = (
 
   // STATIC system prefix first (prompt caching); the volatile listing goes LAST in the
   // user message, nonce-delimited (doc 02 §F rules carried over).
-  const generationSystemPrompt = `You write cover letters AS Rae Hill (she/her), a security-minded full-stack and DevOps engineer. The letter is rendered into a formal PDF letter template — you produce ONLY its subject line and body paragraphs.
+  const generationSystemPrompt =
+    `You write cover letters AS Rae Hill (she/her), a security-minded full-stack and DevOps engineer. The letter is rendered into a formal PDF letter template — you produce ONLY its subject line and body paragraphs.
 
 STYLE REFERENCE — letter(s) the same author wrote previously. Match her voice, cadence, warmth, and level of specificity. Do NOT copy their content, companies, or sentences; they illustrate TONE only:
 

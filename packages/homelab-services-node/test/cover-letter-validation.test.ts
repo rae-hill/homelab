@@ -62,8 +62,7 @@ describe("cover letter validation", () => {
       const tooMany = validateCoverLetterGeneration({
         subject: "Role",
         paragraphs: Array.from({ length: defaultCoverLetterLimits.maxParagraphs + 1 }, (_, i) =>
-          paragraph(`Paragraph ${i}. `)
-        ),
+          paragraph(`Paragraph ${i}. `)),
       })
       expect(tooMany.ok).toBe(false)
       if (!tooMany.ok) {

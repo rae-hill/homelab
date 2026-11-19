@@ -4,9 +4,9 @@ import { Config, Services } from "homelab-services"
 import * as path from "node:path"
 import {
   makeDocumentRenderingServiceTypst,
+  type TypstCompileResultLike,
   type TypstCompilerFactory,
   type TypstCompilerLike,
-  type TypstCompileResultLike,
   type TypstNodeErrorLike,
 } from "../src/layers/document-rendering-service-typst.js"
 
@@ -15,8 +15,8 @@ const makeFakeCompiler = (overrides: Partial<TypstCompilerLike> = {}) => {
   const state = {
     shadows: new Map<string, Uint8Array>(),
     shadowsAtCompile: [] as Array<Map<string, Uint8Array>>,
-    compiledWith: [] as string[],
-    evicted: [] as number[],
+    compiledWith: [] as Array<string>,
+    evicted: [] as Array<number>,
   }
   const okResult: TypstCompileResultLike = {
     hasError: () => false,
@@ -39,8 +39,7 @@ const makeFakeCompiler = (overrides: Partial<TypstCompilerLike> = {}) => {
   return { state, compiler }
 }
 
-const envWith = (typstAssetsDir: Option.Option<string>) =>
-  Layer.succeed(Config.Env.Env, { typstAssetsDir } as any)
+const envWith = (typstAssetsDir: Option.Option<string>) => Layer.succeed(Config.Env.Env, { typstAssetsDir } as any)
 
 const renderWith = (
   factory: TypstCompilerFactory,
@@ -65,7 +64,7 @@ const ASSETS = "/fake/typst-assets"
 describe("document rendering service (typst)", () => {
   it.effect("renders PDF bytes, maps shadows at ABSOLUTE workspace-joined paths, and evicts the global cache", () =>
     Effect.gen(function*() {
-      const { state, compiler } = makeFakeCompiler()
+      const { compiler, state } = makeFakeCompiler()
       const pdf = yield* renderWith(() => compiler, Option.some(ASSETS))
 
       expect(Array.from(pdf.slice(0, 4))).toEqual(PDF_MAGIC)
@@ -80,7 +79,7 @@ describe("document rendering service (typst)", () => {
 
   it.effect("fails with a typed error when TYPST_ASSETS_DIR is unset (feature dark, no crash)", () =>
     Effect.gen(function*() {
-      const { state, compiler } = makeFakeCompiler()
+      const { compiler, state } = makeFakeCompiler()
       const error = yield* Effect.flip(renderWith(() => compiler, Option.none()))
       expect(error._tag).toBe("DocumentRenderingServiceTypstError")
       expect(error.message).toContain("TYPST_ASSETS_DIR is not configured")
@@ -131,7 +130,7 @@ describe("document rendering service (typst)", () => {
 
   it.effect("each render starts from a clean shadow state (no cross-render leakage)", () =>
     Effect.gen(function*() {
-      const { state, compiler } = makeFakeCompiler()
+      const { compiler, state } = makeFakeCompiler()
       yield* renderWith(() => compiler, Option.some(ASSETS), {
         mainFilePath: "templates/letter.typ",
         shadows: { "templates/letter.json": new TextEncoder().encode("{\"first\":true}") },

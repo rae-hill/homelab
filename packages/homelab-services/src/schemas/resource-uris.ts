@@ -13,6 +13,7 @@ export const ResourceURISchema = Schema.Literals([
   "OAuth_ClaimCheck",
   "Resume_Print",
   "Resume_Tailor",
+  "Resume_CoverLetter",
 ])
 
 export const ResourceURILiterals = ResourceURISchema.literals

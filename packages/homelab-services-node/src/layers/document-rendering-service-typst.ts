@@ -1,8 +1,8 @@
+import { NodeCompiler } from "@myriaddreamin/typst-ts-node-compiler"
 import { Effect, Layer, Semaphore } from "effect"
 import { Config, Services, Utils } from "homelab-services"
 import { Buffer } from "node:buffer"
 import * as path from "node:path"
-import { NodeCompiler } from "@myriaddreamin/typst-ts-node-compiler"
 
 /**
  * `DocumentRenderingServiceTypst` — adapter over the typst.ts all-in-one Node compiler
@@ -84,11 +84,14 @@ class DocumentRenderingServiceTypstImpl
       }
       // Feature-dark posture (OpenRouter client precedent): a missing TYPST_ASSETS_DIR is a
       // typed CALL-TIME failure, never a layer-build failure that would keep the server down.
-      const workspace = yield* Effect.fromOption(this.env.typstAssetsDir, () =>
-        new Services.DocumentRenderingServiceTypst.DocumentRenderingServiceTypstError({
-          message: "TYPST_ASSETS_DIR is not configured — cover-letter rendering is dark on this host",
-          error: null,
-        }))
+      const workspace = yield* Effect.fromOption(
+        this.env.typstAssetsDir,
+        () =>
+          new Services.DocumentRenderingServiceTypst.DocumentRenderingServiceTypstError({
+            message: "TYPST_ASSETS_DIR is not configured — cover-letter rendering is dark on this host",
+            error: null,
+          }),
+      )
       // The constructor can throw (missing/incompatible native binding).
       const instance = yield* Effect.try({
         try: () => this.factory(workspace),
@@ -221,5 +224,5 @@ export const makeDocumentRenderingServiceTypst = (factory: TypstCompilerFactory)
 
 /** Live layer backed by the real typst.ts NodeCompiler (workspace = TYPST_ASSETS_DIR). */
 export const DocumentRenderingServiceTypstLive = makeDocumentRenderingServiceTypst((workspace) =>
-  NodeCompiler.create({ workspace }),
+  NodeCompiler.create({ workspace })
 )

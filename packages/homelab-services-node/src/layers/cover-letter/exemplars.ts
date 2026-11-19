@@ -16,7 +16,8 @@ export interface CoverLetterExemplar {
 export const COVER_LETTER_EXEMPLARS: ReadonlyArray<CoverLetterExemplar> = [
   {
     name: "sailpoint-2026",
-    text: `Hello! My name is Rae, and I am interested in one of the many opportunities available at SailPoint. In particular, the Senior DevOps Engineering position stood out to me; though if there's a better fit in another role, I'd be open to applying to that one instead. I’ve spent much of my career split about 60/40 between full-stack and DevOps responsibilities. Recently, my interests have leaned more toward DevOps, so I would be grateful to be considered for this role.
+    text:
+      `Hello! My name is Rae, and I am interested in one of the many opportunities available at SailPoint. In particular, the Senior DevOps Engineering position stood out to me; though if there's a better fit in another role, I'd be open to applying to that one instead. I’ve spent much of my career split about 60/40 between full-stack and DevOps responsibilities. Recently, my interests have leaned more toward DevOps, so I would be grateful to be considered for this role.
 
 I am fascinated by the correctness, in a cryptographic sense, of authentication and authorization systems. I have long been interested in contributing to an identity platform, especially now that AI agents and chatbots require equal, if not greater, access to a user’s resources and to act on behalf of a user’s identity. When I came across the DevOps listing for SailPoint, I jumped at the opportunity. I am curious about SailPoint’s approach to identity in this age of AI; it is a challenging problem to solve and requires a lot of knowledge and skill to implement correctly. It’s been a joy to implement authentication systems both in my personal and professional life, and I am familiar with the great many challenges that go into designing such a system.
 

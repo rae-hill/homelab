@@ -40,6 +40,8 @@ export const BadRequestReasonsSchema = Schema.Literals([
   "dns-ssid-required",
   "resume-tailor-base-version-mismatch",
   "resume-tailor-quota-exceeded",
+  "resume-cover-letter-base-version-mismatch",
+  "resume-cover-letter-quota-exceeded",
 ])
 
 export class BadRequest extends Schema.TaggedError<BadRequest>()(

@@ -48,7 +48,7 @@ export const validateCoverLetterGeneration = (
   readonly ok: false
   readonly violations: ReadonlyArray<string>
 } => {
-  const violations: string[] = []
+  const violations: Array<string> = []
   const subject = scrubGeneratedText(generation.subject).trim()
   const paragraphs = generation.paragraphs.map((p) => scrubGeneratedText(p).trim())
 
