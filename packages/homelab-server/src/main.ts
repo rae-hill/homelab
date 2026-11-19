@@ -52,7 +52,13 @@ const Server = HttpRouter.serve(Routes, {
   Layer.provide(Shell.Authorization.Aggregate),
   Layer.provide(Shell.Crypto.Aggregate),
   Layer.provide(Shell.Printing.Aggregate),
-  Layer.provide(Shell.Tailor.Aggregate.pipe(Layer.provide(SharedAiInfra))),
+  // Tailor + CoverLetter share ONE quota bucket and ONE cleanup cache (CL-D6/CL-D7) —
+  // the merged aggregate under a single provide is what guarantees the shared instances.
+  Layer.provide(
+    Layer.merge(Shell.Tailor.Aggregate, Shell.CoverLetter.Aggregate).pipe(
+      Layer.provide(SharedAiInfra),
+    ),
+  ),
   Layer.provide(Shell.ProfilePayload.Aggregate),
   Layer.provide(Layers.CertificateService.CertificateServiceLive),
   Layer.provide(Layers.UuidService.UuidServiceLive),
