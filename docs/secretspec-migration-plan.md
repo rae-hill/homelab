@@ -1,10 +1,12 @@
 # SecretSpec Migration Plan
 
-> Status: **Phase 1 COMPLETE** — declaration layer live; all sops files are
+> Status: **Phases 1–2 COMPLETE** — declaration layer live (all sops files
 > module-local; `secretspec check` resolves 60/60 secrets across the 6 host
-> profiles. Phases 2–6 pending. Vendor research against `repos/secretspec`
-> @ v0.21.1 (= nixpkgs-unstable pin; nixpkgs-26.05 carries a stale 0.10.1).
-> Predecessor work: per-service sops split (commit `24d6d41179`).
+> profiles); dev/e2e run on generated ephemeral secrets (repo-root
+> `secretspec.toml`, commit `3c1ae71d15`). **Phase 3 SCOPED** (§4.3 + §7:
+> exec-wrapper delivery — renderer design dropped); waves 3a–3e actionable,
+> 3f gated on §9 Q1. Vendor research against `repos/secretspec` @ v0.21.1
+> (= nixpkgs-unstable pin; nixpkgs-26.05 carries a stale 0.10.1).
 
 ## 1. Goals
 
@@ -42,7 +44,7 @@ Key mechanics we rely on (verified in vendored source, not just docs):
 | `composed`                                         | 0.16+             | Read-only `${UPPERCASE}` interpolation of declared secrets (DSNs etc.); static strings only                                                                                                                                                                                                     |
 | `as_path`                                          | ✓                 | Value → temp file, env gets the path; CLI files persist; exact bytes 0.21+                                                                                                                                                                                                                      |
 | `encoding` / `extract`                             | 0.19+             | base64/hex for binary-through-text providers; JSON-pointer/INI extraction                                                                                                                                                                                                                       |
-| `export --format json --scope S`                   | ✓                 | The bridge primitive: one JSON object of name→value                                                                                                                                                                                                                                             |
+| `export --format json --scope S`                   | ✓                 | One JSON object of name→value; as_path secrets export PATHS and their temp files PERSIST (no child-lifetime cleanup) — units use `run` instead                                                                                                                                                  |
 | `systemd-credential` provider                      | 0.17+             | Read-only, from `$CREDENTIALS_DIRECTORY` — the SA-token bootstrap reader                                                                                                                                                                                                                        |
 | Audit log                                          | ✓                 | Local JSONL, value-free, records scope/profile/reason/provenance                                                                                                                                                                                                                                |
 
@@ -59,8 +61,10 @@ consumers with `secretspec run`_ for system services.
 **Consequence:** SecretSpec cannot replace sops-nix's runtime delivery role
 (materializing `/run/secrets/<name>` files with owner/group/mode at activation,
 rendering templates, restart coordination) out of the box. The plan therefore
-pairs SecretSpec (declaration + resolution) with a **thin self-built NixOS
-bridge** for delivery, designed to be retired when upstream reconcile ships.
+pairs SecretSpec (declaration + resolution) with **thin self-built exec
+wrappers** (§4.3) for delivery — `run`/`as_path` cover env/file-native
+services; renderer-shaped cases (templates, activation-time consumers) stay
+sops-nix until upstream reconcile ships.
 
 ## 3. Current state (post-split inventory)
 
@@ -149,7 +153,7 @@ Design decisions (all verified with `secretspec check`):
   provider's lookup is `[project, profile, key] → [profile, key] → [key]`,
   case-sensitive; lowercase names hit the flat `[key]` path with **no `ref`
   mapping needed**. (`composed` secrets' `${UPPERCASE}` restriction only
-  affects composed references, which the bridge renderer replaces anyway.)
+  affects composed references, which the wrapper glue replaces anyway.)
 - `host_op_<host>` (the per-host 1Password SA alias) is bound ONLY by the
   root — it is host-scoped, path-free, and flips from `"null://"` to
   `onepassword+token://homelab-<host>` in Phase 4. A null provider mid-chain
@@ -242,114 +246,142 @@ git" auditable at a glance; scattered files shift that job to the declaration
 layer. Secret scanners match `ENC[` content markers, not paths, so tooling is
 unaffected.
 
-### 4.3 Delivery bridge (the self-built part)
+### 4.3 Delivery: exec wrappers (no renderer, no reconciliation unit)
 
-New module `modules/system/system-secretspec.nix` (+ HM and darwin variants):
+**Superseded design:** the earlier plan had a self-built
+`system-secretspec.nix` bridge — oneshot units running `secretspec export`
+into a renderer that rewrote the same `/run/secrets/<name>` paths sops-nix
+uses. Dropped by decision: `secretspec run` + `as_path` already deliver
+secrets at service start, so host delivery is a **lightweight exec wrapper
+around each service's binary** — no daemon, no generation dirs, no path
+compatibility layer:
 
-```nix
-services.secretspec = {
-  enable = true;
-  profile = "augustus";                    # = host name
-  specFile = ./secretspec.toml;            # value-free → safe in the Nix store
-  sets = {
-    failure-notifs = {                      # one reconciliation "set" per service
-      scope = "failure-notifs-augustus";
-      files = {                             # → /run/secrets/<name> (SAME paths sops-nix uses)
-        pushover_user_key = { owner = "root"; mode = "0400"; };
-        pushover_token    = { owner = "root"; mode = "0400"; };
-      };
-    };
-    kanidm = {
-      scope = "kanidm";
-      files = { kanidm_admin_passphrase = { owner = "kanidm"; group = "kanidm"; }; /* … */ };
-      rendered = {                          # successor of sops.templates
-        "kanidm-backup-passphrase" = {
-          owner = "restic";
-          content = "${KANIDM_RESTIC_BACKUP_PASSPHRASE}";   # ${NAME} refs resolved at runtime
-        };
-      };
-    };
-  };
-};
+```
+systemd unit (or launchd agent / HM package override):
+  ExecStart = <wrapper>            # in the Nix store: NAMES only, never values
+  wrapper   = exec secretspec run --profile <host> --scope <svc> \
+              -f ${self}/nix-config/secretspec.toml \
+              -- <glue: sh -c '…env renames…; exec real-bin "$@"'>
 ```
 
-Implementation notes:
+Mechanics (verified against the vendored 0.21.1 source):
 
-- A oneshot systemd unit per set (or one unit iterating sets), ordered
-  `After=network-online.target` only when a remote provider is in the chain.
-  ExecStart runs `secretspec export --profile <host> --scope <set> --format json`
-  piped into a small renderer (jq/awk or a tiny static helper) that:
-  1. writes a fresh generation dir under `/run/secretspec/gen-<N>/`,
-  2. materializes each declared file (owner/group/mode via install/chmod),
-  3. renders `rendered` templates by `${NAME}` substitution **in memory** from
-     the JSON (content strings come from Nix, so constants/ports stay
-     single-sourced in `constants.nix` — unlike static `composed` TOML),
-  4. atomically swaps symlinks `/run/secrets/<name>` (or a per-set dir) into place.
-- **Path compatibility is the migration trick:** the bridge writes the _same_
-  `/run/secrets/<name>` and `/run/secrets/rendered/<name>` paths sops-nix uses.
-  A service cutover = remove its `sops.secrets.*` declarations, add its
-  `services.secretspec.sets.<svc>` binding — consumer modules (`passwordFile =
-  config.sops.secrets.X.path` → `… = "/run/secrets/X"` or a shared option) are
-  the only diff, and can even be kept identical via a `config.secretspec.paths.X`
-  helper. Exactly one writer per secret at any time.
-- Restart coordination: v1 = none beyond boot/activation ordering (document
-  manual `systemctl restart` after rotations); v2 = renderer compares old/new
-  values in memory and sets a marker that triggers `restartUnits` like sops-nix.
-- Security rules inherited from `nixos.md` (non-negotiable): no values in Nix
-  eval/store/argv/journal; plaintext only in memory and tmpfs; the spec file in
-  the store carries names only; audit log stays on the host.
-- HM variant: `home.activation` (or a user systemd unit) resolving
-  `--scope opencode` into `~/.config/secretspec/files/` (0600); opencode
-  provider `{file:…}` references repoint there. Dev machines can instead use
-  the keyring/1Password-desktop provider interactively.
-- darwin variant (mini): the openclaw gateway wrapper already `cat`s secret
-  files into env vars before exec — swap the `cat`s for a single
-  `eval $(secretspec export --scope openclaw --format shell)` (wrapper runs as
-  jacob; desktop-app or SA provider). No system-level bridge needed on mini.
+- **`as_path = true` secrets** → `run` writes the value to a temp file
+  (mode 0400, owner = service user) and injects the env var as its absolute
+  path; the file lives exactly as long as the wrapped child (`run` holds the
+  temp files until the child exits, then deletes them). For daemons that
+  read secrets from files — our own failure-notifs (`PUSHOVER_*_FILE`) and
+  homelab-api (`TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH`,
+  `OPENROUTER_API_KEY_FILE`) already speak exactly this dialect, as the e2e
+  pipeline proved — this is a native fit.
+- **Raw-value secrets** → plain env injection for env-native daemons
+  (containers via `--env NAME` pass-through, grafana `GF_*`, restic
+  `RESTIC_PASSWORD_FILE`). `/proc/<pid>/environ` is same-uid+root readable —
+  comparable to the 0400 files sops-nix writes today; values never touch the
+  Nix store (wrappers carry names only), argv (`--env NAME`, never
+  `NAME=value`), or the journal.
+- **Glue scripts** bridge name mismatches: fleet manifest names are lowercase
+  (sops yaml keys, Phase 1), daemons expect their own env names —
+  `sh -c 'export PUSHOVER_USER_KEY_FILE="$pushover_user_key"; exec "$@"' _`
+  keeps the manifest untouched. Note `run --scope` actively SCRUBS
+  out-of-scope secret names from the child env — wrappers must not rely on
+  ambient secret env (feature, not bug).
+- **Storage access (sops interim):** the unit exports `SOPS_AGE_KEY_FILE`
+  pointing at the same host key file sops-nix uses; the sops provider reads
+  the module-local encrypted yamls through the store copy of the repo
+  (relative alias paths rebase against the `-f` manifest's dir — the store
+  copy is self-contained; ciphertext in the store is fine, values are not).
+  **1Password end-state:** a per-service SA token via `LoadCredential=` or a
+  0400 root-provisioned `EnvironmentFile=` — the vault/SA granularity this
+  forces is §9 Q1.
+- **Restart semantics improve:** every `systemctl restart` re-resolves values
+  (rotation = restart; no activation dependency); `After=network-online.target`
+  only for units whose chain includes 1Password.
+- **Units use `run`, never `export`:** `export` persists its as_path temp
+  files (no child-lifetime cleanup); `run` deletes them on child exit. The
+  openclaw-style `eval $(secretspec export --format shell)` pattern stays
+  acceptable only where the scope contains no as_path secrets.
+- Nix plumbing = one lib helper (`mkSecretspecWrapper { profile, scope,
+  target, glue? }`) + per-service module edits; no new state, no /etc files,
+  nothing to reconcile.
+
+**Hard scope boundaries — what wrappers do NOT cover** (stays sops-nix;
+renderer-shaped problems we deliberately do not solve):
+
+1. **Activation-time consumers**: `services.kanidm.provision.*`
+   (adminPasswordFile, every catalog `basicSecretFile`), peesequel postgres
+   passwords — consumed by generated activation/oneshot scripts during
+   `nixos-rebuild`. Secrets ALSO consumed by an app at runtime (OIDC client
+   secrets, db passwords) get a dual-mechanism interim: wrapper for the app
+   side, sops-nix for the provisioner — same storage file, two READERS, no
+   conflict (exactly one writer is preserved: sops-nix keeps writing its
+   /run/secrets path until Phase 4 deletes the declaration).
+2. **Config-file templates with no env alternative**: radius.toml
+   (kanidm-radius), smb credentials (kernel `mount.cifs` needs a stable real
+   file), the serial-numbers JSON (composed), step-ca's yk-pin.txt (static
+   `pin-source=` path inside the KMS URI).
+3. **Lifeline class (§6)**: cicero step-ca, all four ssh-cert-renewers,
+   aedilis technitium, praeconinus homelab-api — untouched until Phase 5; no
+   delivery experiments on CA/DNS/SSH/public-VPS paths.
+4. **Non-root service users during the sops interim**: a wrapper running as
+   the service user needs the host age key → that user could decrypt EVERY
+   sops file the key recipients cover (blast-radius growth vs sops-nix's
+   root-decrypts-once model). Policy: waves are gated — root-run and
+   user-level (jacob-owned: workstation HM, mini) deliveries first; non-root
+   daemons wait for per-service credentials (§9 Q1) or per-module age keys.
 
 ### 4.4 1Password operations
 
 - **Service accounts are created manually** (1Password web UI or
   `op service-account create`). SecretSpec cannot create them; a 1Password
-  Terraform provider exists if we later want automation. One-time cost: ~6 SAs.
-- Vault layout (recommended): one vault per host — `homelab-augustus`,
-  `homelab-nixos`, `homelab-mini`, … — plus `homelab-dev` for human/dev use.
-  Each host SA gets read/write on **its** vault only (least privilege; a
-  compromised host cannot drain the fleet). Secrets land as Secure Notes
-  `secretspec/homelab/<host>/<KEY>` (convention) — browseable and rotatable in
-  the 1Password UI.
+  Terraform provider exists if we later want automation. One-time cost:
+  ~20 SAs (one per service — §9 Q1 decided).
+- Vault layout — **DECIDED (§9 Q1): one vault + one SA per service** (plus
+  `homelab-dev` for human/dev use). The wrapper model (§4.3) has each wrapped
+  service user read its own SA token; per-service vaults keep least privilege
+  (a compromised grafana cannot drain kanidm's passphrase), where a per-host
+  token would re-expose every host secret to every service user. Secrets land
+  as Secure Notes `secretspec/homelab/<host>/<key>` (convention) — browseable
+  and rotatable in the 1Password UI.
 - **Token bootstrap (chicken-and-egg)**: the SA token itself must reach the host
   through a channel that doesn't need 1Password.
-  - Interim: sops-nix — one new secret `secretspec_sa_token` per host in a
-    tiny `secrets/<host>/secretspec.yaml`; the bridge unit gets it via
-    `EnvironmentFile=`/`LoadCredential=` (never `Environment=` inline).
+  - Interim: sops-nix — one new secret `secretspec_sa_token` per service in a
+    tiny `secrets/<host>/secretspec.yaml`; the wrapped
+    service's unit gets it via `LoadCredential=` or a root-provisioned 0400
+    `EnvironmentFile=` (never `Environment=` inline).
   - End state: `systemd-creds encrypt --name=secretspec-sa-token` (host-bound,
-    TPM2 where available) + `LoadCredentialEncrypted=`; the bridge reads it
+    TPM2 where available) + `LoadCredentialEncrypted=`; the wrapper reads it
     through SecretSpec's read-only `systemd-credential://` provider — exactly
     the upstream design. This removes the last sops-nix dependency.
 - SA token rotation: 1Password SAs support expiry/rotation; rotating = issue
-  new token, update the bootstrap, restart the bridge units. Document in the
-  runbook.
+  new token, update the bootstrap, restart the wrapped services. Document in
+  the runbook.
 
-## 5. `as_path` vs env vs files — the delivery decision
+## 5. `as_path` vs env vs files — the delivery decision (REVISED)
 
-Judgment call requested; recommendation:
+The original recommendation (host files under `/run` via a self-built
+renderer) is **superseded** by decision + Phase 2 experience:
 
-- **Host services: files under `/run` (tmpfs) with unix owner/mode — not env,
-  not `as_path`.** Nearly every consumer takes a `*File` option (kanidm
-  provision, step-ca, restic `passwordFile`, caddy `basicSecretFile`, …); env
-  vars leak to every child process and are world-readable via
-  `/proc/<pid>/environ` for same-uid processes; a 0400 owner-only tmpfs file is
-  the tighter boundary and matches today's semantics exactly (zero consumer
-  churn). Upstream `nixos.md` itself says `as_path` must **not** be reused as
-  the managed-file implementation — it's a process/SDK transform with temp-dir
-  paths and no owner/group control.
-- **Dev workflows: env is right** — `secretspec run -- <cmd>` for short-lived
-  shells/processes; `as_path = true` only where a tool insists on a file path
-  (e.g. `GOOGLE_APPLICATION_CREDENTIALS`, generated SSH keys for a one-off cmd).
-- So the user's instinct ("keep them in the environment, avoid secrets on
-  disk") holds for _dev_, with the nuance that on hosts the tmpfs-file model is
-  both the status quo and the more secure option; `/run` _is_ "not on disk".
+- **Host services: exec wrapper (`secretspec run`) around the daemon** —
+  `as_path` (0400 temp file, env = path, lifetime = child process) wherever
+  the daemon reads secrets from files via `*_FILE`/`*_PATH`-style env;
+  raw env injection for env-native daemons. Values never in the Nix store
+  (wrappers carry names only), never in argv/journal; env is same-uid+root
+  readable via `/proc` — comparable to today's 0400 `/run/secrets` files.
+- The renderer/reconcile module is dropped: it duplicated what `run` +
+  `as_path` provide, and its path-compatibility trick only matters for
+  consumers that genuinely need stable real files (kernel smb credentials,
+  config-file templates) — those stay sops-nix instead (§4.3 boundaries).
+  The upstream `nixos.md` warning ("don't reuse as_path as managed-file
+  delivery") is respected in spirit: as_path files are per-process ephemera,
+  not a managed /run tree.
+- **Dev workflows: raw env, generated per run** — validated in Phase 2
+  (single generation event shared by all children of one `run`; the staging
+  script's file assembly keeps the server's path-based contract; fallback
+  self-generation keeps CI independent of secretspec).
+- systemd-creds (`LoadCredentialEncrypted=`) remains a future hardening
+  option — most relevant for the SA-token bootstrap (Phase 5) — not a
+  delivery mechanism for this migration.
 
 ## 6. Migration classification policy
 
@@ -377,7 +409,7 @@ stay in git history; nothing is deleted until its replacement is verified).
 - `repos/secretspec` submodule @ v0.21.1 (flake.lock-parity not applicable;
   tag = nixpkgs-unstable pin).
 - Add `pkgs-unstable.secretspec` to the devshell; record version assertion in
-  the bridge module (`package` option + min-version check).
+  the wrapper helper (`package` option + min-version check).
 
 ### Phase 1 — Declaration layer + module-local relocation ✅ DONE
 
@@ -412,100 +444,190 @@ this change):
   (name, description, owner-service, scope) — previously spread across
   20 Nix files.
 
-### Phase 2 — Dev/e2e secrets
+### Phase 2 — Dev/e2e secrets ✅ DONE
 
-- Root (or `packages/homelab-server/`) `secretspec.toml` with profiles:
-  - `development`: keyring/1Password-desktop provider for human tooling.
-  - `e2e`: `dotenv://.secretspec-e2e.env` (gitignored) + `generate = true`
-    types — first run mints and stores, later runs reuse (preserves the
-    current never-overwrite behavior):
-    `HMAC_SECRET` (hex 32), `JWK_PASSPHRASE` (password),
-    `OPENROUTER_API_KEY` (default = dummy), serial numbers (hex), API keys
-    (defaults = the fixed test contract values).
-- Refactor `scripts/stage-e2e-secrets.mjs` to pull values via
-  `secretspec export --profile e2e --format json` and keep only the fixture
-  _assembly_ it uniquely does (JWK/JWE via `jose`, `api-keys.json` contract
-  shape). SecretSpec can't produce JWE-wrapped JWKs — that logic stays.
-- `require_reason` left at default (`"agents"`) → agent secret access is
-  audit-logged with reasons.
+Outcome (this change): repo-root `secretspec.toml` (project `homelab-dev`;
+manifest discovery walks up from CWD, so `nix-config/` still finds the fleet
+manifest first) with `development` + `e2e` profiles — **pure ephemeral
+generation**, no storage:
 
-### Phase 3 — Bridge module + pilot (augustus/failure-notifs)
+- `JWK_PASSPHRASE` (password 43, alphanumeric) and `HMAC_SECRET` (hex,
+  `bytes = 32` → the same 64-hex-char shape the server contract expects),
+  both `providers = ["ephemeral"]` (`null://`) + `generate`. Verified
+  semantics: one generation event per materializing resolution — children of
+  a single `secretspec run` share values, the next run gets fresh ones,
+  nothing is written anywhere ("generated for this resolution without
+  provider storage").
+- The earlier dotenv-persistence sketch is DROPPED (decision: generate on the
+  fly; no dev/e2e secret needs a stable identity beyond one run).
+  `OPENROUTER_API_KEY`, the API-key contract and the serial numbers stay
+  script constants — non-secret fixtures with fixed e2e-contract values;
+  generating them would add nothing.
+- Injection point = the staging script, not the server: `scripts/e2e.sh`
+  runs `secretspec run --profile e2e -- node scripts/stage-e2e-secrets.mjs`
+  when secretspec is on PATH (devshell), else bare `node` (CI deliberately
+  has no Nix — the script's fallback path is the legacy behavior, unchanged).
+  The script consumes the injected env and keeps the assembly it uniquely
+  does (ES256 keygen + PBES2 JWE wrap via `jose`).
+- Consistency rule: the JWK JWE is only decryptable with the matching
+  passphrase, so in injected mode the derived fixtures (JWE, public JWK,
+  passphrase file, hmac-secret) are ALWAYS regenerated from the same
+  generation event — at the paths the effective `.env-serve-test` references
+  (parsed from the file; hand-tuned setups may point
+  `TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH` somewhere other than the stock
+  `private/jwk-secret`, and regenerating a mismatched pair fails the server
+  boot with JWEDecryptionFailed — learned empirically). Secret files are
+  pinned 0600. Static contract files (api-keys.json, serial-numbers.json,
+  openrouter dummy, .env-serve-test itself) keep never-overwrite semantics
+  in BOTH modes, so hand-tuned dev setups survive.
+- The server itself is NOT wrapped: its env contract is file paths
+  (HOMELAB_SECRET_FILE, TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH, …) fed from
+  `.env-serve-test` via dotenvx, and the unit-test layer hardcodes `private/`
+  paths — the files must exist regardless, so `as_path` injection would be
+  redundant here and would mask hand-tuned env files (process env beats
+  dotenvx). `as_path` gets its prove-out in Phase 3 instead.
+- `require_reason = false` in the dev manifest (throwaway values; keeps
+  e2e.sh / seed-secrets / CI frictionless). The fleet manifest keeps
+  `"agents"`.
+- Devshell: new `seed-secrets` command = staging under the `development`
+  profile; watch commands (`yarn workspace homelab-server dev`) then read the
+  staged files as before.
+- Verified: `secretspec check` green for both profiles + the `server` scope;
+  `run` injects correctly-shaped values (lengths/patterns asserted, values
+  never printed); staging smoke-tested in both modes; full e2e suite green
+  via the devshell `e2e` command.
 
-- Build `system-secretspec.nix` (§4.3) + renderer; unit-tested against a
-  `null`-provider spec in a VM-less check first (renderer is pure: JSON in,
-  files out).
-- Pilot = failure-notifs (2 root-owned secrets, no template, low blast
-  radius): declare `services.secretspec.sets.failure-notifs`, delete the two
-  `sops.secrets.pushover_*` declarations, keep values in the sops yaml
-  (provider chain still `sops_pushover` until Phase 4).
-- Soak: reboot augustus, verify `/run/secrets/pushover_*` identical
-  (perms/owner/content hash), failure-notifs still fires test notification.
-- Then roll the bridge out to remaining augustus services one commit each
-  (still sops-backed — this phase changes _delivery_, not _storage_).
+### Phase 3 — Exec-wrapper delivery (SCOPED; waves gated per §4.3)
+
+> Progress: 3a ✅ (`nix-config/lib/secretspec.nix` →
+> `constants.secretspec.mkWrapper`); 3b ✅ built — failure-notifs@augustus is
+> cut over to the wrapper, awaiting deploy + soak. 3c–3f pending.
+
+Design = §4.3 (wrapper + as_path/env glue; NO renderer, NO /run/secrets
+rewrite). Storage stays the sops yamls throughout — this phase changes
+_delivery_ only. One service per commit; each ends with
+`secrets-check <host> --scope <svc>` green + service health verified.
+
+- **3a infra**: `mkSecretspecWrapper` lib helper (nix-config/lib/);
+  secretspec package on augustus; `SOPS_AGE_KEY_FILE` wiring. No consumer
+  changes. Smoke: wrapper resolves a null-provider test spec end-to-end on
+  the host (no real secrets touched).
+- **3b pilot — failure-notifs@augustus** (root-run, our script, 2 secrets):
+  as_path + glue — the script's `PUSHOVER_USER_KEY_FILE`/`PUSHOVER_TOKEN_FILE`
+  contract needs ZERO script changes; delete the two `sops.secrets.pushover_*`
+  declarations (the yaml keeps the values — storage still sops until
+  Phase 4). Soak: reboot augustus, fire a test notification, confirm no
+  `/run/secrets/pushover_*` dependency remains.
+- **3c root-run wave**: technitium-metrics-token oneshot (our inline script
+  switches from baked `cat` paths to env — tiny rewrite); the six restic
+  backup jobs (kanidm, planka, habitsync, openwebui, minecraft, postgres —
+  `RESTIC_PASSWORD_FILE` via as_path; the wrapper point inside the restic
+  module's generated script is TBD at implementation). Root-run → no
+  credential blast-radius change.
+- **3d rootful-container wave** (podman runs root-side): planka, habitsync,
+  openwebui — replace environmentFiles/bind-mounted secret files with
+  `secretspec run -- podman run --env NAME` pass-throughs (values never in
+  argv). Their activation-side consumers (peesequel, kanidm provision) stay
+  sops-nix — dual readers, same storage (§4.3 boundary 1).
+- **3e user-level wave** (jacob-owned, no privilege issue): mini openclaw
+  (swap the 5-file cat/wait-loop wrapper for one `secretspec run`); nixos HM
+  opencode (wrap the opencode binary OR use the 1Password-desktop provider —
+  §9 Q4).
+- **3f gated wave — non-root daemons** (BLOCKED on the §9 Q1 credential
+  decision): grafana (`GF_*` env + `$__env{}` provisioning refs), unpoller
+  (env overrides — verify names first), home-assistant (`!env_var` YAML refs —
+  verify support in our HA version), homelab-api + homelab-secret-provisioner
+  (as_path fits env.ts natively; api-keys.json + serial-numbers stay rendered
+  files).
+- **Out of scope — stay sops-nix**: kanidm provision secrets, radius.toml,
+  smb credentials, serial-numbers template, ALL lifeline services
+  (cicero/aedilis/praeconinus + ssh-cert-renewer ×4), step-ca.
 
 ### Phase 4 — 1Password cutover, service by service
 
-Per service (start with the pilot):
+Prerequisite: §9 Q1 DECIDED — **per-service vaults+SAs**. Consequence for
+the manifests: the root binds one `op_<svc>[_<host>]` alias per service
+(`onepassword+token://homelab-<svc>[-<host>]`, token via provider
+credentials / LoadCredential — never in the URI), replacing the single
+`host_op_<host>` placeholders in each migrated service's chain as it cuts
+over.
 
-1. Create vault `homelab-augustus` + SA (manual, once per host); bootstrap the
-   token via sops-nix (`secrets/<host>/secretspec.yaml`).
-2. On the host: `secretspec import onepassword --profile augustus --scope <svc>`
-   (copies missing values into 1Password; never overwrites).
-3. Flip the service's chain to `["host_op"]` (drop the sops alias); redeploy;
-   verify `check --scope` + service health.
-4. `git rm` the service's sops yaml; delete its sops-nix declarations (already
-   gone in Phase 3) — done.
+Per service, in Phase 3 wave order (3b → 3c → 3d → 3e → 3f):
+
+1. Create the vault + SA (manual); bootstrap the token via sops-nix
+   (`secrets/<host>/secretspec.yaml`, delivered 0400 to the service user).
+2. On the host: `secretspec import onepassword --profile <host> --scope <svc>`
+   (copies missing values; never overwrites).
+3. Flip the service's chain to `["op_<svc>"]` (drop the sops alias);
+   redeploy; verify `check --scope` + service health.
+4. `git rm` the service's sops yaml — its sops-nix declarations are already
+   gone (Phase 3) or dual-reader leftovers removed here.
 5. Rotate anything sensitive that lived in git history as a follow-up task
    (the yamls were encrypted, so this is optional hygiene, not incident
    response).
 
-Order: failure-notifs → unpoller → minecraft → grafana → technitium(aug) →
-habitsync → planka → openwebui → home-assistant → radius → kanidm →
-homelab-api(aug) → smb(nixos) → openclaw(mini) → opencode(nixos HM).
-Lifeline-class services skip this phase entirely.
+Services deferred by §4.3 boundaries (kanidm provision, radius, smb, serial
+numbers) and the lifeline class skip this phase — their endgame is Phase 5.
 
 ### Phase 5 — Retire sops-nix
 
-- Remaining sops-nix usage = lifeline secrets + SA-token bootstrap.
+- Remaining sops-nix usage after Phases 3–4 = lifeline secrets, the
+  activation-time consumers (kanidm provision, peesequel), the
+  template-bound configs (radius.toml, smb creds, serial numbers, yk-pin),
+  and the SA-token bootstrap.
 - Move SA-token bootstrap to `systemd-creds` encrypted credentials (§4.4);
-  bridge reads via `systemd-credential://` provider.
+  wrappers read via SecretSpec's `systemd-credential://` provider.
 - Lifeline secrets: either (a) keep sops-nix for just those files, or
-  (b) convert them to SecretSpec `age`/`sops` provider files resolved by the
-  same bridge — then sops-nix the _NixOS module_ is fully gone; `sops`/`age`
-  remain only as encryption tools.
-- mini (darwin) + HM configs cut over via their variants (§4.3).
+  (b) point the same wrappers' chains at SecretSpec `age`/`sops` providers
+  and let sops-nix the _NixOS module_ die entirely; `sops`/`age` remain as
+  encryption tools. The activation-time + template consumers decide whether
+  (b) is complete or a residual sops-nix stays for them.
+- Deferred services (radius, kanidm provision, smb) get an explicit decision
+  here: stay sops-nix permanently, or revisit when upstream ships reconcile.
 
 ### Phase 6 — Future (upstream convergence)
 
-- When SecretSpec ships the reconcile/NixOS module (§2 gap), replace the
-  bridge set-by-set; persistent systemd-encrypted credentials then also solve
-  offline boot for 1Password-backed secrets.
+- When SecretSpec ships the reconcile/NixOS module (§2 gap), re-evaluate the
+  renderer-shaped leftovers (templates, activation-time consumers) —
+  wrappers stay for everything else; persistent systemd-encrypted
+  credentials then also solve offline boot for 1Password-backed secrets.
 - Watch: dynamic secrets/leases (`dynamic-secrets.md` draft) — could replace
   the technitium metrics-token TOTP dance with short-lived leases; docker/git
   credential helpers (0.20+) for dev ergonomics.
 
 ## 8. Risks & mitigations
 
-| Risk                                                                    | Mitigation                                                                                                                                                   |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Boot-time dependency on 1Password (cloud outage → secrets unresolvable) | Lifeline classification (§6); sops fallback stays in chains until a service proves stable on 1Password; upstream persistent-credential destination later     |
-| Self-built bridge = maintenance surface; upstream reconcile may differ  | Keep bridge thin (export+render+chmod, no daemon); path-compatible outputs make a later swap mechanical                                                      |
-| SecretSpec project is young (0.x); CLI churn                            | Pin via pkgs-unstable like other tools; re-vendor submodule on bumps; conformance suite in-repo for the renderer                                             |
-| Value model = UTF-8 strings                                             | All current secrets are text (verified inventory); binary future needs → `encoding = "base64"`                                                               |
-| Key-name case mismatch sops-yaml↔spec                                   | Phase 1 explicitly verifies and records the answer before any cutover                                                                                        |
-| Two writers of `/run/secrets/<name>` during transition                  | Per-service atomic cutover: a secret is declared in sops-nix OR bound in the bridge, never both; snapshot diff enforces                                      |
-| SA token sprawl/leak                                                    | One SA per host, vault-scoped ACLs, expiry + rotation runbook, token never in env-inline/store                                                               |
-| Agent (opencode) secret access                                          | `require_reason = "agents"` default + local audit log; keep `sops`/`op` shell deny rules, add `secretspec` get/export to the deny-or-ask list in permissions |
+| Risk                                                                                              | Mitigation                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Boot-time dependency on 1Password (cloud outage → secrets unresolvable)                           | Lifeline classification (§6); sops fallback stays in chains until a service proves stable on 1Password; `After=network-online.target` only where the chain needs it; upstream persistent-credential destination later |
+| Service-user reads storage credentials (age key / SA token) → blast radius beyond its own secrets | Wave gating (§4.3 boundary 4): root-run + user-level deliveries first; non-root daemons only after per-service vaults/SAs (§9 Q1) or per-module age keys                                                              |
+| Wrapper glue scripts: env names drift from manifest names                                         | Glue lives in the service's own module beside its declarations; `secrets-check <host> --scope <svc>` + service health gate every cutover commit                                                                       |
+| `export`-based flows persist as_path temp files (no child-lifetime cleanup)                       | Units use `run` exclusively; `export` only for dev/e2e and eval-style wrappers whose scope has no as_path secrets                                                                                                     |
+| Restart-time resolution latency + secretspec version churn on hosts                               | Pin secretspec (pkgs-unstable, like other tools); re-vendor submodule on bumps; wrapper smoke test in 3a; sops-provider resolution is local (ms) until Phase 4                                                        |
+| Value model = UTF-8 strings                                                                       | All current secrets are text (verified inventory); binary future needs → `encoding = "base64"`                                                                                                                        |
+| Key-name case mismatch sops-yaml↔spec                                                             | Resolved in Phase 1: lowercase names, case-sensitive flat lookup, no refs needed                                                                                                                                      |
+| Dual readers during transition (wrapper + sops-nix activation on one secret)                      | Same storage file, read-only on both sides; per-service atomic cutover of the runtime side; exactly one WRITER preserved; snapshot diff enforces                                                                      |
+| SA token sprawl/leak                                                                              | Least-privilege vault scoping (§9 Q1), expiry + rotation runbook, token via LoadCredential/0400 EnvironmentFile — never inline `Environment=`, never in the store                                                     |
+| Agent (opencode) secret access                                                                    | `require_reason = "agents"` on the fleet manifest + local audit log; keep `sops`/`op` shell deny rules; the dev manifest is `false` (throwaway generated values only)                                                 |
 
-## 9. Open questions (for review before Phase 1)
+## 9. Open questions
 
-1. Vault layout: per-host vaults (recommended) vs one `homelab` vault with
-   profile-namespaced items?
-2. Agree with the lifeline classification (cicero/aedilis/step-jwk/praeconinus
-   stay on local encrypted files forever-ish)?
-3. Pilot choice failure-notifs@augustus OK?
-4. HM opencode keys: bridge-rendered user files (works headless) vs 1Password
-   desktop provider on the workstation (simpler, needs app running)? Probably
-   the former for parity, desktop for interactive dev.
-5. Do we want `secretspec`-based docker/git credential helpers in the devshell
-   (0.20+) as a Phase 2 extra?
+1. **Vault/SA granularity (gates Phases 3f + 4):** ✅ DECIDED — **per-service
+   vaults + SAs** (least privilege: each wrapped service user reads only its
+   own SA token, so a compromised service can't drain the host's other
+   secrets; a per-host token would re-create exactly the blast radius §4.3
+   boundary 4 avoids). Cost: ~20 vaults+SAs created manually across Phase 4.
+2. Lifeline classification (§6) — cicero/aedilis/step-jwk/praeconinus stay
+   on local encrypted files permanently. ✅ agreed ("sops files are fine").
+3. Pilot failure-notifs@augustus — still the right pilot under the wrapper
+   model (root-run, our script, as_path needs zero script changes). ✅
+4. HM opencode keys: wrapper-injected env/as_path (headless-safe) vs the
+   1Password-desktop provider on the workstation (simpler, needs the app
+   running)? Probably wrapper for parity, desktop for interactive dev.
+5. Dual-mechanism interim acceptable for OIDC client secrets + db passwords
+   (app side wrapped while kanidm-provision/peesequel stay sops-nix)?
+6. Deferred-services endgame (radius.toml, smb creds, kanidm provision,
+   serial numbers): stay sops-nix permanently vs revisit at upstream
+   reconcile (Phase 6)?
+7. Do we want `secretspec`-based docker/git credential helpers in the
+   devshell (0.20+)?

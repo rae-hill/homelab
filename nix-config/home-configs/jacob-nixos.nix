@@ -116,6 +116,7 @@ in
             vivaldi-nvidia
             clipboard-jh
             signal-desktop
+            libreoffice
           ];
 
           dconf = {

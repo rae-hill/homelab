@@ -93,5 +93,8 @@
 [submodule "repos/typst.ts"]
 	path = repos/typst.ts
 	url = https://github.com/Myriad-Dreamin/typst.ts.git
-[submodule "repos/typst"]
-	ts = shallow
+	shallow = true
+[submodule "repos/oidc-client-ts"]
+	path = repos/oidc-client-ts
+	url = https://github.com/authts/oidc-client-ts.git
+	shallow = true

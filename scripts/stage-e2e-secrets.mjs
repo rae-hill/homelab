@@ -17,21 +17,31 @@
  * Also runs stage-test-secrets.mjs (homelab-services-node unit-test fixtures),
  * since the e2e workspace transitively imports that package's test-utils.
  *
- * Everything is freshly generated random material in gitignored paths — it
- * mimics the sops-managed production layout without any real secrets. The
- * api-keys.json content is the e2e suite's contract (key IDs + permissions,
- * mirroring packages/homelab-e2e-tests/test-utils/testing-layer.ts and the nix
- * apiKeys permissions enum); the key strings double as throwaway client
- * secrets, so this file must only ever contain these test values.
+ * Secret VALUES come from SecretSpec when available (repo-root
+ * secretspec.toml, profiles e2e/development — generated fresh per run, null
+ * provider = nothing stored): scripts/e2e.sh invokes this script under
+ * `secretspec run --profile e2e`, which injects JWK_PASSPHRASE and
+ * HMAC_SECRET. In that mode the secret-derived fixtures (the JWK JWE + its
+ * passphrase file, the public JWK, hmac-secret — at whatever paths the
+ * effective .env-serve-test references, so hand-tuned setups stay
+ * consistent) are ALWAYS regenerated from the injected values — the JWE is
+ * only decryptable with the matching passphrase, so both must come from the
+ * same generation event — and secret files are pinned 0600.
  *
- * Idempotent: existing files are NEVER overwritten, so developer machines
- * keep their hand-tuned .env-serve-test and real key material. Delete a file
- * to regenerate it. Invoked automatically by scripts/e2e.sh; safe to run
- * standalone:  node scripts/stage-e2e-secrets.mjs
+ * Without injection (plain `node scripts/stage-e2e-secrets.mjs`, e.g. CI
+ * runners without Nix) everything is freshly self-generated random material
+ * in gitignored paths and the script is fully idempotent: existing files are
+ * NEVER overwritten, so developer machines keep their hand-tuned
+ * .env-serve-test and real key material. Delete a file to regenerate it.
+ *
+ * The static contract files (api-keys.json, serial-numbers.json,
+ * .env-serve-test, the openrouter dummy) are never secret-derived and keep
+ * never-overwrite semantics in BOTH modes. Invoked automatically by
+ * scripts/e2e.sh; safe to run standalone.
  */
 import { CompactEncrypt, exportJWK } from "jose"
 import { randomBytes } from "node:crypto"
-import { access, mkdir, writeFile } from "node:fs/promises"
+import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises"
 import * as path from "node:path"
 
 // Also stage the services-node unit-test fixtures (module runs on import).
@@ -40,6 +50,49 @@ await import("./stage-test-secrets.mjs")
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const serverDir = path.join(repoRoot, "packages", "homelab-server")
 const privateDir = path.join(serverDir, "private")
+
+// Ephemeral secrets injected by SecretSpec (repo-root secretspec.toml;
+// scripts/e2e.sh and the devshell's seed-secrets command run this file under
+// `secretspec run --profile e2e|development`). Both values arrive together or
+// not at all; their presence switches this run into fresh-generation mode
+// where the secret-derived fixtures are ALWAYS rewritten — the jwk.json JWE
+// is only decryptable with the matching passphrase, so both must come from
+// the same generation event. Without injection (e.g. CI runners without Nix)
+// the legacy behavior applies: self-generate, never overwrite.
+const injectedPassphrase = process.env.JWK_PASSPHRASE
+const injectedHmac = process.env.HMAC_SECRET
+const secretspecMode = injectedPassphrase !== undefined && injectedHmac !== undefined
+if (!secretspecMode && (injectedPassphrase !== undefined || injectedHmac !== undefined)) {
+  console.error("ERROR: only one of JWK_PASSPHRASE / HMAC_SECRET is set — expected both (secretspec run)")
+  process.exit(1)
+}
+
+// Parse the (possibly hand-tuned) .env-serve-test so the derived fixtures are
+// regenerated at the paths the server will ACTUALLY read: the JWE and its
+// passphrase must come from the same generation event, wherever the env file
+// points them (hand-tuned setups may reference e.g. ./private/private-key-secret
+// instead of the stock ./private/jwk-secret — regenerating a mismatched pair
+// fails boot with JWEDecryptionFailed). Relative paths resolve against
+// packages/homelab-server (dotenvx's CWD); a missing file/keys falls back to
+// the stock names. This reads PATHS only — never secret material.
+const readEnvFile = async (file) => {
+  const env = {}
+  try {
+    for (const line of (await readFile(file, "utf8")).split("\n")) {
+      const m = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line.trim())
+      if (m) env[m[1]] = m[2]
+    }
+  } catch {
+    // missing env file → stock defaults below
+  }
+  return env
+}
+const serveTestEnv = await readEnvFile(path.join(serverDir, ".env-serve-test"))
+const fromServerDir = (value, fallback) => path.resolve(serverDir, value || fallback)
+const jwkPath = fromServerDir(serveTestEnv.TOKEN_ISSUER_PRIVATE_KEY_PATH, "./private/jwk.json")
+const jwkSecretPath = fromServerDir(serveTestEnv.TOKEN_ISSUER_PRIVATE_KEY_SECRET_PATH, "./private/jwk-secret")
+const jwkPubPath = fromServerDir(serveTestEnv.TOKEN_ISSUER_PUBLIC_KEY_PATH, "./private/jwk.pub.json")
+const hmacSecretPath = fromServerDir(serveTestEnv.HOMELAB_SECRET_FILE, "./private/hmac-secret")
 
 const exists = async (file) => {
   try {
@@ -50,14 +103,17 @@ const exists = async (file) => {
   }
 }
 
-const stage = async (file, generate) => {
+const stage = async (file, generate, { overwrite = false, secret = false } = {}) => {
   const rel = path.relative(process.cwd(), file)
-  if (await exists(file)) {
+  if (!overwrite && (await exists(file))) {
     console.log(`skip (exists): ${rel}`)
     return
   }
-  await writeFile(file, await generate())
-  console.log(`staged: ${rel}`)
+  await mkdir(path.dirname(file), { recursive: true })
+  await writeFile(file, await generate(), secret ? { mode: 0o600 } : undefined)
+  // writeFile's mode only applies when the file is CREATED — pin it on overwrites too.
+  if (secret) await chmod(file, 0o600)
+  console.log(`${overwrite ? "regenerated" : "staged"}: ${rel}`)
 }
 
 /**
@@ -99,14 +155,14 @@ const apiKeys = [
 ]
 
 /** Fresh ES256 (P-256) issuer key material; private key wrapped as a flattened JWE. */
-const generateIssuerKeys = async () => {
+const generateIssuerKeys = async (passphrase) => {
   const { privateKey, publicKey } = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
     "sign",
     "verify",
   ])
 
   const kid = randomBytes(16).toString("base64url")
-  const jwkSecret = randomBytes(32).toString("base64url")
+  const jwkSecret = passphrase ?? randomBytes(32).toString("base64url")
 
   const clean = (jwk) => {
     delete jwk.key_ops
@@ -176,15 +232,24 @@ ROOT_CERT_CRT=../../certs/alford-root.crt
 INTERMEDIATE_CERT_CRT=../../certs/intermediate_ca_2.crt
 `
 
+console.log(
+  secretspecMode
+    ? "secretspec mode: injected ephemeral secrets — derived fixtures regenerated"
+    : "standalone mode: self-generating missing fixtures (never overwrites existing files)",
+)
+
 await mkdir(privateDir, { recursive: true })
 
-const { jwe, publicJwk, jwkSecret } = await generateIssuerKeys()
+const { jwe, publicJwk, jwkSecret } = await generateIssuerKeys(injectedPassphrase)
 
 await stage(path.join(privateDir, "api-keys.json"), async () => JSON.stringify(apiKeys, null, 2))
-await stage(path.join(privateDir, "jwk.json"), async () => jwe)
-await stage(path.join(privateDir, "jwk.pub.json"), async () => publicJwk)
-await stage(path.join(privateDir, "jwk-secret"), async () => jwkSecret)
-await stage(path.join(privateDir, "hmac-secret"), async () => randomBytes(32).toString("hex"))
+await stage(jwkPath, async () => jwe, { overwrite: secretspecMode, secret: true })
+await stage(jwkPubPath, async () => publicJwk, { overwrite: secretspecMode })
+await stage(jwkSecretPath, async () => jwkSecret, { overwrite: secretspecMode, secret: true })
+await stage(hmacSecretPath, async () => injectedHmac ?? randomBytes(32).toString("hex"), {
+  overwrite: secretspecMode,
+  secret: true,
+})
 await stage(path.join(privateDir, "serial-numbers.json"), async () => JSON.stringify(serialNumbers, null, 2))
 await stage(path.join(privateDir, "openrouter-api-key"), async () => "sk-or-e2e-dummy-not-a-real-key")
 await stage(path.join(serverDir, ".env-serve-test"), async () => envServeTest)

@@ -13,8 +13,9 @@ export const Route = createFileRoute("/oauth-callback")({
 /**
  * OIDC redirect-landing route (`/oauth-callback`, registered with kanidm). Completes the
  * PKCE code exchange via the shared AuthService — which validates `state` + the code
- * verifier and stores the session in sessionStorage — records the signed-in user in
- * redux, then bounces back to the resume. On failure, offers a way home.
+ * verifier and stores the session in localStorage (access + rotating refresh token) —
+ * records the signed-in user in redux, then bounces back to the resume. On failure,
+ * offers a way home.
  */
 function OAuthCallbackPage() {
   const dispatch = useAppDispatch()

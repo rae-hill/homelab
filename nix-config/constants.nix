@@ -149,7 +149,5 @@
         uid = 1000;
       };
     };
-
-    secretsDir = inputs.self + "/nix-config/secrets";
   };
 }

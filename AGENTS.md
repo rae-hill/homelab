@@ -144,6 +144,7 @@ the pinned tag's source before trusting them.
 | SecretSpec behavior (providers, extends/scopes, export, generation, sops/1Password)     | `./repos/secretspec/` (cachix/secretspec, tag `v0.21.1` = pkgs-unstable pin)                                    |
 | open-resume.com PDF parsing (section-title detection, feature scoring, bold heuristics) | `./repos/open-resume/` (xitanggg/open-resume, pinned at `main`; parser in `src/app/lib/parse-resume-from-pdf/`) |
 | typst.ts node compiler behavior (`NodeCompiler`, universe-package resolution, fonts, PDF export, diagnostics) | `./repos/typst.ts/` (Myriad-Dreamin/typst.ts, tag `v0.7.0` = the `@myriaddreamin/typst-ts-node-compiler` npm pin) |
+| oidc-client-ts behavior (signinSilent/refresh-token rotation, UserManager events, storage) | `./repos/oidc-client-ts/` (authts/oidc-client-ts, tag `v3.5.0` = the npm pin in shared)                           |
 
 If a needed upstream is not vendored yet, add it as a submodule (see the `effect-services` skill →
 "Adding a New Vendored Submodule") pinned to the tag nixpkgs builds, rather than relying on web
@@ -188,10 +189,14 @@ nix build .#checks.x86_64-linux.shellcheck    # ShellCheck gate for shell script
 e2e tests (`homelab-e2e-tests`): use the devshell `e2e` command (wraps `scripts/e2e.sh`) —
 it bootstraps the machine-local fixtures (`scripts/stage-e2e-secrets.mjs`), builds the
 rolldown bundle, starts its own server on :54328, runs the suite, and kills the server
-afterwards. Args pass through to vitest as test-file filters (`e2e src/resume` runs just
-the resume tests; no args = full suite). Server logs land in `.e2e-log-dump.txt`. Do NOT
-hand-roll backend servers for e2e. The live resume-print success test only runs where
-`CHROME_EXECUTABLE` is set (devshell provides it; CI skips it).
+afterwards. Fixture secrets are generated fresh per run by secretspec (repo-root
+`secretspec.toml`, profile `e2e`, null provider = nothing stored); the devshell
+`seed-secrets` command stages the same fixtures under the `development` profile for watch
+commands (`yarn workspace homelab-server dev`). CI (deliberately no Nix) falls back to the
+staging script's self-generation. Args pass through to vitest as test-file filters
+(`e2e src/resume` runs just the resume tests; no args = full suite). Server logs land in
+`.e2e-log-dump.txt`. Do NOT hand-roll backend servers for e2e. The live resume-print
+success test only runs where `CHROME_EXECUTABLE` is set (devshell provides it; CI skips it).
 To target a specific package or test: `yarn workspace <package-name> <command> <args>`
 (do NOT use `--` to separate args).
 

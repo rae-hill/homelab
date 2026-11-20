@@ -233,6 +233,18 @@
                   '';
                 }
                 {
+                  name = "seed-secrets";
+                  help = "Stage homelab-server dev fixtures with freshly generated development-profile secrets (repo-root secretspec.toml)";
+                  # The staging script consumes the injected JWK_PASSPHRASE /
+                  # HMAC_SECRET and writes the gitignored private/ fixture
+                  # files that watch commands (`yarn workspace homelab-server
+                  # dev`) and serve:test read. See
+                  # docs/secretspec-migration-plan.md Phase 2.
+                  command = ''
+                    cd "$PRJ_ROOT" && exec secretspec run --profile development -- node scripts/stage-e2e-secrets.mjs
+                  '';
+                }
+                {
                   name = "update-missing-hashes";
                   help = "Regenerate missing-hashes.json for Nix yarn-berry builds";
                   command = "${pkgs.yarn-berry_4-fetcher.yarn-berry-fetcher}/bin/yarn-berry-fetcher missing-hashes yarn.lock 2>/dev/null | grep -v '^CacheKey\\|^Success\\|^$' > missing-hashes.json";
