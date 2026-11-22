@@ -86,8 +86,19 @@ export interface EnvDef {
   /** Model slug for the cheap cleanup stage (stage 1). */
   readonly openRouterCleanupModel: string
 
+  /** Model slug for cover-letter generation (stage 2 of the cover-letter pipeline). */
+  readonly openRouterCoverLetterModel: string
+
   /** Base URL of the OpenRouter API. */
   readonly openRouterBaseUrl: URL
+
+  /**
+   * Filesystem path to the Typst assets root: `templates/letter.typ`,
+   * `images/signature.PNG`, and `vendor/letterloom-3.0.0/` (the letter template imports
+   * letterloom BY PATH — no universe-package resolution, no XDG env needed).
+   * None = cover-letter rendering dark on this host.
+   */
+  readonly typstAssetsDir: Option.Option<string>
 }
 
 export class Env extends Context.Service<Env, EnvDef>()("homelab-api/config/env/Env") {}
@@ -164,5 +175,11 @@ export const openRouterModel = Env.pipe(Effect.map((_) => _.openRouterModel))
 /** {@inheritDoc EnvDef.openRouterCleanupModel} */
 export const openRouterCleanupModel = Env.pipe(Effect.map((_) => _.openRouterCleanupModel))
 
+/** {@inheritDoc EnvDef.openRouterCoverLetterModel} */
+export const openRouterCoverLetterModel = Env.pipe(Effect.map((_) => _.openRouterCoverLetterModel))
+
 /** {@inheritDoc EnvDef.openRouterBaseUrl} */
 export const openRouterBaseUrl = Env.pipe(Effect.map((_) => _.openRouterBaseUrl))
+
+/** {@inheritDoc EnvDef.typstAssetsDir} */
+export const typstAssetsDir = Env.pipe(Effect.map((_) => _.typstAssetsDir))

@@ -1,9 +1,10 @@
 import { Effect, Equal, Schema } from "effect"
 import type { Schemas } from "homelab-services"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ResumeContent } from "shared"
 
 import { toaster } from "../../components/chakra/toaster"
+import { downloadCoverLetter, requestCoverLetter } from "../homelab/cover-letter"
 import { requestTailor, type TailorResponse } from "../homelab/tailor"
 import { printConfigActions } from "../print-config/slice"
 import { useAppDispatch, useAppSelector } from "../print-config/store"
@@ -236,4 +237,130 @@ export function useApplyEntry() {
     confirm,
     cancel,
   }
+}
+
+/**
+ * Download a cover letter for a stored entry. Mirrors useApplyEntry's stale-guard + decode
+ * mechanics: if entry.baseVersion !== CONTENT_DEFAULTS_VERSION or decode fails, toast
+ * "Stale entry" and return. Otherwise, run requestCoverLetter → downloadCoverLetter with
+ * Effect.runPromise, surfacing reason-specific toasts (quota → daily limit; base-version →
+ * re-tailor hint; else generic). Local busy + elapsed state (1s interval, tailoring-tab idiom).
+ */
+export function useDownloadCoverLetter(entry: TailorEntry) {
+  const [busy, setBusy] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const intervalRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (busy) {
+      setElapsed(0)
+      intervalRef.current = window.setInterval(() => {
+        setElapsed((prev) => prev + 1)
+      }, 1000)
+    } else {
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+    return () => {
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current)
+      }
+    }
+  }, [busy])
+
+  const download = useCallback(async () => {
+    if (busy) return
+
+    // Stale guard: baseVersion mismatch (same copy family as useApplyEntry).
+    if (entry.baseVersion !== ResumeContent.CONTENT_DEFAULTS_VERSION) {
+      toaster.create({
+        title: "Stale entry",
+        description: "Re-tailor this listing first.",
+        type: "error",
+      })
+      return
+    }
+
+    // Decode the stored content patch.
+    if (entry.contentPatch === null) {
+      toaster.create({
+        title: "No content",
+        description: "This entry has no tailored content.",
+        type: "error",
+      })
+      return
+    }
+
+    let decoded: ResumeContent.ContentState
+    try {
+      decoded = Schema.decodeUnknownSync(ResumeContent.ContentPatchBase64)(entry.contentPatch)
+    } catch {
+      toaster.create({
+        title: "Stale entry",
+        description: "Re-tailor this listing first.",
+        type: "error",
+      })
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      const bytes = await Effect.runPromise(
+        requestCoverLetter(entry.listingText, decoded, entry.baseVersion),
+      )
+
+      // entry.jobTitle is NullOr(String); fall back to "listing" for the filename slug
+      const jobTitle = entry.jobTitle ?? "listing"
+      downloadCoverLetter(bytes, jobTitle)
+
+      toaster.create({
+        title: "Cover letter ready",
+        type: "success",
+      })
+    } catch (error) {
+      // Reason-specific toast copy: quota → daily limit; base-version → re-tailor; else generic.
+      const message = extractErrorMessage(error)
+      const lowerMessage = message.toLowerCase()
+
+      let description: string
+      if (lowerMessage.includes("quota") || lowerMessage.includes("rate limit")) {
+        description = "You've hit your daily limit. Try again tomorrow."
+      } else if (lowerMessage.includes("version") || lowerMessage.includes("base")) {
+        description = "Re-tailor this listing first."
+      } else {
+        description = "Couldn't generate the cover letter."
+      }
+
+      toaster.create({
+        title: "Cover letter failed",
+        description,
+        type: "error",
+      })
+    } finally {
+      setBusy(false)
+    }
+  }, [busy, entry])
+
+  return { download, busy, elapsed }
+}
+
+/** Best-effort human-readable message from an unknown error (mirrors describeError idiom). */
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "object" && error !== null) {
+    const maybe = error as { message?: unknown; error?: unknown }
+    if (typeof maybe.message === "string" && maybe.message !== "") {
+      return maybe.message
+    }
+    // CoverLetterRequestError wraps the underlying error in the `error` field
+    if (typeof maybe.error === "object" && maybe.error !== null) {
+      const inner = maybe.error as { message?: unknown }
+      if (typeof inner.message === "string" && inner.message !== "") {
+        return inner.message
+      }
+    }
+  }
+  return String(error)
 }

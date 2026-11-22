@@ -130,6 +130,7 @@
                       "OAuth_ClaimCheck"
                       "Resume_Print"
                       "Resume_Tailor"
+                      "Resume_CoverLetter"
                     ]
                   );
                   description = "Permissions granted to this key.";

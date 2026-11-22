@@ -31,7 +31,7 @@ let
 
       yarnOfflineCache = fetcher.fetchYarnBerryDeps {
         inherit src missingHashes;
-        hash = "sha256-EqT35uR0j/vXTeF1phoYJmAaM8KVtWgjH97F5qHT6zI=";
+        hash = "sha256-jJAuIKAOjht0apJ6AKZuUud4QO9MLJoavO65Zh19TOg=";
       };
     in
     pkgs.stdenv.mkDerivation {
@@ -105,15 +105,47 @@ let
         syslibs="${pkgs.glibc}/lib:${pkgs.stdenv.cc.cc.lib}/lib"
         while read -r libvips; do
           patchelf --set-rpath '$ORIGIN:'"$syslibs" "$libvips"
-        done < <(find $out/lib/bundle/node_modules -type f -name "libvips-cpp.so*")
+        done < <(find $out/lib/bundle/node_modules/sharp $out/lib/bundle/node_modules/@img -type f -name "libvips-cpp.so*" 2>/dev/null)
         while read -r addon; do
           patchelf --set-rpath '$ORIGIN/../../sharp-libvips-linux-x64/lib:$ORIGIN/../../sharp-libvips-linux-arm64/lib:'"$syslibs" \
             "$addon"
-        done < <(find $out/lib/bundle/node_modules -type f -name "*.node")
+        done < <(find $out/lib/bundle/node_modules/sharp $out/lib/bundle/node_modules/@img -type f -name "*.node" 2>/dev/null)
 
         # Fail the BUILD if the closure cannot load and exercise sharp, rather
         # than degrading silently on the server.
         (cd $out/lib/bundle && node -e "require('./node_modules/sharp')({create:{width:1,height:1,channels:3,background:'red'}}).png().toBuffer().then(()=>console.log('sharp runtime closure OK')).catch((e)=>{console.error(e);process.exit(1)})")
+
+        # --- typst-ts-node-compiler runtime closure (doc 05 T1) ------------------
+        # The cover-letter generator uses @myriaddreamin/typst-ts-node-compiler to
+        # render PDFs server-side. Like sharp, it's a prebuilt napi binary kept
+        # external by the rolldown bundle. Copy the main package + the build-platform
+        # optional dependency (node_modules/@myriaddreamin/typst-ts-node-compiler-<arch>).
+        mkdir -p $out/lib/bundle/node_modules/@myriaddreamin
+        cp -rL node_modules/@myriaddreamin/typst-ts-node-compiler $out/lib/bundle/node_modules/@myriaddreamin/
+        for pkg in node_modules/@myriaddreamin/typst-ts-node-compiler-*; do
+          [ -d "$pkg" ] || continue # optional deps: only the build platform is present
+          cp -rL "$pkg" "$out/lib/bundle/node_modules/@myriaddreamin/"
+        done
+
+        # Patch the typst napi binaries: they need glibc/libstdc++ but NOT the sharp
+        # $ORIGIN chain (no libvips sibling). RPATH points directly at the nix store libs.
+        while read -r addon; do
+          patchelf --set-rpath "${pkgs.glibc}/lib:${pkgs.stdenv.cc.cc.lib}/lib" "$addon"
+        done < <(find $out/lib/bundle/node_modules/@myriaddreamin -type f -name "*.node" 2>/dev/null)
+
+        # Fail the BUILD if the typst closure cannot load and exercise the compiler.
+        # This guards the CJS-named-import-from-ESM question (doc 02) at the bundle level.
+        (cd $out/lib/bundle && node -e "
+          const {NodeCompiler}=require('@myriaddreamin/typst-ts-node-compiler');
+          const c=NodeCompiler.create({});
+          const pdf=c.pdf({mainFileContent:'Hello, typst!'});
+          if(pdf.subarray(0,4).toString()!=='%PDF'){console.error('typst smoke: bad pdf');process.exit(1)};
+          console.log('typst runtime closure OK')")
+
+        # --- typst assets (templates, signature, vendored letterloom) ----------------
+        # The letter template imports the vendored letterloom BY PATH, so the copied
+        # tree is fully self-contained (no universe-package resolution, no XDG env).
+        cp -r packages/homelab-services-node/assets/typst $out/lib/typst-assets
 
         cat > $out/bin/homelab-api <<EOF
         #!/bin/sh

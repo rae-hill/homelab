@@ -32,6 +32,15 @@
         allowReboot = false;
       };
 
+      networking.hosts = {
+        "127.0.0.1" = [
+          "opencode.plato-splunk.media"
+        ];
+        "::1" = [
+          "opencode.plato-splunk.media"
+        ];
+      };
+
       # Host-specific user tweaks on top of users-human (imported in default.nix).
       users.users.jacob = {
         # Start user@1000 at boot (no graphical login needed) so the opencode-web

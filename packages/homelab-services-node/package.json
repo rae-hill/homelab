@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "^4.1.x",
+    "@myriaddreamin/typst-ts-node-compiler": "0.7.0",
     "@turbodocx/html-to-docx": "^1.23.3",
     "bufferutil": "^4.1.0",
     "effect": "^4.1.x",

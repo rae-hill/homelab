@@ -138,6 +138,7 @@ const apiKeys = [
       "Cert_Combined",
       "Resume_Print",
       "Resume_Tailor",
+      "Resume_CoverLetter",
     ],
     email: "test@a.plato-splunk.media",
   },
@@ -224,6 +225,7 @@ KANIDM_OPENID_PROVIDER_URL=https://idm.plato-splunk.media/oauth2/openid/homelab/
 API_KEYS_FILE=./private/api-keys.json
 SERIAL_NUMBERS_FILE=./private/serial-numbers.json
 OPENROUTER_API_KEY_FILE=./private/openrouter-api-key
+TYPST_ASSETS_DIR=../../packages/homelab-services-node/assets/typst
 ROOT_CERT_DER=../../certs/alford-root.der
 INTERMEDIATE_CERT_DER=../../certs/intermediate_ca_2.der
 ROOT_CERT_CRT=../../certs/alford-root.crt

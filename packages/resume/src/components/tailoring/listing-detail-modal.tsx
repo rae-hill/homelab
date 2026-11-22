@@ -3,6 +3,7 @@ import type { Schemas } from "homelab-services"
 import { useState } from "react"
 
 import { useApplyEntry, useCloseDetail, useRemoveEntry, useTailorDetail } from "../../state/tailor"
+import { ActionsTab } from "./actions-tab"
 import { CollapsibleListing } from "./collapsible-listing"
 import { FitSummary } from "./fit-summary"
 import { KeywordCoverage } from "./keyword-coverage"
@@ -82,6 +83,7 @@ export function ListingDetailModal() {
                   <Tabs.List flexShrink={0}>
                     <Tabs.Trigger value="summary">Summary</Tabs.Trigger>
                     <Tabs.Trigger value="changes">Changes</Tabs.Trigger>
+                    <Tabs.Trigger value="actions">Actions</Tabs.Trigger>
                     <Tabs.Indicator />
                   </Tabs.List>
                   <Box flex="1" minH={0} overflowY="auto" pt={4}>
@@ -124,6 +126,9 @@ export function ListingDetailModal() {
                           Apply changes to resume
                         </Button>
                       </VStack>
+                    </Tabs.Content>
+                    <Tabs.Content value="actions" pt={4}>
+                      <ActionsTab entry={entry} />
                     </Tabs.Content>
                   </Box>
                 </Tabs.Root>

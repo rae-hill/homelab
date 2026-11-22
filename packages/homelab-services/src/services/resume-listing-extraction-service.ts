@@ -11,6 +11,10 @@ export class ListingExtractionError extends Data.TaggedError("ListingExtractionE
 /**
  * Stage 1 result: cleaned listing + extracted metadata.
  * Self-contained structural type (no node imports).
+ *
+ * `fromCache` is true when the result was served by the ListingCleanupCacheService decorator
+ * (docs/cover-letter-generator/01 §A) instead of a live stage-1 call; `stage` then reports the
+ * ORIGINAL call's meta. The raw impl always returns false.
  */
 export interface ExtractionResult {
   readonly cleanedListing: string
@@ -22,6 +26,7 @@ export interface ExtractionResult {
     readonly completionTokens: number
     readonly latencyMs: number
   }
+  readonly fromCache: boolean
 }
 
 export interface ResumeListingExtractionServiceDef {

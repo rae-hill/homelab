@@ -450,6 +450,7 @@ function setupParams<Res extends ResourceURIs.ResourceURIs>(
     "OAuth_ClaimCheck": {},
     "Resume_Print": {},
     "Resume_Tailor": {},
+    "Resume_CoverLetter": {},
   }
 
   return defaults[resource]

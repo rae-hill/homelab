@@ -26,6 +26,7 @@ in
       hm.shell-zsh
       hm.themes-catppuccin
       hm.opencode
+      hm.rae-shell
 
       (
         {
@@ -117,6 +118,7 @@ in
             clipboard-jh
             signal-desktop
             libreoffice
+            btop
           ];
 
           dconf = {

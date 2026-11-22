@@ -75,6 +75,12 @@ if [[ -z "${CHROME_EXECUTABLE:-}" && -f packages/homelab-server/.env-serve-test 
   fi
 fi
 
+# Typst assets for the cover-letter generator's typst.ts compiler (doc 05 D):
+# ALWAYS resolve from the live worktree (repo_root, not the devshell env — ${self}
+# there would be a stale store snapshot) so template edits take effect immediately.
+# letterloom is imported BY PATH inside the template, so no XDG_DATA_HOME is needed.
+export TYPST_ASSETS_DIR="${repo_root}/packages/homelab-services-node/assets/typst"
+
 echo "==> building homelab-server bundle"
 yarn workspace homelab-server build || exit 1
 

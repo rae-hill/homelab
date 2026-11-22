@@ -42,9 +42,18 @@ in
       options.services.homelab-api = {
         enable = lib.mkEnableOption "Homelab API Server";
 
-        pkg = lib.mkPackageOption "homelab-api" {
-          description = "The homelab-api package to use";
+        # Plain mkOption, NOT lib.mkPackageOption: the package comes from this
+        # flake's outputs, not from a name inside `pkgs`, and mkPackageOption is
+        # a three-argument curried function (pkgs: name: opts:) — the former
+        # two-argument call here left a lambda in the options tree that threw
+        # ("has type 'lambda' rather than an attribute set") whenever anything
+        # forced the option. See docs/mkpackageoption-lambda-bug.md; the
+        # option-decls flake check now guards the whole class.
+        pkg = lib.mkOption {
+          type = lib.types.package;
           default = pkg;
+          defaultText = "inputs.self.packages.<system>.homelab-api";
+          description = "The homelab-api package to use.";
         };
 
         originUrl = lib.mkOption {
@@ -132,6 +141,7 @@ in
                       "OAuth_ClaimCheck"
                       "Resume_Print"
                       "Resume_Tailor"
+                      "Resume_CoverLetter"
                     ]
                   );
                 };
@@ -153,6 +163,20 @@ in
           description = ''
             Absolute path to the chrome/chromium executable used by the resume PDF print
             service (POST /resume/print → puppeteer-core). Exported as CHROME_EXECUTABLE.
+            Leave null on deployments where the resume group stays dark (e.g. praeconinus).
+          '';
+          default = null;
+        };
+
+        typstAssetsDir = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          description = ''
+            Typst template/asset root (TYPST_ASSETS_DIR) for POST /resume/cover-letter
+            (cover-letter generator): the letter.typ template, signature image, and the
+            vendored letterloom template it imports BY PATH (no universe-package
+            resolution, no XDG_DATA_HOME). Ships in the package at
+            <pkg>/lib/typst-assets — hosts opt in explicitly (chromeExecutable
+            precedent); augustus points it at the homelab-api package output.
             Leave null on deployments where the resume group stays dark (e.g. praeconinus).
           '';
           default = null;
@@ -264,6 +288,7 @@ in
               else
                 ""
             }
+            ${if cfg.typstAssetsDir != null then "TYPST_ASSETS_DIR=${cfg.typstAssetsDir}" else ""}
             ${
               if config.services.tempo.enable then
                 "OTEL_GRPC_ENDPOINT_URL=http://127.0.0.1:${toString c.services.tempo.grpcPort}"
@@ -297,7 +322,9 @@ in
             Group = cfg.userName;
             EnvironmentFile = config.sops.templates."homelab-api-env".path;
 
-            ExecStart = "${pkg}/bin/homelab-api";
+            # cfg.pkg (not the let-binding) so hosts can override the package
+            # and every deploy forces the option declaration.
+            ExecStart = "${cfg.pkg}/bin/homelab-api";
 
             Restart = "on-failure";
             RestartSec = 5;

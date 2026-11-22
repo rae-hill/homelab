@@ -143,7 +143,9 @@ const StageMeta = Schema.Struct({
  * - stage1: stage 1 metadata (null if stage 1 failed and fell back to defaults)
  * - stage2: stage 2 metadata (null if stage 2 failed)
  * - degraded: true if the pipeline fell back to defaults or partial results
- * - cacheHit: reserved seam, always false in v1 (no cache until persistence work, D9)
+ * - cacheHit: true when stage-1 cleanup was served from the shared ListingCleanupCacheService
+ *   (cover-letter-generator CL-D6 activated the D9 seam). Semantic note: this is a STAGE-1
+ *   cache hit, not full-response caching (doc 06 full-response cache remains future work).
  * - contentHash: sha256 of the encoded request content
  * - listingHash: sha256 of the normalized listing (cache-key ingredient + persistence seam)
  * - promptVersion: version tag for the prompts used

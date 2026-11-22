@@ -55,10 +55,15 @@ const TestEnvLive = Layer.effect(
     openRouterApiKeyFile: Config.option(Config.String("OPENROUTER_API_KEY_FILE")),
     openRouterModel: Config.withDefault(Config.String("OPENROUTER_MODEL"), "test-model"),
     openRouterCleanupModel: Config.withDefault(Config.String("OPENROUTER_CLEANUP_MODEL"), "test-cleanup-model"),
+    openRouterCoverLetterModel: Config.withDefault(
+      Config.String("OPENROUTER_COVER_LETTER_MODEL"),
+      "test-cover-letter-model",
+    ),
     openRouterBaseUrl: Config.withDefault(
       Config.schema(Schema.URLFromString, "OPENROUTER_BASE_URL"),
       new URL("https://openrouter.ai/api/v1"),
     ),
+    typstAssetsDir: Config.option(Config.String("TYPST_ASSETS_DIR")),
   }),
 ).pipe(Layer.provide(TestConfigProvider))
 
@@ -89,7 +94,9 @@ export const makeTestEnvWithFlags = (
     openRouterApiKeyFile: Option.some(path.join(privateDir, "openrouter-key")),
     openRouterModel: "test-model",
     openRouterCleanupModel: "test-cleanup-model",
+    openRouterCoverLetterModel: "test-cover-letter-model",
     openRouterBaseUrl: new URL("https://openrouter.ai/api/v1"),
+    typstAssetsDir: Option.none(),
   })
 
 const TestRemoteOIDCWellKnownDetails = Layer.succeed(

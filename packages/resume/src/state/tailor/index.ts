@@ -1,6 +1,7 @@
 export {
   useApplyEntry,
   useCloseDetail,
+  useDownloadCoverLetter,
   useOpenDetail,
   useRemoveEntry,
   useSubmitTailor,

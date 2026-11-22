@@ -30,9 +30,14 @@ export const EnvLive = Layer.effect(
     openRouterApiKeyFile: Config.option(Config.String("OPENROUTER_API_KEY_FILE")),
     openRouterModel: Config.withDefault(Config.String("OPENROUTER_MODEL"), "anthropic/claude-sonnet-5.5"),
     openRouterCleanupModel: Config.withDefault(Config.String("OPENROUTER_CLEANUP_MODEL"), "openai/gpt-6-luna"),
+    openRouterCoverLetterModel: Config.withDefault(
+      Config.String("OPENROUTER_COVER_LETTER_MODEL"),
+      "anthropic/claude-sonnet-5.5",
+    ),
     openRouterBaseUrl: Config.withDefault(
       Config.schema(Schema.URLFromString, "OPENROUTER_BASE_URL"),
       new URL("https://openrouter.ai/api/v1"),
     ),
+    typstAssetsDir: Config.option(Config.String("TYPST_ASSETS_DIR")),
   }),
 )
