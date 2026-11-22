@@ -19,7 +19,7 @@ a fail-closed build-time smoke test.
 
 A Node native addon (`*.node`) is just an ELF shared library that node `dlopen()`s. Like any
 ELF object it declares its dependencies in `DT_NEEDED` (`libc.so.6`, `libgcc_s.so.1`, …), and
-the dynamic loader (`ld.so`) must *find* those files at load time.
+the dynamic loader (`ld.so`) must _find_ those files at load time.
 
 On a conventional distro the loader searches, roughly:
 
@@ -39,14 +39,14 @@ Two tools fix this:
 
 - **`patchelf --set-rpath`** rewrites the binary's `DT_RUNPATH` (or `DT_RPATH`) to point at the
   actual store paths.
-- **`$ORIGIN`** — a special RUNPATH token meaning "the directory containing *this* object" —
+- **`$ORIGIN`** — a special RUNPATH token meaning "the directory containing _this_ object" —
   lets relocated trees stay internally relative (essential when the bundle is copied into
   `$out`, since the store path isn't known at patch time… it IS known in `$out`, but `$ORIGIN`
   keeps sibling packages resolvable regardless of where the closure is copied).
 
 One subtlety worth knowing: **`DT_RUNPATH` is not transitive** — it applies only to the object
 carrying it, not to that object's dependencies (unlike the older `DT_RPATH`, which the whole
-load chain inherits). That's why *each* binary in a chain (`sharp.node` → `libvips-cpp.so` →
+load chain inherits). That's why _each_ binary in a chain (`sharp.node` → `libvips-cpp.so` →
 glibc) needs its own correct RUNPATH.
 
 ## How the homelab-api package ships sharp (the working precedent)
@@ -80,8 +80,8 @@ $ readelf -d .../node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64.node | gr
 
 ## The hazard: one `find` to rule them all
 
-The patchelf step that handled sharp's addons was scoped by *filename pattern*, not by
-*package*:
+The patchelf step that handled sharp's addons was scoped by _filename pattern_, not by
+_package_:
 
 ```sh
 # BEFORE (hazardous):
@@ -107,7 +107,7 @@ sibling library tree**. Under the old loop it would have received sharp's RUNPAT
   `node_modules/@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu/` to
   `node_modules/sharp-libvips-linux-x64/lib` — **which does not exist** (the real libvips lives
   under `node_modules/@img/`). Dead path entries.
-- It still *loads*, because the `$syslibs` tail (glibc + libstdc++ store paths) happens to
+- It still _loads_, because the `$syslibs` tail (glibc + libstdc++ store paths) happens to
   cover its actual `DT_NEEDED` list. **Working by coincidence is the dangerous part**: the
   build passes, the smoke test passes, and the rot is invisible until something changes.
 
@@ -117,12 +117,12 @@ sibling library tree**. Under the old loop it would have received sharp's RUNPAT
    against wherever the binary ends up. If a future dependency ever creates a matching sibling
    directory (another image pipeline, a vendored libvips, a renamed scope), the loader picks
    the **first match** — the unrelated binary silently binds against the wrong `libvips`/`libc++`
-   ABI and fails at *runtime*, far from the cause.
+   ABI and fails at _runtime_, far from the cause.
 2. **Ordering changes.** RUNPATH is consulted before the defaults but after `LD_LIBRARY_PATH`;
    a dead entry is harmless until a real one with an incompatible version appears earlier in
    the list.
 3. **Diagnostics lie.** `readelf -d` / `ldd` are how you debug loader failures. A RUNPATH that
-   describes *another package's* layout sends whoever debugs it (future you, or an agent) down
+   describes _another package's_ layout sends whoever debugs it (future you, or an agent) down
    exactly the wrong path.
 4. **Copy-paste escalation.** The next native dep's closure snippet would copy the loop as-is,
    compounding the mis-stamping.
@@ -159,7 +159,7 @@ done < <(find $out/lib/bundle/node_modules/@myriaddreamin -type f -name "*.node"
    optional deps mean only the host platform is present; the `[ -d ]` guard handles the
    unexpanded glob).
 3. **Read the binary's actual needs**: `readelf -d <addon>.node | grep NEEDED` — derive the
-   RPATH from *that list*, never from another package's loop. Rust/napi bindings typically need
+   RPATH from _that list_, never from another package's loop. Rust/napi bindings typically need
    only glibc (+ libgcc_s); C++ addons need libstdc++; image codecs need their sibling `.so`
    trees via `$ORIGIN` chains.
 4. **Scope every patchelf `find`** to the owning package directory. An unscoped
@@ -177,7 +177,7 @@ done < <(find $out/lib/bundle/node_modules/@myriaddreamin -type f -name "*.node"
 ## Lessons
 
 - **Packaging globs are scope-creep hazards.** `find … -name "*.node"` reads as "all native
-  addons" but encodes "all addons get *sharp's* RPATH". Name the owner in the search path.
+  addons" but encodes "all addons get _sharp's_ RPATH". Name the owner in the search path.
 - **"It works" ≠ "it's right" for ELF metadata.** The loader tolerates dead RUNPATH entries;
   correctness is only visible via `readelf`, and only pays off when the tree changes.
 - **Every native dep earns its own closure treatment** — copy, patch, smoke — as a unit. The

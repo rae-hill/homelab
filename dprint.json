@@ -31,6 +31,7 @@
     ".pnp.cjs",
     ".pnp.loader.mjs",
     "repos/*",
+    "packages/homelab-services-node/assets/typst/vendor/**",
     "**/*.svg",
     "**/routeTree.gen.ts"
   ],

@@ -1,9 +1,9 @@
 # The `services.homelab-api.pkg` Lambda Bug — How a Broken Option Declaration Hid for Months
 
-Status: **documented, NOT yet fixed** (found 2026-11-19 during the cover-letter work, CL-T8).
+Status: **FIXED 2026-11-20** (found 2026-11-19 during the cover-letter work, CL-T8).
 Location: `nix-config/modules/homelab/homelab-api/systemd-service.nix` → `options.services.homelab-api.pkg`.
-Severity: latent — any host-config evaluation that *reads* the option throws; nothing read it
-until now, so no deployment ever broke.
+Severity: latent — any host-config evaluation that _reads_ the option threw; nothing read it
+until the fix, so no deployment ever broke.
 
 ## The bug
 
@@ -55,11 +55,11 @@ mkPackageOption :: Pkgs -> (String | [String]) -> { nullable?, default?, example
 
 The broken call passes only **two** arguments:
 
-| Param    | Expected                       | Actually received                          |
-| -------- | ------------------------------ | ------------------------------------------ |
-| `pkgs`   | a package set (`pkgs`)         | the string `"homelab-api"`                  |
-| `name`   | a package name (`String`)      | `{ description = ...; default = pkg; }`     |
-| 3rd arg  | the options attrset            | **missing → the result is the awaiting lambda** |
+| Param   | Expected                  | Actually received                               |
+| ------- | ------------------------- | ----------------------------------------------- |
+| `pkgs`  | a package set (`pkgs`)    | the string `"homelab-api"`                      |
+| `name`  | a package name (`String`) | `{ description = ...; default = pkg; }`         |
+| 3rd arg | the options attrset       | **missing → the result is the awaiting lambda** |
 
 So `lib.mkPackageOption "homelab-api" {...}` evaluates to `λ{ nullable ? false, ... }: ...` — a
 function. The module system requires every option declaration to be an attrset (with `type`,
@@ -67,7 +67,7 @@ function. The module system requires every option declaration to be an attrset (
 
 Note the call was wrong twice over: even fully applied, `name` must be a string (it got an
 attrset), `description` is not a valid argument name (it's `extraDescription`), and
-`attrByPath` would look up the "package" inside the *string* `"homelab-api"`. The lambda error
+`attrByPath` would look up the "package" inside the _string_ `"homelab-api"`. The lambda error
 just fires first.
 
 ## Why nothing ever noticed: lazy evaluation
@@ -78,21 +78,22 @@ metadata, or building the options manual. In this module:
 
 - The unit/env template uses the **let-binding** `pkg` (and `${cfg.package}`-style references
   never existed) — the option was never read.
-- `nix build .#homelab-api` builds the *package*, not any host config — modules aren't involved.
+- `nix build .#homelab-api` builds the _package_, not any host config — modules aren't involved.
 - `nix flake check` / host `toplevel.drvPath` evals force `config.system.build.toplevel`, whose
   dependency graph never touches this option.
 
 So the broken declaration sat inert: a landmine that only arms when someone reads the option.
 It was found exactly that way — the cover-letter wiring wanted
 `config.services.homelab-api.pkg` for a default path and detonated the whole augustus eval.
-(The workaround shipped instead: `nix-config/system-configs/augustus/programs.nix` references
-`inputs.self.packages.${system}.homelab-api` directly, with a comment pointing here.)
+(The workaround shipped first: `nix-config/system-configs/augustus/programs.nix` referenced
+`inputs.self.packages.${system}.homelab-api` directly. Since the fix it reads the option again —
+`config.services.homelab-api.pkg`.)
 
 ## The correct declaration
 
 The package comes from **this flake's outputs**, not from `pkgs` — so `mkPackageOption` (which
-exists to resolve names *inside a package set*) is the wrong tool entirely. A plain option is
-right:
+exists to resolve names _inside a package set_) is the wrong tool entirely. A plain option is
+right (shipped 2026-11-20, verbatim):
 
 ```nix
 pkg = lib.mkOption {
@@ -102,6 +103,10 @@ pkg = lib.mkOption {
   description = "The homelab-api package to use.";
 };
 ```
+
+The fix also made the option _consumed_ so it can never go latent again: the unit's
+`ExecStart` is now `${cfg.pkg}/bin/homelab-api` (was the let-binding), so every deploy of an
+enabled host forces the declaration, and hosts can actually override the package.
 
 If the package genuinely lived in `pkgs`, the correct `mkPackageOption` form would be:
 
@@ -117,7 +122,7 @@ pkg = lib.mkPackageOption pkgs [ "python3Packages" "pytorch" ] {
 ## Lessons
 
 1. **Lazy evaluation hides declaration-time type errors.** A malformed option declaration is
-   not caught at module-load time; it is caught at first *read*. Option declarations deserve
+   not caught at module-load time; it is caught at first _read_. Option declarations deserve
    the same review scrutiny as code that runs.
 2. **Curried Nix functions fail as lambdas, not as errors.** Passing too few arguments to a
    curried lib function yields a function value that "looks fine" until the module system (or
@@ -127,14 +132,21 @@ pkg = lib.mkPackageOption pkgs [ "python3Packages" "pytorch" ] {
    ```sh
    nix eval '.#nixosConfigurations.augustus.options.services.homelab-api.pkg.type.name'
    ```
-   (or a small check that `deepSeq`s `options.*.*` type/description for every module the host
-   imports). `nix flake check` alone does NOT catch it — nothing forces unused options.
+   IMPLEMENTED as `nix-config/checks/option-decls.nix` (check `option-decls`, x86_64-linux,
+   runs as part of `nix flake check`): it walks every host's `options` tree with
+   `lib.collect lib.isOption` — the predicate forces `_type` on every node, which makes the
+   module system merge each option's declarations (where a malformed one throws) — and
+   additionally forces every option's `type.name`. `nix flake check` alone does NOT catch it —
+   nothing forces unused options.
 4. **Audit call sites when adding a second consumer.** The bug became visible only when a
    second reference to the package appeared; `grep -rn mkPackageOption nix-config/` shows this
    is the only call site, so the blast radius is exactly this one option.
 
 ## Cross-references
 
-- `docs/cover-letter-generator/05-nix-and-deployment.md` §B — where the workaround lives.
-- `nix-config/system-configs/augustus/programs.nix` — `typstAssetsDir`, with the NOTE comment.
+- `docs/cover-letter-generator/05-nix-and-deployment.md` §B — where the workaround lived (NOTE
+  updated when the option was fixed).
+- `nix-config/system-configs/augustus/programs.nix` — `typstAssetsDir`, now reads the fixed
+  option (`config.services.homelab-api.pkg`).
+- `nix-config/checks/option-decls.nix` — the flake-check regression guard (lesson 3).
 - Companion doc on the other CL-T8 nix discovery: `docs/native-addon-rpath-hazard.md`.

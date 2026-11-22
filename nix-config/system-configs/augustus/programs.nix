@@ -2,8 +2,6 @@
 {
   flake.modules.nixos.host-augustus-programs =
     {
-      inputs,
-      lib,
       config,
       pkgs,
       ...
@@ -137,12 +135,10 @@
         # signature image, and vendored letterloom (imported BY PATH — no universe-package
         # resolution, no XDG env), installed by the homelab-api package. Null on
         # praeconinus keeps cover-letter rendering dark there by design.
-        # NOTE: references the flake package directly (same source as the module's `pkg`
-        # let-binding) — the services.homelab-api.pkg OPTION declaration is a latent
-        # mkPackageOption misuse that throws when forced; don't read it until it's fixed.
-        typstAssetsDir = "${
-          inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.homelab-api
-        }/lib/typst-assets";
+        # Reads the services.homelab-api.pkg OPTION (fixed 2026-11-20 — it used to be a
+        # latent mkPackageOption lambda that threw when forced; see
+        # docs/mkpackageoption-lambda-bug.md), so it tracks any host-level pkg override.
+        typstAssetsDir = "${config.services.homelab-api.pkg}/lib/typst-assets";
         apiKeys = {
           jacob = {
             apiKeyFile = config.sops.secrets.homelab_api_key_jacob.path;
