@@ -31,7 +31,7 @@ let
 
       yarnOfflineCache = fetcher.fetchYarnBerryDeps {
         inherit src missingHashes;
-        hash = "sha256-ZsQLgstpYPqrf6M4PL4aK5AC5wLJL2mRewZ3ooJrYZU=";
+        hash = "sha256-EqT35uR0j/vXTeF1phoYJmAaM8KVtWgjH97F5qHT6zI=";
       };
     in
     pkgs.stdenv.mkDerivation {

@@ -1,8 +1,9 @@
 # AGENTS.md
 
 Guidance for AI agents working in this repo (TypeScript/Yarn-workspaces monorepo under
-`packages/` + NixOS config under `nix-config/`). Deeper, task-specific guides live in
-`.opencode/skills/` and load on demand (see index at the bottom).
+`packages/` — private apps — and `lib/` — publishable `@rae-hill/*` libraries — + NixOS config
+under `nix-config/`). Deeper, task-specific guides live in `.opencode/skills/` and load on
+demand (see index at the bottom).
 
 ## Path Resolution & Navigation
 
@@ -21,6 +22,11 @@ When the user refers to a package by name in a TypeScript/frontend/backend/test 
 | `homelab-shared/dir/foo.ts` (legacy name for `shared`) | `./packages/shared/src/dir/foo.ts`                |
 | `homelab-data/dir/foo.ts`                              | `./packages/homelab-data/src/dir/foo.ts`          |
 | `homelab-e2e-tests/dir/foo.ts`                         | `./packages/homelab-e2e-tests/src/dir/foo.ts`     |
+
+Publishable libraries live under `lib/` instead: `scratch/dir/foo.ts` or `@rae-hill/scratch` →
+`./lib/scratch/src/dir/foo.ts`. They are ESM-only, published to npm via semantic-release + OIDC
+Trusted Publishing on push to `main` (see the `creating-libs` skill and
+`docs/npm-lib-publishing-plan.md`). Never hand-edit their `version` or create release tags.
 
 ### Nix Packages & Config
 
@@ -239,6 +245,7 @@ git commit --no-verify -m "..."
 | `adding-client-certs` | Adding step-ca client-cert uses: hand-coded provisioners, UUID extension, serial→user maps, sops secrets, issuance/renewal |
 | `effect-services`     | Writing Effect services/layers, using vendored `./repos/` references                                                       |
 | `frontend`            | Editing `packages/homelab-frontend` (Astro, SolidJS, nanostores)                                                           |
+| `creating-libs`       | Standing up a new publishable lib under `lib/` (@rae-hill/* npm publishing, RsLib/TypeDoc/RsPress, semantic-release)       |
 | `nix-hashes`          | `yarn.lock` changed or "fetchYarnDeps hash is out of date" build error                                                     |
 | `nix-services`        | systemd services, OCI containers, or failure-notifs in `nix-config/`                                                       |
 | `port-assignments`    | Adding/changing ports, firewall rules, or `service-registry.nix`                                                           |

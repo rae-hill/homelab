@@ -1,6 +1,7 @@
 {
   "name": "homelab-services",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Runtime-agnostic service definitions, schemas, and types for homelab",

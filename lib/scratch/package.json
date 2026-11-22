@@ -1,0 +1,59 @@
+{
+  "name": "@rae-hill/scratch",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Throwaway proof-of-concept library for the lib/* publishing pipeline (RsLib + TypeDoc + semantic-release + npm Trusted Publishing)",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rae-hill/homelab.git",
+    "directory": "lib/scratch"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "rslib build",
+    "build:watch": "rslib build --watch",
+    "circular": "yarn madge --circular ./src/index.ts",
+    "docs": "node ../../scripts/typedoc-versioned.mjs",
+    "docs:dev": "rspress dev",
+    "docs:site": "rspress build",
+    "lint": "eslint src",
+    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:staged": "vitest related --run",
+    "test:watch": "vitest watch"
+  },
+  "devDependencies": {
+    "@effect/vitest": "^4.1.x",
+    "@rslib/core": "1.0.7",
+    "@rspress/core": "2.1.3",
+    "@types/node": "^24",
+    "madge": "^8.0.0",
+    "rsbuild-plugin-arethetypeswrong": "0.4.0",
+    "rsbuild-plugin-publint": "1.0.0",
+    "typedoc": "~0.28.20",
+    "typedoc-plugin-markdown": "~4.14.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.x"
+  }
+}

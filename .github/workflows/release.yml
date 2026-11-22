@@ -1,0 +1,55 @@
+name: Release
+
+# Publishes lib/* packages (@rae-hill/*) to npm when conventional commits land
+# on main. Versions/notes come from semantic-release (via
+# @anolilab/multi-semantic-release); publishing goes through `yarn npm publish`
+# with OIDC Trusted Publishing + provenance — there is no npm token anywhere.
+# See docs/npm-lib-publishing-plan.md.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "lib/**"
+      - "scripts/typedoc-versioned.mjs"
+      - "release.config.js"
+      - ".github/workflows/release.yml"
+      - ".github/actions/setup/action.yml"
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # release commits, tags, GitHub Releases
+  issues: write # @semantic-release/github release comments
+  pull-requests: write # @semantic-release/github release comments
+  id-token: write # OIDC: npm Trusted Publishing + sigstore provenance
+
+jobs:
+  release:
+    name: Release libraries
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Full history + tags: semantic-release computes releases from the log.
+      - name: Install dependencies
+        uses: ./.github/actions/setup
+        with:
+          fetch-depth: "0"
+
+      # Gates: never publish a lib that doesn't typecheck, lint, and test.
+      # Run via root scripts so yarn adds the root node_modules/.bin to PATH
+      # (bare `yarn workspaces foreach` CLI invocations don't, and root-only
+      # binaries like eslint would not resolve inside the workspaces).
+      # (RsLib builds additionally run publint + arethetypeswrong.)
+      - name: Typecheck libs
+        run: yarn typecheck:libs
+      - name: Lint libs
+        run: yarn lint:libs
+      - name: Test libs
+        run: yarn test:libs
+
+      - name: Release
+        run: yarn release

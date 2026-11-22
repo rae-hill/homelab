@@ -1,18 +1,10 @@
 {
   "name": "homelab-api",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Effect-ts Bun HTTP Server / API definitions for homelab services",
-  "repository": {
-    "type": "git",
-    "url": "<PLACEHOLDER>",
-    "directory": "packages/homelab-api"
-  },
-  "publishConfig": {
-    "access": "public",
-    "directory": "dist"
-  },
   "exports": {
     ".": {
       "import": "./src/index.ts"

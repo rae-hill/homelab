@@ -1,6 +1,7 @@
 {
   "name": "proton-mail-mcp",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "MCP stdio server for Proton Mail via the local Proton Mail Bridge — env-whitelisted read + label tools",

@@ -1,18 +1,10 @@
 {
   "name": "shared",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Shared schemas, constants, and utilities for homelab frontends and backends (browser-safe)",
-  "repository": {
-    "type": "git",
-    "url": "<PLACEHOLDER>",
-    "directory": "packages/shared"
-  },
-  "publishConfig": {
-    "access": "public",
-    "directory": "dist"
-  },
   "exports": {
     ".": {
       "import": "./src/index.ts"

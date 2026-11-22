@@ -1,6 +1,7 @@
 {
   "name": "homelab-services-node",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Node.js service layer implementations for homelab",
