@@ -12,7 +12,7 @@ Registered in `schemas/index.ts` as `export * as ResumeCoverLetter from "./resum
 ```ts
 export const ResumeCoverLetterRequest = Schema.Struct({
   listing: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(200_000)), // same bounds as tailor
-  content: ResumeContent.ContentPatchBase64,   // decoded to ContentState at the HttpApi EDGE
+  content: ResumeContent.ContentPatchBase64, // decoded to ContentState at the HttpApi EDGE
   baseVersion: Schema.String,
 })
 ```
@@ -57,8 +57,9 @@ declare module "homelab-services/resource-uris" {
 
 Register in `homelab/resume/index.ts`:
 `ResumeApi = HttpApiGroup.make("resume").add(Print.ResumePrint).add(Tailor.ResumeTailor).add(CoverLetter.ResumeCoverLetter)`
-+ `export * as CoverLetter from "./cover-letter.js"`. The typed client grows
-`client.resume["cover-letter"]` automatically (frontend consumes it in doc 04).
+
+- `export * as CoverLetter from "./cover-letter.js"`. The typed client grows
+  `client.resume["cover-letter"]` automatically (frontend consumes it in doc 04).
 
 Single-member binary success (unlike print's two-member union) — no content-type discrimination
 needed; response is always `application/pdf`. **No `Content-Disposition`** — same stance as
@@ -92,7 +93,8 @@ export const handleResumeCoverLetter = Effect.fn("handleResumeCoverLetter")(
 
     if (args.payload.baseVersion !== ResumeContent.CONTENT_DEFAULTS_VERSION) {
       return yield* new ApiErrors.BadRequest({
-        message: `baseVersion mismatch: got ${args.payload.baseVersion}, expected ${ResumeContent.CONTENT_DEFAULTS_VERSION}`,
+        message:
+          `baseVersion mismatch: got ${args.payload.baseVersion}, expected ${ResumeContent.CONTENT_DEFAULTS_VERSION}`,
         reason: "resume-cover-letter-base-version-mismatch",
       })
     }
@@ -101,7 +103,7 @@ export const handleResumeCoverLetter = Effect.fn("handleResumeCoverLetter")(
     return yield* Services.CoverLetterService.generateCoverLetter(
       identity.identifier,
       args.payload.listing,
-      args.payload.content,      // ContentState — decoded at the edge by ContentPatchBase64
+      args.payload.content, // ContentState — decoded at the edge by ContentPatchBase64
       args.payload.baseVersion,
     )
   },
@@ -109,13 +111,16 @@ export const handleResumeCoverLetter = Effect.fn("handleResumeCoverLetter")(
   Effect.mapError(
     flow(
       Match.value,
-      Match.tag("TailorQuotaExceeded", (e) => new ApiErrors.BadRequest({
-        message: `AI quota exhausted; retry in ${e.retryAfterSeconds}s`,
-        reason: "resume-cover-letter-quota-exceeded",
-      })),
-      Match.tag("CoverLetterError", (e) => new ApiErrors.InternalServerError({
-        message: e.message, error: e.error,
-      })),
+      Match.tag("TailorQuotaExceeded", (e) =>
+        new ApiErrors.BadRequest({
+          message: `AI quota exhausted; retry in ${e.retryAfterSeconds}s`,
+          reason: "resume-cover-letter-quota-exceeded",
+        })),
+      Match.tag("CoverLetterError", (e) =>
+        new ApiErrors.InternalServerError({
+          message: e.message,
+          error: e.error,
+        })),
       Match.orElse((_) => _),
     ),
   ),
@@ -142,10 +147,10 @@ openRouterCoverLetterModel: Config.withDefault(
 typstAssetsDir: Config.option(Config.String("TYPST_ASSETS_DIR")),
 ```
 
-+ `EnvDef` fields/accessors in `homelab-services/src/config/env.ts` (doc 01 §E) + BOTH testing
-layers (`homelab-server/test-utils/testing-layer.ts`, `homelab-services-node/test-utils/testing-layer.ts`
-— `TestConfigProvider` map AND `makeTestEnvWithFlags` defaults: `"test-cover-letter-model"`,
-`Option.none()`; the render-gated suites override `TYPST_ASSETS_DIR` to the repo assets path).
+- `EnvDef` fields/accessors in `homelab-services/src/config/env.ts` (doc 01 §E) + BOTH testing
+  layers (`homelab-server/test-utils/testing-layer.ts`, `homelab-services-node/test-utils/testing-layer.ts`
+  — `TestConfigProvider` map AND `makeTestEnvWithFlags` defaults: `"test-cover-letter-model"`,
+  `Option.none()`; the render-gated suites override `TYPST_ASSETS_DIR` to the repo assets path).
 
 ## F) Unit tests — `homelab-server/test/handlers/resume/cover-letter.test.ts`
 
@@ -154,13 +159,13 @@ House idiom (`@effect/vitest`, `HandlerTestLayer`, `withIdentity`, args factory,
 () => Effect.succeed(new Uint8Array([0x25, 0x50, 0x44, 0x46, ...])) })` (`%PDF`), merged over
 `HandlerTestLayer`.
 
-| Group         | Cases                                                                                                    |
-| ------------- | -------------------------------------------------------------------------------------------------------- |
-| authorization | identity without `Resume_CoverLetter` → `AuthorizationError`; guest → `AuthorizationError`                 |
-| validation    | stale `baseVersion` → `BadRequest` (reason `resume-cover-letter-base-version-mismatch`)                    |
+| Group         | Cases                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| authorization | identity without `Resume_CoverLetter` → `AuthorizationError`; guest → `AuthorizationError`                          |
+| validation    | stale `baseVersion` → `BadRequest` (reason `resume-cover-letter-base-version-mismatch`)                             |
 | quota         | service fails `TailorQuotaExceeded{retryAfterSeconds}` → `BadRequest` (reason `resume-cover-letter-quota-exceeded`) |
-| happy path    | authorized identity → `%PDF` bytes returned verbatim                                                        |
-| error mapping | `CoverLetterError{message,error}` → `InternalServerError` with raw nested `error`                          |
+| happy path    | authorized identity → `%PDF` bytes returned verbatim                                                                |
+| error mapping | `CoverLetterError{message,error}` → `InternalServerError` with raw nested `error`                                   |
 
 ## G) E2E tests — `homelab-e2e-tests/src/resume/cover-letter.test.ts`
 

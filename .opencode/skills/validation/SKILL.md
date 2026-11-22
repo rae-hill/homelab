@@ -85,6 +85,21 @@ shell), lint it with `config.constants.shell.checkScriptText pkgs { name; text; 
 resulting derivation to `flake.lintedShellScripts`. See `nix-config/lib/shell.nix` for both
 helpers and the registry option, and `docs/shellcheck-nix-test-plan.md` for the design.
 
+### Option Declarations (NixOS modules)
+
+```sh
+nix build .#checks.x86_64-linux.option-decls
+# (also runs as part of `nix flake check`)
+```
+
+Malformed NixOS option **declarations** — e.g. a partially applied curried lib function like
+`lib.mkPackageOption "name" { … }` that leaves a lambda in the `options` tree — throw only when
+something _reads_ the option, so host `toplevel` evals never notice them
+(`docs/mkpackageoption-lambda-bug.md`). The `checks.option-decls` gate
+(`nix-config/checks/option-decls.nix`) walks every host's `options` tree with
+`lib.collect lib.isOption` and forces each option's `type.name` at eval time, making
+`nix flake check` catch the whole bug class. Linux-only, like the ShellCheck gate.
+
 ### Format
 
 **Agents do not run formatters.** The opencode harness automatically formats every file it

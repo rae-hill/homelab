@@ -56,7 +56,7 @@ New module options + `environment` entries (the `CHROME_EXECUTABLE` pattern, ~li
 typstAssetsDir = mkOption {
   type = types.nullOr types.str;
   default = null;   # hosts opt in explicitly (chromeExecutable posture); augustus sets
-                    # "${inputs.self.packages.<system>.homelab-api}/lib/typst-assets"
+                    # "${config.services.homelab-api.pkg}/lib/typst-assets"
   description = "Typst template/asset root (TYPST_ASSETS_DIR): letter.typ template,
     signature image, and vendor/letterloom-3.0.0 imported BY PATH (no universe-package
     resolution, no XDG env). null ⇒ cover-letter rendering dark.";
@@ -75,10 +75,13 @@ TYPST_ASSETS_DIR=${cfg.typstAssetsDir}
   unit's environment only when the owner wants an override (same posture as `OPENROUTER_MODEL`).
 - Feature flag: augustus runs `FEATURE_FLAGS=*` ⇒ `Resume_CoverLetter.enabled` automatically.
   **praeconinus**: explicit flag list omits `Resume_*` — verify NO change adds it (stays dark).
-- NOTE (found during CL-T8): the module's pre-existing `services.homelab-api.pkg` option is a
-  latent `mkPackageOption` misuse that THROWS when forced ("type lambda") — nothing read it
-  before; augustus's `typstAssetsDir` therefore references the flake package directly. Fix the
-  declaration separately if anything else ever needs it.
+- NOTE (found during CL-T8, FIXED 2026-11-20): the module's pre-existing
+  `services.homelab-api.pkg` option WAS a latent `mkPackageOption` misuse that threw when
+  forced ("type lambda") — nothing read it before; augustus's `typstAssetsDir` temporarily
+  referenced the flake package directly. The declaration is now a plain `lib.mkOption`
+  (consumed by the unit's `ExecStart`), augustus reads the option again, and
+  `nix-config/checks/option-decls.nix` guards the whole bug class during `nix flake check`.
+  See `docs/mkpackageoption-lambda-bug.md`.
 
 ## C) Identity — kanidm group + claim (CL-D4)
 
@@ -127,8 +130,8 @@ Frontend constant `RESUME_COVER_LETTER_ROLE` (doc 04) must match the claim strin
 row to BOTH vendored-repo tables — `AGENTS.md` ("Vendored App Source — Prefer Over Web Docs") and
 `.opencode/skills/effect-services/SKILL.md`:
 
-| Question about | Resolves to |
-| --- | --- |
+| Question about                                                                                                | Resolves to                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | typst.ts node compiler behavior (`NodeCompiler`, universe-package resolution, fonts, PDF export, diagnostics) | `./repos/typst.ts/` (Myriad-Dreamin/typst.ts, tag `v0.7.0` = the `@myriaddreamin/typst-ts-node-compiler` pin) |
 
 ## F) Deploy checklist (augustus)
@@ -144,6 +147,7 @@ row to BOTH vendored-repo tables — `AGENTS.md` ("Vendored App Source — Prefe
    `DocumentRenderingServiceTypst.renderPdf`; journal warnings for typst font fallbacks (README OQ2).
 
 **Rollback / dark switches** (independent, no redeploy of code needed):
+
 - `FEATURE_FLAGS` minus `Resume_CoverLetter.enabled` ⇒ endpoint 403s (flag check in `canCreate`).
 - `TYPST_ASSETS_DIR` unset ⇒ rendering layer fails fast; tailor/print unaffected.
 - Claim/group removal ⇒ UI hides the button (role hook) and server rejects.

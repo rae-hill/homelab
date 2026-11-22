@@ -42,9 +42,18 @@ in
       options.services.homelab-api = {
         enable = lib.mkEnableOption "Homelab API Server";
 
-        pkg = lib.mkPackageOption "homelab-api" {
-          description = "The homelab-api package to use";
+        # Plain mkOption, NOT lib.mkPackageOption: the package comes from this
+        # flake's outputs, not from a name inside `pkgs`, and mkPackageOption is
+        # a three-argument curried function (pkgs: name: opts:) — the former
+        # two-argument call here left a lambda in the options tree that threw
+        # ("has type 'lambda' rather than an attribute set") whenever anything
+        # forced the option. See docs/mkpackageoption-lambda-bug.md; the
+        # option-decls flake check now guards the whole class.
+        pkg = lib.mkOption {
+          type = lib.types.package;
           default = pkg;
+          defaultText = "inputs.self.packages.<system>.homelab-api";
+          description = "The homelab-api package to use.";
         };
 
         originUrl = lib.mkOption {
@@ -313,7 +322,9 @@ in
             Group = cfg.userName;
             EnvironmentFile = config.sops.templates."homelab-api-env".path;
 
-            ExecStart = "${pkg}/bin/homelab-api";
+            # cfg.pkg (not the let-binding) so hosts can override the package
+            # and every deploy forces the option declaration.
+            ExecStart = "${cfg.pkg}/bin/homelab-api";
 
             Restart = "on-failure";
             RestartSec = 5;

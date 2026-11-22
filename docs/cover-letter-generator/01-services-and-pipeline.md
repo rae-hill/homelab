@@ -8,20 +8,20 @@ with source, source wins.
 
 ## Service catalog
 
-| Service                          | Location (def → impl)                                                     | New/Reused | Role                                                                                     |
-| -------------------------------- | ------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
-| `CoverLetterService`             | `services/cover-letter-service.ts` → `layers/cover-letter-service.ts`     | NEW        | Orchestrator: hygiene → quota → cleanup (cached) → generate → validate → render → PDF     |
-| `CoverLetterPromptConfigService` | `services/cover-letter-prompt-config-service.ts` → `layers/...`           | NEW        | Versioned generation prompt + strict response format + exemplar composition               |
-| `ListingCleanupCacheService`     | `services/listing-cleanup-cache-service.ts` → `layers/...`                | NEW        | In-process exact-hash cache store (Ref-backed LRU+TTL) for stage-1 cleanup results        |
-| (decorator, no new tag)          | — → `layers/cached-resume-listing-extraction-service.ts`                  | NEW        | Wraps `ResumeListingExtractionService` with the cache; same tag, zero consumer rework     |
-| `CoverLetterTemplateService`     | see doc 02                                                                 | NEW        | Letter content → Typst main path + `templates/letter.json` shadow data                    |
-| `DocumentRenderingServiceTypst`  | see doc 02                                                                 | NEW        | typst.ts `NodeCompiler` lifecycle → PDF bytes                                             |
-| `ResumeListingExtractionService` | existing                                                                   | REUSED     | Stage-1 cleanup + `jobTitle`/`company` (now behind the cache decorator)                   |
-| `OpenRouterClientService`        | existing                                                                   | REUSED     | The only HTTP talker to OpenRouter                                                        |
-| `PromptSanitizationService`      | existing                                                                   | REUSED     | `sanitize`/`truncate`/`hygienize` on the raw listing                                      |
-| `HashingServiceSha256`           | existing                                                                   | REUSED     | `listingHash` = `digestHex(sanitize(listing))` (cache-key ingredient)                     |
-| `TailorQuotaService`             | existing                                                                   | REUSED     | Shared per-subject/global daily AI budget (CL-D7)                                         |
-| `ResumeContentMergeService` etc. | existing                                                                   | NOT USED   | No resume-content mutation in this feature — the letter is a new artifact                 |
+| Service                          | Location (def → impl)                                                 | New/Reused | Role                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------- |
+| `CoverLetterService`             | `services/cover-letter-service.ts` → `layers/cover-letter-service.ts` | NEW        | Orchestrator: hygiene → quota → cleanup (cached) → generate → validate → render → PDF |
+| `CoverLetterPromptConfigService` | `services/cover-letter-prompt-config-service.ts` → `layers/...`       | NEW        | Versioned generation prompt + strict response format + exemplar composition           |
+| `ListingCleanupCacheService`     | `services/listing-cleanup-cache-service.ts` → `layers/...`            | NEW        | In-process exact-hash cache store (Ref-backed LRU+TTL) for stage-1 cleanup results    |
+| (decorator, no new tag)          | — → `layers/cached-resume-listing-extraction-service.ts`              | NEW        | Wraps `ResumeListingExtractionService` with the cache; same tag, zero consumer rework |
+| `CoverLetterTemplateService`     | see doc 02                                                            | NEW        | Letter content → Typst main path + `templates/letter.json` shadow data                |
+| `DocumentRenderingServiceTypst`  | see doc 02                                                            | NEW        | typst.ts `NodeCompiler` lifecycle → PDF bytes                                         |
+| `ResumeListingExtractionService` | existing                                                              | REUSED     | Stage-1 cleanup + `jobTitle`/`company` (now behind the cache decorator)               |
+| `OpenRouterClientService`        | existing                                                              | REUSED     | The only HTTP talker to OpenRouter                                                    |
+| `PromptSanitizationService`      | existing                                                              | REUSED     | `sanitize`/`truncate`/`hygienize` on the raw listing                                  |
+| `HashingServiceSha256`           | existing                                                              | REUSED     | `listingHash` = `digestHex(sanitize(listing))` (cache-key ingredient)                 |
+| `TailorQuotaService`             | existing                                                              | REUSED     | Shared per-subject/global daily AI budget (CL-D7)                                     |
+| `ResumeContentMergeService` etc. | existing                                                              | NOT USED   | No resume-content mutation in this feature — the letter is a new artifact             |
 
 All defs follow the house pattern exactly: `*Id` path constant
 (`"homelab-api/services/cover-letter/CoverLetterService"` etc.), `Data.TaggedError` errors,
@@ -44,7 +44,10 @@ export interface ListingCleanupCacheEntry {
   readonly cleanedListing: string
   readonly jobTitle: string
   readonly company: string | null
-  readonly stageMeta: { readonly model: string; readonly promptTokens: number | null; /* mirror existing stage-1 meta shape */ }
+  readonly stageMeta: {
+    readonly model: string
+    readonly promptTokens: number | null /* mirror existing stage-1 meta shape */
+  }
 }
 
 export interface ListingCleanupCacheServiceDef {
@@ -74,12 +77,12 @@ Same tag (`ResumeListingExtractionService`), composed so consumers (`TailorServi
 export const CachedResumeListingExtractionServiceLive = Layer.effect(
   Services.ResumeListingExtractionService.ResumeListingExtractionService,
   Effect.gen(function*() {
-    const cache    = yield* Services.ListingCleanupCacheService.ListingCleanupCacheService // from RIn — SHARED
-    const hashing  = yield* Services.HashingServiceSha256.HashingServiceSha256
-    const prompts  = yield* Services.ResumePromptConfigService.ResumePromptConfigService
-    const env      = yield* Config.Env.Env
+    const cache = yield* Services.ListingCleanupCacheService.ListingCleanupCacheService // from RIn — SHARED
+    const hashing = yield* Services.HashingServiceSha256.HashingServiceSha256
+    const prompts = yield* Services.ResumePromptConfigService.ResumePromptConfigService
+    const env = yield* Config.Env.Env
     const openRouter = yield* Services.OpenRouterClientService.OpenRouterClientService
-    const inner = makeResumeListingExtractionService(/* existing factory + these deps */)
+    const inner = makeResumeListingExtractionService() /* existing factory + these deps */
     return new CachedExtractionImpl(inner, cache, hashing, prompts, env)
   }),
 )
@@ -161,10 +164,13 @@ delimiters, `Schema.toJsonSchemaDocument` response formats).
 `layers/cover-letter/exemplars.ts` (node-side, NOT shipped to clients):
 
 ```ts
-export interface CoverLetterExemplar { readonly name: string; readonly text: string }
+export interface CoverLetterExemplar {
+  readonly name: string
+  readonly text: string
+}
 export const COVER_LETTER_EXEMPLARS: ReadonlyArray<CoverLetterExemplar> = [
   { name: "sailpoint-2026", text: `Hello! My name is Rae, …` }, // body of cover-letters-2026-sailpoint.typ,
-                                                                 // template scaffolding stripped
+  // template scaffolding stripped
 ]
 ```
 
@@ -205,7 +211,7 @@ seam: promote `resume-data.ts` positions into `shared` later if letters need emp
 
 ```ts
 Schema.Struct({
-  subject: Schema.String,              // ≤120 chars enforced server-side, not in schema (strict-mode safe)
+  subject: Schema.String, // ≤120 chars enforced server-side, not in schema (strict-mode safe)
   paragraphs: Schema.Array(Schema.String),
 })
 ```
@@ -229,15 +235,15 @@ pattern, doc 02 §D — "Not three").
 export const CoverLetterServiceId = "homelab-api/services/cover-letter/CoverLetterService"
 
 export class CoverLetterError extends Data.TaggedError("CoverLetterError")<{
-  readonly message: string      // short stage context ("cover-letter generation failed")
-  readonly error: unknown       // raw nested cause (D12 pattern — NO describeErrorChain)
+  readonly message: string // short stage context ("cover-letter generation failed")
+  readonly error: unknown // raw nested cause (D12 pattern — NO describeErrorChain)
 }> {}
 
 export interface CoverLetterServiceDef {
   readonly generateCoverLetter: (
-    subject: string,                          // Identity.identifier — quota key
-    listing: string,                          // raw pasted listing
-    content: ResumeContent.ContentState,      // decoded at the HttpApi edge (CL-D2)
+    subject: string, // Identity.identifier — quota key
+    listing: string, // raw pasted listing
+    content: ResumeContent.ContentState, // decoded at the HttpApi edge (CL-D2)
     baseVersion: string,
   ) => Effect.Effect<Uint8Array, CoverLetterError | Services.TailorService.TailorQuotaExceeded>
 }
@@ -272,14 +278,14 @@ Layer.effect(Tag, Effect.gen(...yield deps...))`, Impl class NOT exported, const
 
 v1 guards (pure functions in `layers/cover-letter/validation.ts`, each unit-tested):
 
-| Guard          | Rule                                                                     | On violation                     |
-| -------------- | ------------------------------------------------------------------------ | -------------------------------- |
-| Decode         | `CoverLetterGeneration` strict schema                                     | one retry, then `CoverLetterError` |
-| Paragraph count| 2 ≤ `paragraphs.length` ≤ 6                                               | `CoverLetterError` (no silent trim) |
-| Paragraph size | each 40–1,500 chars after trim; total ≤ 6,000                             | `CoverLetterError`                 |
-| Subject        | 1–120 chars, single line                                                  | `CoverLetterError`                 |
-| Output hygiene | strip zero-width chars (`\u200B-\u200F` etc.), reject control chars       | strip; reject → `CoverLetterError` |
-| Markup inertness | none needed — CL-D10: body travels as JSON data, joined as literal text | —                                  |
+| Guard            | Rule                                                                    | On violation                        |
+| ---------------- | ----------------------------------------------------------------------- | ----------------------------------- |
+| Decode           | `CoverLetterGeneration` strict schema                                   | one retry, then `CoverLetterError`  |
+| Paragraph count  | 2 ≤ `paragraphs.length` ≤ 6                                             | `CoverLetterError` (no silent trim) |
+| Paragraph size   | each 40–1,500 chars after trim; total ≤ 6,000                           | `CoverLetterError`                  |
+| Subject          | 1–120 chars, single line                                                | `CoverLetterError`                  |
+| Output hygiene   | strip zero-width chars (`\u200B-\u200F` etc.), reject control chars     | strip; reject → `CoverLetterError`  |
+| Markup inertness | none needed — CL-D10: body travels as JSON data, joined as literal text | —                                   |
 
 Deferred (README OQ3): fabrication guard (numbers/proper nouns ⊆ content+listing). The human
 review control is the downloaded PDF itself.
@@ -287,7 +293,7 @@ review control is the downloaded PDF itself.
 ## E) Env additions (`homelab-services/src/config/env.ts` + `homelab-server/src/env.ts`)
 
 ```ts
-openRouterCoverLetterModel: string   // OPENROUTER_COVER_LETTER_MODEL, default "anthropic/claude-sonnet-5.5" (CL-D8)
+openRouterCoverLetterModel: string // OPENROUTER_COVER_LETTER_MODEL, default "anthropic/claude-sonnet-5.5" (CL-D8)
 typstAssetsDir: Option.Option<string> // TYPST_ASSETS_DIR (CL-D9) — None ⇒ rendering fails fast, feature dark
 ```
 

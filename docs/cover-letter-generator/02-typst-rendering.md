@@ -7,17 +7,17 @@ APIs that do not exist; see caveats). Read-only repo: never edit, never import f
 
 ## Vendored facts that shape the design (v0.7.0)
 
-| Fact | Consequence |
-| ---- | ----------- |
-| npm package: **`@myriaddreamin/typst-ts-node-compiler@0.7.0`** (`packages/typst.node`) exports `NodeCompiler`. There is NO `@typst.ts/*` scope at this tag. | `yarn add` this exact package into `homelab-services-node`; pin `0.7.0` to match the submodule. |
-| napi-rs prebuilt platform packages (`@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu` etc.) via `optionalDependencies`; no node-gyp, no postinstall. | Works in the Nix sandbox like `sharp`'s `@img/*` — but needs the same rolldown-external + copy + patchelf treatment (doc 05). |
-| Package is **CJS-only**; the server workspace is ESM (`"type": "module"`). | `import { NodeCompiler } from "@myriaddreamin/typst-ts-node-compiler"` should lex as a named re-export (same pattern as `@swc/core`) — **smoke-test once in CL-T4**; fallback: default-import + destructure. |
-| **All compiler methods are SYNCHRONOUS.** `pdf(...)` returns a Node `Buffer` and **throws** on compile errors (message = diagnostics summary). The docs' `await $typst.pdf(...)` only works because awaiting a non-promise is a no-op. | Every call site must be `Effect.try`/`Effect.sync`-wrapped (owner rule: any function/constructor that may throw gets its own Effect). Rendering blocks the event loop ~100s of ms — acceptable at homelab single-user traffic; `worker_threads` is the documented escape hatch if that ever changes. |
-| Non-throwing path: `compile(opts): NodeTypstCompileResult` with `hasError()`, `result`, `takeWarnings()`, `takeDiagnostics(): NodeError \| null` (`shortDiagnostics`, `compilationStatus`), plus `compiler.fetchDiagnostics(err)` for full locations. `pdf()` silently DROPS warnings. | Use `compile()` → inspect diagnostics (log warnings) → `pdf(result.result!)`, so font-fallback warnings are visible in logs instead of lost. |
+| Fact                                                                                                                                                                                                                                                                                                                                                         | Consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| npm package: **`@myriaddreamin/typst-ts-node-compiler@0.7.0`** (`packages/typst.node`) exports `NodeCompiler`. There is NO `@typst.ts/*` scope at this tag.                                                                                                                                                                                                  | `yarn add` this exact package into `homelab-services-node`; pin `0.7.0` to match the submodule.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| napi-rs prebuilt platform packages (`@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu` etc.) via `optionalDependencies`; no node-gyp, no postinstall.                                                                                                                                                                                                     | Works in the Nix sandbox like `sharp`'s `@img/*` — but needs the same rolldown-external + copy + patchelf treatment (doc 05).                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Package is **CJS-only**; the server workspace is ESM (`"type": "module"`).                                                                                                                                                                                                                                                                                   | `import { NodeCompiler } from "@myriaddreamin/typst-ts-node-compiler"` should lex as a named re-export (same pattern as `@swc/core`) — **smoke-test once in CL-T4**; fallback: default-import + destructure.                                                                                                                                                                                                                                                                                                                                                      |
+| **All compiler methods are SYNCHRONOUS.** `pdf(...)` returns a Node `Buffer` and **throws** on compile errors (message = diagnostics summary). The docs' `await $typst.pdf(...)` only works because awaiting a non-promise is a no-op.                                                                                                                       | Every call site must be `Effect.try`/`Effect.sync`-wrapped (owner rule: any function/constructor that may throw gets its own Effect). Rendering blocks the event loop ~100s of ms — acceptable at homelab single-user traffic; `worker_threads` is the documented escape hatch if that ever changes.                                                                                                                                                                                                                                                              |
+| Non-throwing path: `compile(opts): NodeTypstCompileResult` with `hasError()`, `result`, `takeWarnings()`, `takeDiagnostics(): NodeError \| null` (`shortDiagnostics`, `compilationStatus`), plus `compiler.fetchDiagnostics(err)` for full locations. `pdf()` silently DROPS warnings.                                                                       | Use `compile()` → inspect diagnostics (log warnings) → `pdf(result.result!)`, so font-fallback warnings are visible in logs instead of lost.                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Universe packages: `NodeCompiler.create` hardwires `HttpRegistry`; resolution order is `dirs::data_dir()/typst/packages/<ns>/<name>/<ver>` → `dirs::cache_dir()/...` → download from `https://packages.typst.org` (preview only). **No create() option controls this.** `dirs` honors `XDG_DATA_HOME`/`XDG_CACHE_HOME`/`HOME`; unset ⇒ NotFound diagnostics. | **AVOIDED ENTIRELY (implementation decision):** the template imports the vendored letterloom **by path** (`../vendor/letterloom-3.0.0/src/lib.typ`) — letterloom is self-contained (only relative imports of its own src files, verified). No registry, no XDG env, no network, identical behavior in devshell/tests/nix-store. The initial XDG_DATA_HOME approach was built and then REMOVED: a vitest run pointed XDG_DATA_HOME at the git-tracked assets dir and tools polluted it (`vitest/`, `mimeapps.list`) — the hazard class is gone with the mechanism. |
-| Embedded fonts: New Computer Modern (NewCM10, 4 styles + math), Libertinus Serif, DejaVu Sans Mono, Foxit PDF core fonts. Missing fonts ⇒ warnings + fallback, compile still succeeds. | Letterloom renders out of the box with NewCM; `fontArgs: [{ fontPaths }]` is the seam if the owner wants resume-matching fonts (README OQ2). |
-| `evictCache(maxAge)` is **global** (all instances); docs warn to evict periodically to avoid a memory leak; in-repo precedent: `projects/rehype-typst` evicts `10` after each compile. | Evict `10` after every render — traffic is a handful of letters/day. |
-| `mapShadow(path, Buffer)` / `addSource(path, string)` inject in-memory files; `create({ workspace, fontArgs, inputs })`; per-compile `inputs` REPLACE ctor inputs. | Signature PNG + generated letter data ride as shadows; no workspace dir needed at runtime. |
+| Embedded fonts: New Computer Modern (NewCM10, 4 styles + math), Libertinus Serif, DejaVu Sans Mono, Foxit PDF core fonts. Missing fonts ⇒ warnings + fallback, compile still succeeds.                                                                                                                                                                       | Letterloom renders out of the box with NewCM; `fontArgs: [{ fontPaths }]` is the seam if the owner wants resume-matching fonts (README OQ2).                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `evictCache(maxAge)` is **global** (all instances); docs warn to evict periodically to avoid a memory leak; in-repo precedent: `projects/rehype-typst` evicts `10` after each compile.                                                                                                                                                                       | Evict `10` after every render — traffic is a handful of letters/day.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `mapShadow(path, Buffer)` / `addSource(path, string)` inject in-memory files; `create({ workspace, fontArgs, inputs })`; per-compile `inputs` REPLACE ctor inputs.                                                                                                                                                                                           | Signature PNG + generated letter data ride as shadows; no workspace dir needed at runtime.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## A) Assets (CL-T1) — `packages/homelab-services-node/assets/typst/`
 
@@ -101,20 +101,25 @@ Pairs with the existing `DocumentRenderingServiceDocx` (naming + adapter-injecti
 
 ```ts
 // homelab-services/src/services/document-rendering-service-typst.ts
-export const DocumentRenderingServiceTypstId = "homelab-api/services/rendering/DocumentRenderingServiceTypst"
+export const DocumentRenderingServiceTypstId =
+  "homelab-api/services/rendering/DocumentRenderingServiceTypst"
 
-export class DocumentRenderingServiceTypstError extends Data.TaggedError("DocumentRenderingServiceTypstError")<{
-  readonly message: string      // e.g. "typst compilation failed" + diagnostics summary
-  readonly error: unknown       // raw nested cause (D12 pattern)
-}> {}
+export class DocumentRenderingServiceTypstError
+  extends Data.TaggedError("DocumentRenderingServiceTypstError")<{
+    readonly message: string // e.g. "typst compilation failed" + diagnostics summary
+    readonly error: unknown // raw nested cause (D12 pattern)
+  }>
+{}
 
 export interface TypstRenderRequest {
   readonly mainFileContent: string
-  readonly shadows: Readonly<Record<string, Uint8Array>>   // absolute shadow paths → bytes
+  readonly shadows: Readonly<Record<string, Uint8Array>> // absolute shadow paths → bytes
 }
 
 export interface DocumentRenderingServiceTypstDef {
-  readonly renderPdf: (req: TypstRenderRequest) => Effect.Effect<Uint8Array, DocumentRenderingServiceTypstError>
+  readonly renderPdf: (
+    req: TypstRenderRequest,
+  ) => Effect.Effect<Uint8Array, DocumentRenderingServiceTypstError>
 }
 ```
 
@@ -163,12 +168,14 @@ export interface CoverLetterInput {
   readonly paragraphs: ReadonlyArray<string>
   readonly company: string | null
 }
-export interface CoverLetterDocument {           // consumed directly by renderPdf
+export interface CoverLetterDocument { // consumed directly by renderPdf
   readonly mainFileContent: string
   readonly shadows: Readonly<Record<string, Uint8Array>>
 }
 export interface CoverLetterTemplateServiceDef {
-  readonly buildLetter: (input: CoverLetterInput) => Effect.Effect<CoverLetterDocument, CoverLetterTemplateError>
+  readonly buildLetter: (
+    input: CoverLetterInput,
+  ) => Effect.Effect<CoverLetterDocument, CoverLetterTemplateError>
 }
 ```
 
