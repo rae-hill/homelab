@@ -52,6 +52,13 @@ let
     }
   ];
 
+  mgmtInterfaceRecords = [
+    {
+      A.name = mkDomain "net";
+      A.address = "10.76.100.1";
+    }
+  ];
+
   # Public-facing names that must remain resolvable from this (now authoritative)
   # internal zone. Because `plato-splunk.media` is a Primary zone here, any name NOT
   # in the zone returns NXDOMAIN rather than falling through to public DNS — so the
@@ -116,6 +123,7 @@ let
       ++ (mkTailnetApex "ollama" "mini")
       # nas LAN outlier (A only, no AAAA)
       ++ nasRecords
+      ++ mgmtInterfaceRecords
       # public OVH endpoint identities (dns, aedilis)
       ++ publicEndpointRecords;
   };
