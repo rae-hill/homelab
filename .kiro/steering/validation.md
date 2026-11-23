@@ -31,13 +31,14 @@ see edits, but newly created files **always** do.
 Run these commands from the repo root in order:
 
 ```sh
-dprint fmt fmt .
+fmt .
 nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 yarn lint --fix
 yarn lint
 yarn typecheck
 yarn test
 nix build .#checks.x86_64-linux.shellcheck    # ShellCheck gate for shell scripts
+nix build .#checks.x86_64-linux.formatting    # repo-wide dprint gate (catches unformatted commits)
 ```
 
 ## Commands
@@ -82,7 +83,7 @@ helpers and the registry option, and `docs/shellcheck-nix-test-plan.md` for the 
 ### Format
 
 ```sh
-dprint fmt fmt .
+fmt .
 nix run .#nixfmt -- $(git ls-files '*.nix' ':!:repos/**')
 ```
 
@@ -107,6 +108,11 @@ engines:
 The pinned `nixfmt` is defined once as `packages.<system>.nixfmt = pkgs.nixfmt` in `flake.nix`; the
 devshell, the hook (`.#nixfmt`), and the nixvim config (`nix-config/modules/editors/editors-nixvim/plugins/conform.nix`) all
 resolve to that same version so formatting is deterministic everywhere.
+
+**Verification gate:** `nix build .#checks.x86_64-linux.formatting` runs `dprint check` across the
+flake tree (`flake.nix` → `checks.formatting`). `nix flake check --no-build` never builds it — run
+it explicitly before committing, especially with `--no-verify` (which skips the hook's `fmt .`),
+and after running generators (TypeDoc docs self-format via `scripts/typedoc-versioned.mjs`).
 
 ### Lint
 

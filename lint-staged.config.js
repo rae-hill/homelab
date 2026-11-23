@@ -14,6 +14,11 @@ const libRefresh = (files) => {
   for (const name of names) {
     cmds.push(`yarn workspace @rae-hill/${name} build`)
     cmds.push(`yarn workspace @rae-hill/${name} docs`)
+    // This group runs AFTER the "*" group's repo-wide `fmt .` (config order),
+    // so freshly rendered docs must be formatted again before staging. The
+    // docs script self-formats via dprint; this is the belt-and-braces pass
+    // for environments where its dprint spawn is unavailable.
+    cmds.push(`fmt lib/${name}/docs`)
     cmds.push(`git add lib/${name}/docs`)
   }
   return cmds

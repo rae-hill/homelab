@@ -13,10 +13,18 @@
  * `outputs` from a config file (not the CLI). Committed docs stay organized
  * per minor release; prior minor folders are left untouched as history, and
  * the RsPress site config picks versions up by scanning docs/.
+ *
+ * Generated output is dprint-formatted before exit: raw TypeDoc markdown
+ * violates the repo's dprint.json, agent commits skip the formatting hook
+ * (--no-verify is the house rule), and lint-staged's repo-wide `fmt .` would
+ * otherwise keep resurfacing the unformatted docs as unstaged drift. The
+ * format pass soft-fails (warning only) where dprint is unavailable (e.g. the
+ * release CI runner); `nix build .#checks.x86_64-linux.formatting` is the
+ * authoritative gate.
  */
 import { spawnSync } from "node:child_process"
 import { readFileSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, relative, resolve } from "node:path"
 
 const libDir = process.cwd()
 
@@ -68,6 +76,27 @@ try {
   }
 
   process.exitCode = result.status ?? 1
+
+  // Format the generated markdown to the repo's dprint standard (see the
+  // header note). Runs from the repo root so dprint auto-discovers dprint.json.
+  if (process.exitCode === 0) {
+    const repoRoot = resolve(libDir, "..", "..")
+    const outRel = relative(repoRoot, resolve(libDir, outDir))
+    const fmt = spawnSync("dprint", ["fmt", "--", outRel], {
+      stdio: "inherit",
+      cwd: repoRoot,
+      env: process.env,
+      shell: process.platform === "win32",
+    })
+    if (fmt.error?.code === "ENOENT") {
+      console.warn(
+        `[typedoc-versioned] dprint not on PATH; generated docs left UNFORMATTED — run \`fmt ${outRel}\` in the devshell before committing.`,
+      )
+    } else if (fmt.error || fmt.status !== 0) {
+      const reason = fmt.error ? fmt.error.message : `exit code ${fmt.status}`
+      console.warn(`[typedoc-versioned] dprint fmt failed (${reason}); generated docs may be unformatted.`)
+    }
+  }
 } finally {
   rmSync(tmpConfig, { force: true })
 }

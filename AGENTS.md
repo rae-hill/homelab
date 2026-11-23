@@ -181,6 +181,9 @@ dprint for TS/JS/JSON/Markdown/TOML/CSS/HTML/YAML/Astro, pinned nixfmt for `.nix
 (`nix-config/home-configs/jacob-nixos.nix` → `programs.opencode.settings.formatter`).
 Do not run formatters manually. Bulk/non-harness fallback: `fmt [paths]` (devshell) and
 `nix run .#nixfmt -- <file>` — never against `repos/`.
+The harness only formats files it edits itself — shell-generated output (e.g. TypeDoc docs;
+`scripts/typedoc-versioned.mjs` self-formats) bypasses it, and `--no-verify` commits skip the
+hook's repo-wide `fmt .`. The `formatting` check below catches anything that slipped through.
 
 Run from the repo root after making changes:
 
@@ -190,6 +193,7 @@ yarn lint
 yarn typecheck
 yarn test
 nix build .#checks.x86_64-linux.shellcheck    # ShellCheck gate for shell scripts
+nix build .#checks.x86_64-linux.formatting    # repo-wide dprint gate (catches unformatted --no-verify commits)
 ```
 
 e2e tests (`homelab-e2e-tests`): use the devshell `e2e` command (wraps `scripts/e2e.sh`) —
