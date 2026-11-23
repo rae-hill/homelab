@@ -1,7 +1,7 @@
+import { defineConfig } from "@rspress/core"
 import { readdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { defineConfig } from "@rspress/core"
 
 const here = dirname(fileURLToPath(import.meta.url))
 

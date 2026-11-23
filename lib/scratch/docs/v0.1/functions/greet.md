@@ -1,6 +1,6 @@
 [**@rae-hill/scratch**](../README.md)
 
-***
+---
 
 [@rae-hill/scratch](../README.md) / greet
 
@@ -31,5 +31,5 @@ An exclamation-laden greeting.
 ```ts
 import { greet } from "@rae-hill/scratch"
 
-greet("world") //=> "Hello, world!"
+greet("world") // => "Hello, world!"
 ```

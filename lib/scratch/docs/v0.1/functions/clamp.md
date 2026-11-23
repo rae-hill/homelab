@@ -1,6 +1,6 @@
 [**@rae-hill/scratch**](../README.md)
 
-***
+---
 
 [@rae-hill/scratch](../README.md) / clamp
 
@@ -43,5 +43,5 @@ Upper bound.
 ```ts
 import { clamp } from "@rae-hill/scratch"
 
-clamp(15, 0, 10) //=> 10
+clamp(15, 0, 10) // => 10
 ```

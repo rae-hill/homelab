@@ -1,6 +1,6 @@
 [**@rae-hill/scratch**](../README.md)
 
-***
+---
 
 [@rae-hill/scratch](../README.md) / sum
 
@@ -31,5 +31,5 @@ The total (0 for an empty list).
 ```ts
 import { sum } from "@rae-hill/scratch"
 
-sum([1, 2, 3]) //=> 6
+sum([1, 2, 3]) // => 6
 ```

@@ -9,10 +9,10 @@ Publishing with provenance.
 ```ts
 import { clamp, greet, slugify, sum } from "@rae-hill/scratch"
 
-greet("world") //=> "Hello, world!"
-slugify("Crème Brûlée — Recipe!") //=> "creme-brulee-recipe"
-clamp(15, 0, 10) //=> 10
-sum([1, 2, 3]) //=> 6
+greet("world") // => "Hello, world!"
+slugify("Crème Brûlée — Recipe!") // => "creme-brulee-recipe"
+clamp(15, 0, 10) // => 10
+sum([1, 2, 3]) // => 6
 ```
 
 ## Development (inside this monorepo)

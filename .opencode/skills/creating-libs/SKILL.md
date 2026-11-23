@@ -9,16 +9,16 @@ Scaffold a new publishable ESM-only library under `lib/` from the canonical temp
 
 ## Overview
 
-| Aspect | Detail |
-| --- | --- |
-| Location | `lib/<name>` → publishes to npm as `@rae-hill/<name>` |
-| Build | **RsLib** bundleless ESM + `.d.ts` into `dist/` (publint + arethetypeswrong on every build) |
-| Types | Solution tsconfig pattern: `tsconfig.json` (references src + test) |
-| Tests | **Vitest** (merges `../../vitest.shared.js`) |
-| Linting | Root `eslint.config.mjs`; ignores `dist`, `doc_build`, `docs`, `yarn/**` |
-| Docs | **TypeDoc** → committed markdown in `docs/v<major>.<minor>/`; **RsPress v2** → gitignored HTML in `doc_build/` |
+| Aspect   | Detail                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Location | `lib/<name>` → publishes to npm as `@rae-hill/<name>`                                                                            |
+| Build    | **RsLib** bundleless ESM + `.d.ts` into `dist/` (publint + arethetypeswrong on every build)                                      |
+| Types    | Solution tsconfig pattern: `tsconfig.json` (references src + test)                                                               |
+| Tests    | **Vitest** (merges `../../vitest.shared.js`)                                                                                     |
+| Linting  | Root `eslint.config.mjs`; ignores `dist`, `doc_build`, `docs`, `yarn/**`                                                         |
+| Docs     | **TypeDoc** → committed markdown in `docs/v<major>.<minor>/`; **RsPress v2** → gitignored HTML in `doc_build/`                   |
 | Releases | **multi-semantic-release** per lib → `yarn npm publish` via **OIDC Trusted Publishing** + **provenance** (no NPM_TOKEN anywhere) |
-| Version | Starts `0.1.0`; thereon owned entirely by semantic-release |
+| Version  | Starts `0.1.0`; thereon owned entirely by semantic-release                                                                       |
 
 `packages/*` = private apps (never published). `lib/*` = publishable libs.
 
@@ -49,6 +49,7 @@ lib/<name>/
 ```
 
 **File-specific notes:**
+
 - **package.json**: Change `name` to `@rae-hill/<name>`, update `version` to `0.1.0`, write a one-line `description`, update `repository.directory` to `lib/<name>`, change `repository.url` to `git+https://github.com/rae-hill/homelab.git`. All other fields (exports, publishConfig.exports, devDependencies, scripts) copy verbatim.
 - **src/index.ts**: Start with JSDoc `@packageDocumentation` block. Each exported function gets full TSDoc: `@param`, `@returns`, `@example` with `import { ... } from "@rae-hill/<name>"`.
 - **test/<name>.test.ts**: Import from `../src/<name>.js` (extension required in ESM). Group tests by describe block per exported function.
@@ -60,16 +61,16 @@ lib/<name>/
 
 ## Hard Rules
 
-| Rule | Rationale |
-| --- | --- |
-| **ESM-only** | `"type": "module"`, `.js` extensions in imports |
-| **`workspace:^` for lib→lib deps** | Yarn links locally, rewrites to `^<version>` at pack time; plain semver flips to registry resolution |
-| **Never depend on `packages/*`** | Private app territory; must not pull in apps |
-| **`publishConfig.provenance: true`** | Sigstore provenance on `yarn npm publish` |
-| **`repository.url` exact match** | Provenance verification rejects mismatched URLs (`git+https://github.com/rae-hill/homelab.git`) |
-| **`repository.directory` = `lib/<name>`** | Provenance requires matching directory |
-| **`files: ["dist"]`** | Berry includes README/LICENSE automatically |
-| **`yarn npm publish` only** | Applies publishConfig.swap + workspace rewrite; `npm publish` does neither |
+| Rule                                      | Rationale                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **ESM-only**                              | `"type": "module"`, `.js` extensions in imports                                                      |
+| **`workspace:^` for lib→lib deps**        | Yarn links locally, rewrites to `^<version>` at pack time; plain semver flips to registry resolution |
+| **Never depend on `packages/*`**          | Private app territory; must not pull in apps                                                         |
+| **`publishConfig.provenance: true`**      | Sigstore provenance on `yarn npm publish`                                                            |
+| **`repository.url` exact match**          | Provenance verification rejects mismatched URLs (`git+https://github.com/rae-hill/homelab.git`)      |
+| **`repository.directory` = `lib/<name>`** | Provenance requires matching directory                                                               |
+| **`files: ["dist"]`**                     | Berry includes README/LICENSE automatically                                                          |
+| **`yarn npm publish` only**               | Applies publishConfig.swap + workspace rewrite; `npm publish` does neither                           |
 
 ## Registration
 
@@ -80,11 +81,11 @@ libs typecheck via their own solution tsconfigs through repo-wide `yarn typechec
 
 ## Docs Workflow
 
-| Command | Effect | Output | Git status |
-| --- | --- | --- | --- |
-| `yarn docs` | TypeDoc via `scripts/typedoc-versioned.mjs` | Markdown → `docs/v<major>.<minor>/` | **COMMITTED** |
-| `yarn docs:dev` | RsPress live-reload server | HTML → `doc_build/` | gitignored |
-| `yarn docs:site` | RsPress static build | HTML → `doc_build/` | gitignored |
+| Command          | Effect                                      | Output                              | Git status    |
+| ---------------- | ------------------------------------------- | ----------------------------------- | ------------- |
+| `yarn docs`      | TypeDoc via `scripts/typedoc-versioned.mjs` | Markdown → `docs/v<major>.<minor>/` | **COMMITTED** |
+| `yarn docs:dev`  | RsPress live-reload server                  | HTML → `doc_build/`                 | gitignored    |
+| `yarn docs:site` | RsPress static build                        | HTML → `doc_build/`                 | gitignored    |
 
 `typedoc-versioned.mjs` reads `package.json` version for output folder. RsPress `multiVersion` scans `docs/` at config time — new minor folders auto-appear in the dropdown without config churn. `_meta.json` per version controls sidebars. HTML is never committed.
 
@@ -92,12 +93,12 @@ libs typecheck via their own solution tsconfigs through repo-wide `yarn typechec
 
 ## Release Mechanics
 
-| Conventional commit | Bump at 0.x | Bump at ≥1.x |
-| --- | --- | --- |
-| `fix:`, `perf:` | patch | patch |
-| `feat:` | minor | minor |
-| `BREAKING CHANGE:` | **1.0.0** (semrel refuses 0.x breaking→minor) | major |
-| Non-conventional | No release | No release |
+| Conventional commit | Bump at 0.x                                   | Bump at ≥1.x |
+| ------------------- | --------------------------------------------- | ------------ |
+| `fix:`, `perf:`     | patch                                         | patch        |
+| `feat:`             | minor                                         | minor        |
+| `BREAKING CHANGE:`  | **1.0.0** (semrel refuses 0.x breaking→minor) | major        |
+| Non-conventional    | No release                                    | No release   |
 
 Per-lib artifacts: CHANGELOG.md, GitHub Release, release commit pushed back to `main`, tag
 `@rae-hill/<name>@<version>` (MSR default `${name}@${version}` — no `v`; confirm in the dry-run

@@ -1,6 +1,6 @@
 [**@rae-hill/scratch**](../README.md)
 
-***
+---
 
 [@rae-hill/scratch](../README.md) / slugify
 
@@ -34,5 +34,5 @@ The slug (empty string when nothing alphanumeric remains).
 ```ts
 import { slugify } from "@rae-hill/scratch"
 
-slugify("Crème Brûlée — Recipe!") //=> "creme-brulee-recipe"
+slugify("Crème Brûlée — Recipe!") // => "creme-brulee-recipe"
 ```
