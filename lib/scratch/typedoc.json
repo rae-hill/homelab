@@ -7,5 +7,7 @@
   "readme": "none",
   "excludePrivate": true,
   "excludeInternal": true,
-  "gitRevision": "main"
+  "gitRevision": "main",
+  "disableGit": true,
+  "sourceLinkTemplate": "https://github.com/rae-hill/homelab/blob/{gitRevision}/lib/scratch/src/{path}#L{line}"
 }

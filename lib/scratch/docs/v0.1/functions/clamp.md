@@ -8,7 +8,7 @@
 
 > **clamp**(`value`, `min`, `max`): `number`
 
-Defined in: index.ts:65
+Defined in: [index.ts:65](https://github.com/rae-hill/homelab/blob/main/lib/scratch/src/index.ts#L65)
 
 Clamps `value` into the inclusive range `[min, max]`.
 

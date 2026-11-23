@@ -8,7 +8,7 @@
 
 > **sum**(`values`): `number`
 
-Defined in: index.ts:80
+Defined in: [index.ts:80](https://github.com/rae-hill/homelab/blob/main/lib/scratch/src/index.ts#L80)
 
 Sums a list of numbers.
 

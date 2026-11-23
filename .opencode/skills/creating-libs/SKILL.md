@@ -34,7 +34,9 @@ lib/<name>/
 ├── test/<name>.test.ts             # vitest tests
 ├── package.json                    # name @rae-hill/<name>; version 0.1.0; description changed; export paths unchanged
 ├── rslib.config.ts                 # COPY VERBATIM from lib/scratch (TODO about generate-exports stays)
-├── typedoc.json                    # COPY VERBATIM (entryPoints: ["src/index.ts"])
+├── typedoc.json                    # COPY; update the sourceLinkTemplate path segment to lib/<name>/src
+│                                   #   (entryPoints: ["src/index.ts"]; disableGit+template keep docs byte-identical
+│                                   #   across worktrees/main/CI — see the Docs note below)
 ├── rspress.config.ts               # title: "@rae-hill/<name>" (rest verbatim)
 ├── tsconfig.json                   # solution file; references tsconfig.src.json + tsconfig.test.json
 ├── tsconfig.src.json               # COPY VERBATIM (extends ../../tsconfig.base.json; include src)
@@ -88,6 +90,8 @@ libs typecheck via their own solution tsconfigs through repo-wide `yarn typechec
 | `yarn docs:site` | RsPress static build                        | HTML → `doc_build/`                 | gitignored    |
 
 `typedoc-versioned.mjs` reads `package.json` version for output folder. RsPress `multiVersion` scans `docs/` at config time — new minor folders auto-appear in the dropdown without config churn. `_meta.json` per version controls sidebars. HTML is never committed.
+
+**Source links are environment-independent (do not remove these keys).** TypeDoc normally infers GitHub source links from git, but its repo discovery `stat()`s `.git` and requires a _directory_ — in linked worktrees (every agent worktree) `.git` is a gitlink file, so `Defined in:` renders as plain text there while the main checkout and CI (`actions/checkout`) render links: regenerated docs flip-flopped by generation site. Each lib's typedoc.json therefore pins link output: `"disableGit": true` + `"gitRevision": "main"` + explicit `"sourceLinkTemplate"` (`.../blob/{gitRevision}/lib/<name>/src/{path}#L{line}` — `{path}` is relative to the entry points' common directory, i.e. `src/`). Regeneration is byte-identical in every environment.
 
 **Pre-commit hook** (`libRefresh` in `lint-staged.config.js`) runs build + docs and stages docs when staged files touch `lib/<name>/{src,test,**}` or `{package.json,typedoc.json,rslib.config.ts,rspress.config.ts,vitest.config.ts}`. Human commits rely on this. **Agents with `--no-verify` MUST manually run both steps and `git add lib/<name>/docs` before committing.**
 

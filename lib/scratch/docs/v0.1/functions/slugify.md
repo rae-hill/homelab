@@ -8,7 +8,7 @@
 
 > **slugify**(`input`): `string`
 
-Defined in: index.ts:41
+Defined in: [index.ts:41](https://github.com/rae-hill/homelab/blob/main/lib/scratch/src/index.ts#L41)
 
 Converts arbitrary text into a URL-friendly slug.
 
