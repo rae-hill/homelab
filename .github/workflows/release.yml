@@ -15,7 +15,7 @@ on:
       - "scripts/typedoc-versioned.mjs"
       - "release.config.js"
       - ".github/workflows/release.yml"
-      - ".github/actions/setup/action.yml"
+      - ".github/actions/setup/**"
 
 concurrency:
   group: release
