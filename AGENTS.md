@@ -231,6 +231,34 @@ git commit --no-verify -m "..."
 - Usual guardrails apply: only commit when asked, stage specific files, don't push to `main`
   unless permitted, flag secret-bearing files.
 
+### Shared-repo git safety (multiple agents + worktrees)
+
+Several agents work this repo concurrently from `~/.local/share/opencode/worktree/*`, and the
+human works in the primary checkout. History loss has already happened twice (2026-11-22:
+a debugging agent rewound `main` instead of diagnosing; then `fetch --unshallow
+--update-head-ok` force-synced the checked-out `main` back to a stale `origin/main`). Rules:
+
+- **Push after landing on `main`.** An unpushed `main` is the hazard: any
+  `fetch --update-head-ok` or `+refs/heads/main:refs/heads/main` refspec re-anchors local
+  history to the stale remote. Pushing needs permission — ASK, don't assume; if the owner
+  declines, say plainly that `main` is unpushed and why that is fragile.
+- **Never move a branch that another worktree has checked out.** No `--update-head-ok`, no
+  `git branch -f main`, no `git update-ref refs/heads/main` from a linked worktree. To
+  unshallow, use plain `git fetch --unshallow` (it touches only remote-tracking refs).
+- **Rewinding is not debugging.** Never `reset` `main` to an older commit to "see if my
+  change caused it" — that destroys concurrent work. Diagnose read-only: `git bisect`,
+  `git stash`, or a throwaway `git worktree add --detach <dir> <rev>` you can delete.
+  A `git reset` on shared `main` requires explicit owner permission.
+- **Recovery when history looks wrong:** the objects are almost certainly still there — check
+  `git reflog show main` before doing ANYTHING. Compare the on-disk state to a known commit by
+  tree hash (stage everything into a throwaway `GIT_INDEX_FILE`, `git write-tree`, compare);
+  when they match, `git reset --hard <good-commit>` restores history with zero content change.
+  Tag a snapshot first (`git commit-tree` + `git tag`) so nothing is unreachable.
+- **Verify before you report green.** `nix build .#pkg` succeeding does NOT mean a host config
+  evaluates — the `services.homelab-api.pkg` lambda bug (docs/mkpackageoption-lambda-bug.md)
+  survived months exactly that way. Eval the hosts you touched; `nix flake check` runs the
+  `option-decls` check that forces every option declaration.
+
 ## Skill Index (detailed, loads on demand)
 
 | Skill                 | Use when                                                                                                                   |

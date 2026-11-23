@@ -41,3 +41,47 @@ Because an **agent always runs its own checks** before committing (see
   agent's own commits bypass it via the flag.
 - All the usual commit/push guardrails still apply (no committing unless asked, stage
   specific files, don't push to `main` unless permitted, flag secret-bearing files).
+
+## Shared-repo safety: `main`, worktrees, and concurrent agents
+
+Multiple agents work this repo at once from opencode worktrees
+(`~/.local/share/opencode/worktree/*`) while the human works in the primary checkout.
+Local `main` history has been destroyed twice (2026-11-22): once by an agent that rewound
+`main` while debugging instead of diagnosing, once by
+`git fetch --unshallow --update-head-ok` force-syncing the CHECKED-OUT `main` back to a
+stale `origin/main` (nothing had been pushed, so the remote was ~20 commits behind).
+
+### Rules
+
+- **Push after landing on `main`** (with permission — ask). An unpushed `main` is the
+  hazard: the remote becomes an anchor that drags history backwards on any
+  force-updating fetch, unshallow, or fresh clone.
+- **Never force-update a branch another worktree has checked out**: no
+  `--update-head-ok`, no `+refs/heads/main:refs/heads/main` fetch refspecs, no
+  `git branch -f main` / `git update-ref refs/heads/main` from a linked worktree.
+  Plain `git fetch --unshallow` is safe (remote-tracking refs only).
+- **Rewinding is not debugging.** Never `git reset` shared `main` to an older commit to
+  test a hypothesis — use `git bisect`, `git stash`, or a disposable
+  `git worktree add --detach <dir> <rev>`. Any `reset` on `main` needs the owner's
+  explicit permission.
+- **Commits you don't recognize are someone else's work.** Assume other agents have
+  landed commits since you last looked; re-read `git log` / `git status` before any
+  history operation.
+
+### Recovery playbook (when `main` looks rewound or files are mysteriously staged)
+
+1. **Don't commit the blob, don't clean, don't reset yet.** Inspect first:
+   `git reflog show main` + `git reflog` — the lost tip is virtually always still there.
+2. **Compare disk to candidate commits by TREE HASH**, not by eyeball:
+   ```sh
+   GIT_INDEX_FILE=/tmp/idx git read-tree --empty   # throwaway index
+   GIT_INDEX_FILE=/tmp/idx git add -A
+   GIT_INDEX_FILE=/tmp/idx git write-tree          # compare vs `git rev-parse <commit>^{tree}`
+   ```
+3. **Snapshot before surgery** so nothing becomes unreachable:
+   `git branch backup-main-<date> <lost-tip>` and/or
+   `git tag pre-restore-snapshot-<date> $(git commit-tree <tree> -p HEAD -m "snapshot")`.
+4. If disk == a known-good commit's tree: `git reset --hard <good-commit>` restores full
+   history and changes nothing on disk. If commits must be replayed, `git rebase --onto`
+   in a scratch worktree keeps the dirty main checkout untouched.
+5. Re-validate after restoring (flake check, host evals, lint/test) — and then PUSH.
