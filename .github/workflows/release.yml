@@ -33,7 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # Full history + tags: semantic-release computes releases from the log.
+      # The runner resolves path-local actions (`uses: ./.github/...`) from the
+      # workspace, so the repo must be checked out BEFORE the setup action can
+      # run — the action's own internal checkout can never bootstrap it. Same
+      # pattern as every ci.yml job. Setup then re-checks-out with fetch-depth
+      # "0" (full history + tags): semantic-release computes releases from the
+      # log.
+      - uses: actions/checkout@v4
       - name: Install dependencies
         uses: ./.github/actions/setup
         with:
