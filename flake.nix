@@ -154,6 +154,16 @@
                   dprint
                   yarn-berry
                   nodejs_26
+                  # Node >=25 no longer ships corepack, but tooling still spawns
+                  # it (e.g. rsbuild-plugin-arethetypeswrong runs `corepack yarn
+                  # pack` in yarn-berry workspaces). Strip corepack's own
+                  # yarn/pnpm shims so they don't collide with yarn-berry in the
+                  # devshell buildEnv (`corepack yarn` manages its own copy).
+                  (pkgs.runCommand "corepack-no-shims" { } ''
+                    cp -r ${pkgs.corepack} $out
+                    chmod -R u+w $out
+                    rm -f $out/bin/yarn $out/bin/yarnpkg $out/bin/pnpm $out/bin/pnpx
+                  '')
                   yarn-berry_4-fetcher.yarn-berry-fetcher
                   typescript
                   typescript-language-server
@@ -173,6 +183,12 @@
                 {
                   name = "DPRINT_CACHE_DIR";
                   value = "/home/jacob/.cache/dprint";
+                }
+                {
+                  # Non-interactive corepack downloads (it otherwise prompts on
+                  # first `corepack yarn ...` per pinned packageManager version).
+                  name = "COREPACK_ENABLE_DOWNLOAD_PROMPT";
+                  value = "0";
                 }
                 {
                   name = "CHROME_EXECUTABLE";

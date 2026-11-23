@@ -1,6 +1,7 @@
 {
   "name": "homelab-server",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Effect-ts Bun HTTP Server implementation for homelab services",

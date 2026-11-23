@@ -1,3 +1,24 @@
+// Publishable libs (lib/* → @rae-hill/*): rebuild via RsLib (the build runs
+// publint + arethetypeswrong checks, so publish-readiness is validated here)
+// and regenerate the versioned TypeDoc markdown, staging it so committed docs
+// always match the code in the same commit. Agents committing with
+// --no-verify must run `yarn workspace @rae-hill/<name> build` + `docs` and
+// `git add lib/<name>/docs` themselves (see the creating-libs skill).
+const libRefresh = (files) => {
+  const names = new Set()
+  for (const f of files) {
+    const match = f.match(/\/lib\/([^/]+)\//)
+    if (match) names.add(match[1])
+  }
+  const cmds = []
+  for (const name of names) {
+    cmds.push(`yarn workspace @rae-hill/${name} build`)
+    cmds.push(`yarn workspace @rae-hill/${name} docs`)
+    cmds.push(`git add lib/${name}/docs`)
+  }
+  return cmds
+}
+
 export default {
   "*": (files) => {
     const cmds = ["fmt ."]
@@ -27,6 +48,8 @@ export default {
     () => "yarn lint",
     () => "yarn typecheck",
   ],
+  "lib/*/{src,test}/**": libRefresh,
+  "lib/*/{package.json,typedoc.json,rslib.config.ts,rspress.config.ts,vitest.config.ts}": libRefresh,
   // Exclude vendored submodules under repos/ — those are read-only upstream sources
   // and must never be reformatted by nixfmt (mirrors dprint.json's `repos/*` exclude).
   // Invoke nixfmt via `nix run .#nixfmt` so the hook uses the SAME pinned nixfmt as

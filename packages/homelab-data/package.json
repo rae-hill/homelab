@@ -1,18 +1,10 @@
 {
   "name": "homelab-data",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Data structures and utilities for homelab services",
-  "repository": {
-    "type": "git",
-    "url": "<PLACEHOLDER>",
-    "directory": "packages/homelab-data"
-  },
-  "publishConfig": {
-    "access": "public",
-    "directory": "dist"
-  },
   "exports": {
     ".": {
       "import": "./src/index.ts"

@@ -1,6 +1,7 @@
 {
   "name": "homelab-services-browser",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "license": "MIT",
   "description": "Browser runtime service layer implementations for homelab (localStorage-backed tailor entry store + preset snapshot)",

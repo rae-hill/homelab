@@ -7,6 +7,9 @@ result
 tmp/
 dist/
 build/
+doc_build/
+.rspress/
+.typedoc-versioned.json
 !scratchpad/tsconfig.json
 .direnv/
 .idea/

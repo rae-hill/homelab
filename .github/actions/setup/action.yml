@@ -1,10 +1,17 @@
 name: Setup
 description: Perform standard setup and install dependencies using yarn.
+inputs:
+  fetch-depth:
+    description: Depth passed to actions/checkout. Use "0" (full history + tags) for jobs that analyze git history, e.g. semantic-release.
+    required: false
+    default: "1"
 runs:
   using: composite
   steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
     - name: Install Yarn
       shell: bash
       run: corepack enable

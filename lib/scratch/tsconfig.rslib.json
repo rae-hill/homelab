@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "types": [],
+    "composite": false,
+    "declaration": true,
+    "declarationDir": "dist",
+    "emitDeclarationOnly": true,
+    "tsBuildInfoFile": ".tsbuildinfo/rslib.tsbuildinfo"
+  }
+}
