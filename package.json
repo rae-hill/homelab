@@ -25,7 +25,7 @@
   "devDependencies": {
     "@anolilab/multi-semantic-release": "4.6.3",
     "@babel/cli": "^7.28.6",
-    "@babel/core": "^7.29.0",
+    "@babel/core": "^7.29.6",
     "@babel/plugin-transform-export-namespace-from": "^7.27.1",
     "@babel/plugin-transform-modules-commonjs": "^7.28.6",
     "@effect/build-utils": "^0.8.9",
@@ -62,7 +62,7 @@
     "typescript-eslint": "8.60.0"
   },
   "dependencies": {
-    "fast-xml-parser": "^5.3.7"
+    "fast-xml-parser": "^5.12.0"
   },
   "resolutions": {
     "@astrojs/solid-js@npm:6.0.1/solid-devtools": "0.34.5"
