@@ -16,10 +16,10 @@
     "test:staged": "echo 'No tests for homelab-frontend'"
   },
   "dependencies": {
-    "@astrojs/solid-js": "^6.0.1",
+    "@astrojs/solid-js": "^7.1.2",
     "@kobalte/core": "patch:@kobalte/core@npm%3A0.13.11#~/.yarn/patches/@kobalte-core-npm-0.13.11-288fc5fdf4.patch",
     "@nanostores/solid": "^1.1.1",
-    "astro": "^6.4.2",
+    "astro": "^7.4.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "effect": "^4.1.x",
